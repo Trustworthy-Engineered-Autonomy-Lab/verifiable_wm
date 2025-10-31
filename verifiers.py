@@ -1,6 +1,3 @@
-from models import PenController, PenDecoder
-from models import MCController, MCDecoder
-
 from StarV.layer.FullyConnectedLayer import FullyConnectedLayer
 from StarV.layer.ConvTranspose2DLayer import ConvTranspose2DLayer
 from StarV.layer.ReLULayer import ReLULayer
@@ -28,23 +25,72 @@ class Verifer(ABC):
     def verify_single_cell(self, cell: Dict, num_steps: int = 20) -> bool:
         pass
 
-# ============ Pendulum Neural Network Verifier ============
-class Pendulum(Verifer):
-    """StarV-based Neural Network Verification for Pendulum System"""
-
-    def __init__(self, decoder_path: str, controller_path: str, goal_angle_threshold = 0.15):
-
-        self.decoder_weights = torch.load(decoder_path, map_location="cpu", weights_only=True)
+class PenController:
+    def __init__(self, controller_path: str):
         self.controller_weights = torch.load(controller_path, map_location="cpu", weights_only=True)
 
-        self.goal_angle_threshold = goal_angle_threshold
+    def verify(self, image_star: ImageStar) -> Star:
+        """Verify controller network and return action Star"""
+        # Conv1 + ReLU
+        w_conv1 = self.controller_weights['conv1.weight'].cpu().numpy()
+        b_conv1 = self.controller_weights['conv1.bias'].cpu().numpy()
+        w_conv1 = np.transpose(w_conv1, (2, 3, 1, 0))
+        L_conv1 = Conv2DLayer([w_conv1, b_conv1], [2, 2], [1, 1, 1, 1], [1, 1])
+        R_conv1 = L_conv1.reach([image_star])
+        IM_conv1 = R_conv1[0]
 
-    def angle_normalize(self, x):
-        """Normalize angle to [-π, π] range"""
-        return ((x + np.pi) % (2 * np.pi)) - np.pi
+        IM_conv1_star = IM_conv1.toStar()
+        L_relu_conv1 = ReLULayer()
+        R_relu_conv1 = L_relu_conv1.reach(IM_conv1_star, method='approx')
+        IM_relu_conv1 = R_relu_conv1.toImageStar(image_shape=(48, 48, 4))
 
-    def verify_decoder(self, theta_min: float, theta_max: float,
-                       omega_min: float, omega_max: float) -> ImageStar:
+        # Conv2 + ReLU
+        w_conv2 = self.controller_weights['conv2.weight'].cpu().numpy()
+        b_conv2 = self.controller_weights['conv2.bias'].cpu().numpy()
+        w_conv2 = np.transpose(w_conv2, (2, 3, 1, 0))
+        L_conv2 = Conv2DLayer([w_conv2, b_conv2], [2, 2], [1, 1, 1, 1], [1, 1])
+        R_conv2 = L_conv2.reach([IM_relu_conv1])
+        IM_conv2 = R_conv2[0]
+
+        IM_conv2_star = IM_conv2.toStar()
+        L_relu_conv2 = ReLULayer()
+        R_relu_conv2 = L_relu_conv2.reach(IM_conv2_star, method='approx')
+
+        # FC1 + ReLU
+        Wc1 = self.controller_weights["fc1.weight"].cpu().numpy()
+        bc1 = self.controller_weights["fc1.bias"].cpu().numpy()
+        L_fc_c1 = FullyConnectedLayer([Wc1, bc1])
+        R_fc_c1 = L_fc_c1.reach([R_relu_conv2])
+        star_fc_c1 = R_fc_c1[0]
+
+        L_relu_fc1 = ReLULayer()
+        R_relu_fc1 = L_relu_fc1.reach(star_fc_c1, method='approx')
+
+        # FC2
+        Wc2 = self.controller_weights["fc2.weight"].cpu().numpy()
+        bc2 = self.controller_weights["fc2.bias"].cpu().numpy()
+        L_fc_c2 = FullyConnectedLayer([Wc2, bc2])
+        R_fc_c2 = L_fc_c2.reach([R_relu_fc1])
+        star_fc_c2 = R_fc_c2[0]
+
+        # Tanh activation
+        L_tanh = TanSigLayer()
+        IM_tanh = L_tanh.reach(star_fc_c2, method='approx', RF=0.0)
+
+        # Scale action by 2
+        d = IM_tanh.dim
+        A = 2.0 * np.eye(d, dtype=np.float32)
+        b = np.zeros(d, dtype=np.float32)
+        IM_action = IM_tanh.affineMap(A, b)
+
+        return IM_action 
+    
+class PenDecoder:
+    def __init__(self, decoder_path: str):
+        self.decoder_weights = torch.load(decoder_path, map_location="cpu", weights_only=True)
+
+    def verify(self, theta_min: float, theta_max: float,
+               omega_min: float, omega_max: float) -> ImageStar:
         """Verify decoder network using StarV framework"""
         lb = np.array([theta_min, omega_min], dtype=np.float32)
         ub = np.array([theta_max, omega_max], dtype=np.float32)
@@ -116,61 +162,20 @@ class Pendulum(Verifer):
 
         return IM_satlin
 
-    def verify_controller(self, image_star: ImageStar) -> Star:
-        """Verify controller network and return action Star"""
-        # Conv1 + ReLU
-        w_conv1 = self.controller_weights['conv1.weight'].cpu().numpy()
-        b_conv1 = self.controller_weights['conv1.bias'].cpu().numpy()
-        w_conv1 = np.transpose(w_conv1, (2, 3, 1, 0))
-        L_conv1 = Conv2DLayer([w_conv1, b_conv1], [2, 2], [1, 1, 1, 1], [1, 1])
-        R_conv1 = L_conv1.reach([image_star])
-        IM_conv1 = R_conv1[0]
+# ============ Pendulum Neural Network Verifier ============
+class Pendulum(Verifer):
+    """StarV-based Neural Network Verification for Pendulum System"""
 
-        IM_conv1_star = IM_conv1.toStar()
-        L_relu_conv1 = ReLULayer()
-        R_relu_conv1 = L_relu_conv1.reach(IM_conv1_star, method='approx')
-        IM_relu_conv1 = R_relu_conv1.toImageStar(image_shape=(48, 48, 4))
+    def __init__(self, decoder_path: str, controller_path: str, goal_angle_threshold = 0.15):
+        # Create the controller and decoder
+        self.controller = PenController(controller_path)
+        self.decoder = PenDecoder(decoder_path)
+        self.goal_angle_threshold = goal_angle_threshold
 
-        # Conv2 + ReLU
-        w_conv2 = self.controller_weights['conv2.weight'].cpu().numpy()
-        b_conv2 = self.controller_weights['conv2.bias'].cpu().numpy()
-        w_conv2 = np.transpose(w_conv2, (2, 3, 1, 0))
-        L_conv2 = Conv2DLayer([w_conv2, b_conv2], [2, 2], [1, 1, 1, 1], [1, 1])
-        R_conv2 = L_conv2.reach([IM_relu_conv1])
-        IM_conv2 = R_conv2[0]
-
-        IM_conv2_star = IM_conv2.toStar()
-        L_relu_conv2 = ReLULayer()
-        R_relu_conv2 = L_relu_conv2.reach(IM_conv2_star, method='approx')
-
-        # FC1 + ReLU
-        Wc1 = self.controller_weights["fc1.weight"].cpu().numpy()
-        bc1 = self.controller_weights["fc1.bias"].cpu().numpy()
-        L_fc_c1 = FullyConnectedLayer([Wc1, bc1])
-        R_fc_c1 = L_fc_c1.reach([R_relu_conv2])
-        star_fc_c1 = R_fc_c1[0]
-
-        L_relu_fc1 = ReLULayer()
-        R_relu_fc1 = L_relu_fc1.reach(star_fc_c1, method='approx')
-
-        # FC2
-        Wc2 = self.controller_weights["fc2.weight"].cpu().numpy()
-        bc2 = self.controller_weights["fc2.bias"].cpu().numpy()
-        L_fc_c2 = FullyConnectedLayer([Wc2, bc2])
-        R_fc_c2 = L_fc_c2.reach([R_relu_fc1])
-        star_fc_c2 = R_fc_c2[0]
-
-        # Tanh activation
-        L_tanh = TanSigLayer()
-        IM_tanh = L_tanh.reach(star_fc_c2, method='approx', RF=0.0)
-
-        # Scale action by 2
-        d = IM_tanh.dim
-        A = 2.0 * np.eye(d, dtype=np.float32)
-        b = np.zeros(d, dtype=np.float32)
-        IM_action = IM_tanh.affineMap(A, b)
-
-        return IM_action
+    def angle_normalize(self, x):
+        """Normalize angle to [-π, π] range"""
+        return ((x + np.pi) % (2 * np.pi)) - np.pi
+    
 
     def verify_single_step(self, theta_bound: Sequence[float], omega_bound: Sequence[float]) -> Dict:
         """
@@ -184,10 +189,10 @@ class Pendulum(Verifer):
         theta_min, theta_max = theta_bound
         omega_min, omega_max = omega_bound
         # Verify decoder
-        image_star = self.verify_decoder(*theta_bound, *omega_bound)
+        image_star = self.decoder.verify(*theta_bound, *omega_bound)
 
         # Verify controller and get action Star
-        IM_action = self.verify_controller(image_star)
+        IM_action = self.controller.verify(image_star)
         x_min, x_max = IM_action.getRanges(lp_solver='gurobi')
 
         # Compute sin(theta) using SinLayer
@@ -287,27 +292,70 @@ class Pendulum(Verifer):
         return reached_goal
     
 # ============ StarV Neural Network Verifier ============
-class MountainCar(Verifer):
-    """StarV-based Neural Network Verification for Mountain Car System"""
-
-    def __init__(self, decoder_path: str, controller_path: str, goal_position_threshold = 0.6):
-
-        # Load pre-trained weights
-        self.decoder_weights = torch.load(decoder_path, map_location="cpu", weights_only=True)
+class MCController:
+    def __init__(self, controller_path: str):
         self.controller_weights = torch.load(controller_path, map_location="cpu", weights_only=True)
 
-        # Safety condition: BOTH min and max position >= 0.6
-        self.goal_position_threshold = goal_position_threshold
+    def verify(self, image_star: ImageStar) -> Tuple[float, float]:
+        """Verify controller network using StarV framework"""
+        # Conv1 + ReLU
+        w_conv1 = self.controller_weights['conv1.weight'].cpu().numpy()
+        b_conv1 = self.controller_weights['conv1.bias'].cpu().numpy()
+        w_conv1 = np.transpose(w_conv1, (2, 3, 1, 0))
+        L_conv1 = Conv2DLayer([w_conv1, b_conv1], [2, 2], [1, 1, 1, 1], [1, 1])
 
-        # Mountain Car dynamics constants
-        self.MIN_POS = -1.2
-        self.MAX_POS = 0.6
-        self.MAX_SPEED = 0.07
-        self.MIN_SPEED = -0.07
-        self.POWER = 0.0015
+        R_conv1 = L_conv1.reach([image_star])
+        IM_conv1 = R_conv1[0]
 
-    def verify_decoder(self, pos_min: float, pos_max: float,
-                       vel_min: float, vel_max: float) -> ImageStar:
+        IM_conv1_star = IM_conv1.toStar()
+        L_relu_conv1 = ReLULayer()
+        R_relu_conv1 = L_relu_conv1.reach(IM_conv1_star, method='approx')
+        IM_relu_conv1 = R_relu_conv1.toImageStar(image_shape=(48, 48, 4))
+
+        # Conv2 + ReLU
+        w_conv2 = self.controller_weights['conv2.weight'].cpu().numpy()
+        b_conv2 = self.controller_weights['conv2.bias'].cpu().numpy()
+        w_conv2 = np.transpose(w_conv2, (2, 3, 1, 0))
+        L_conv2 = Conv2DLayer([w_conv2, b_conv2], [2, 2], [1, 1, 1, 1], [1, 1])
+
+        R_conv2 = L_conv2.reach([IM_relu_conv1])
+        IM_conv2 = R_conv2[0]
+
+        IM_conv2_star = IM_conv2.toStar()
+        L_relu_conv2 = ReLULayer()
+        R_relu_conv2 = L_relu_conv2.reach(IM_conv2_star, method='approx')
+
+        # FC1 + ReLU
+        Wc1 = self.controller_weights["fc1.weight"].cpu().numpy()
+        bc1 = self.controller_weights["fc1.bias"].cpu().numpy()
+        L_fc_c1 = FullyConnectedLayer([Wc1, bc1])
+        R_fc_c1 = L_fc_c1.reach([R_relu_conv2])
+        star_fc_c1 = R_fc_c1[0]
+
+        L_relu_fc1 = ReLULayer()
+        R_relu_fc1 = L_relu_fc1.reach(star_fc_c1, method='approx')
+
+        # FC2
+        Wc2 = self.controller_weights["fc2.weight"].cpu().numpy()
+        bc2 = self.controller_weights["fc2.bias"].cpu().numpy()
+        L_fc_c2 = FullyConnectedLayer([Wc2, bc2])
+        R_fc_c2 = L_fc_c2.reach([R_relu_fc1])
+        star_fc_c2 = R_fc_c2[0]
+
+        # Tanh activation
+        L_tanh = TanSigLayer()
+        R_tanh = L_tanh.reach(star_fc_c2, method='approx', RF=0.0)
+
+        # Get action bounds
+        y_min, y_max = R_tanh.getRanges('gurobi')
+        return float(y_min[0]), float(y_max[0])
+    
+class MCDecoder:
+    def __init__(self, decoder_path: str):
+        self.decoder_weights = torch.load(decoder_path, map_location="cpu", weights_only=True)
+
+    def verify(self, pos_min: float, pos_max: float,
+               vel_min: float, vel_max: float) -> ImageStar:
         """Verify decoder network using StarV framework"""
         # Create input Star set
         lb = np.array([pos_min, vel_min], dtype=np.float32)
@@ -388,60 +436,25 @@ class MountainCar(Verifer):
 
         return IM_satlin
 
-    def verify_controller(self, image_star: ImageStar) -> Tuple[float, float]:
-        """Verify controller network using StarV framework"""
-        # Conv1 + ReLU
-        w_conv1 = self.controller_weights['conv1.weight'].cpu().numpy()
-        b_conv1 = self.controller_weights['conv1.bias'].cpu().numpy()
-        w_conv1 = np.transpose(w_conv1, (2, 3, 1, 0))
-        L_conv1 = Conv2DLayer([w_conv1, b_conv1], [2, 2], [1, 1, 1, 1], [1, 1])
 
-        R_conv1 = L_conv1.reach([image_star])
-        IM_conv1 = R_conv1[0]
+class MountainCar(Verifer):
+    """StarV-based Neural Network Verification for Mountain Car System"""
 
-        IM_conv1_star = IM_conv1.toStar()
-        L_relu_conv1 = ReLULayer()
-        R_relu_conv1 = L_relu_conv1.reach(IM_conv1_star, method='approx')
-        IM_relu_conv1 = R_relu_conv1.toImageStar(image_shape=(48, 48, 4))
+    def __init__(self, decoder_path: str, controller_path: str, goal_position_threshold = 0.6):
+        # Create the controller and decoder
+        self.controller = MCController(controller_path)
+        self.decoder = MCDecoder(decoder_path)
 
-        # Conv2 + ReLU
-        w_conv2 = self.controller_weights['conv2.weight'].cpu().numpy()
-        b_conv2 = self.controller_weights['conv2.bias'].cpu().numpy()
-        w_conv2 = np.transpose(w_conv2, (2, 3, 1, 0))
-        L_conv2 = Conv2DLayer([w_conv2, b_conv2], [2, 2], [1, 1, 1, 1], [1, 1])
+        # Safety condition: BOTH min and max position >= 0.6
+        self.goal_position_threshold = goal_position_threshold
 
-        R_conv2 = L_conv2.reach([IM_relu_conv1])
-        IM_conv2 = R_conv2[0]
-
-        IM_conv2_star = IM_conv2.toStar()
-        L_relu_conv2 = ReLULayer()
-        R_relu_conv2 = L_relu_conv2.reach(IM_conv2_star, method='approx')
-
-        # FC1 + ReLU
-        Wc1 = self.controller_weights["fc1.weight"].cpu().numpy()
-        bc1 = self.controller_weights["fc1.bias"].cpu().numpy()
-        L_fc_c1 = FullyConnectedLayer([Wc1, bc1])
-        R_fc_c1 = L_fc_c1.reach([R_relu_conv2])
-        star_fc_c1 = R_fc_c1[0]
-
-        L_relu_fc1 = ReLULayer()
-        R_relu_fc1 = L_relu_fc1.reach(star_fc_c1, method='approx')
-
-        # FC2
-        Wc2 = self.controller_weights["fc2.weight"].cpu().numpy()
-        bc2 = self.controller_weights["fc2.bias"].cpu().numpy()
-        L_fc_c2 = FullyConnectedLayer([Wc2, bc2])
-        R_fc_c2 = L_fc_c2.reach([R_relu_fc1])
-        star_fc_c2 = R_fc_c2[0]
-
-        # Tanh activation
-        L_tanh = TanSigLayer()
-        R_tanh = L_tanh.reach(star_fc_c2, method='approx', RF=0.0)
-
-        # Get action bounds
-        y_min, y_max = R_tanh.getRanges('gurobi')
-        return float(y_min[0]), float(y_max[0])
-
+        # Mountain Car dynamics constants
+        self.MIN_POS = -1.2
+        self.MAX_POS = 0.6
+        self.MAX_SPEED = 0.07
+        self.MIN_SPEED = -0.07
+        self.POWER = 0.0015
+    
     def step_bounds_dynamics(self, pos_min: float, pos_max: float,
                              vel_min: float, vel_max: float,
                              action_min: float, action_max: float) -> Tuple[Tuple[float, float], Tuple[float, float]]:
@@ -478,10 +491,10 @@ class MountainCar(Verifer):
                            vel_min: float, vel_max: float) -> Dict:
         """Perform single-step verification: state -> action -> next_state"""
         # Step 1: Verify decoder
-        image_star = self.verify_decoder(pos_min, pos_max, vel_min, vel_max)
+        image_star = self.decoder.verify(pos_min, pos_max, vel_min, vel_max)
 
         # Step 2: Verify controller
-        action_min, action_max = self.verify_controller(image_star)
+        action_min, action_max = self.controller.verify(image_star)
 
         # Step 3: Compute next state bounds
         (pos_next_min, pos_next_max), (vel_next_min, vel_next_max) = self.step_bounds_dynamics(
