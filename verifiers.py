@@ -25,15 +25,26 @@ class Verifer(ABC):
     def verify_single_cell(self, cell: Dict, num_steps: int = 20) -> bool:
         pass
 
-class PenController:
+class Module(ABC):
+    def __init__(self, weights_path: str):
+        self._weights = torch.load(weights_path, map_location="cpu", weights_only=True)
+
+    def __call__(self, *args, **kwargs):
+        return self.verify(*args, **kwargs)
+
+    @abstractmethod
+    def verify(self, *args, **kwargs):
+        pass
+
+class PenController(Module):
     def __init__(self, controller_path: str):
-        self.controller_weights = torch.load(controller_path, map_location="cpu", weights_only=True)
+        super().__init__(controller_path)
 
     def verify(self, image_star: ImageStar) -> Star:
         """Verify controller network and return action Star"""
         # Conv1 + ReLU
-        w_conv1 = self.controller_weights['conv1.weight'].cpu().numpy()
-        b_conv1 = self.controller_weights['conv1.bias'].cpu().numpy()
+        w_conv1 = self._weights['conv1.weight'].cpu().numpy()
+        b_conv1 = self._weights['conv1.bias'].cpu().numpy()
         w_conv1 = np.transpose(w_conv1, (2, 3, 1, 0))
         L_conv1 = Conv2DLayer([w_conv1, b_conv1], [2, 2], [1, 1, 1, 1], [1, 1])
         R_conv1 = L_conv1.reach([image_star])
@@ -45,8 +56,8 @@ class PenController:
         IM_relu_conv1 = R_relu_conv1.toImageStar(image_shape=(48, 48, 4))
 
         # Conv2 + ReLU
-        w_conv2 = self.controller_weights['conv2.weight'].cpu().numpy()
-        b_conv2 = self.controller_weights['conv2.bias'].cpu().numpy()
+        w_conv2 = self._weights['conv2.weight'].cpu().numpy()
+        b_conv2 = self._weights['conv2.bias'].cpu().numpy()
         w_conv2 = np.transpose(w_conv2, (2, 3, 1, 0))
         L_conv2 = Conv2DLayer([w_conv2, b_conv2], [2, 2], [1, 1, 1, 1], [1, 1])
         R_conv2 = L_conv2.reach([IM_relu_conv1])
@@ -57,8 +68,8 @@ class PenController:
         R_relu_conv2 = L_relu_conv2.reach(IM_conv2_star, method='approx')
 
         # FC1 + ReLU
-        Wc1 = self.controller_weights["fc1.weight"].cpu().numpy()
-        bc1 = self.controller_weights["fc1.bias"].cpu().numpy()
+        Wc1 = self._weights["fc1.weight"].cpu().numpy()
+        bc1 = self._weights["fc1.bias"].cpu().numpy()
         L_fc_c1 = FullyConnectedLayer([Wc1, bc1])
         R_fc_c1 = L_fc_c1.reach([R_relu_conv2])
         star_fc_c1 = R_fc_c1[0]
@@ -67,8 +78,8 @@ class PenController:
         R_relu_fc1 = L_relu_fc1.reach(star_fc_c1, method='approx')
 
         # FC2
-        Wc2 = self.controller_weights["fc2.weight"].cpu().numpy()
-        bc2 = self.controller_weights["fc2.bias"].cpu().numpy()
+        Wc2 = self._weights["fc2.weight"].cpu().numpy()
+        bc2 = self._weights["fc2.bias"].cpu().numpy()
         L_fc_c2 = FullyConnectedLayer([Wc2, bc2])
         R_fc_c2 = L_fc_c2.reach([R_relu_fc1])
         star_fc_c2 = R_fc_c2[0]
@@ -85,9 +96,9 @@ class PenController:
 
         return IM_action 
     
-class PenDecoder:
+class PenDecoder(Module):
     def __init__(self, decoder_path: str):
-        self.decoder_weights = torch.load(decoder_path, map_location="cpu", weights_only=True)
+        super().__init__(decoder_path)
 
     def verify(self, theta_min: float, theta_max: float,
                omega_min: float, omega_max: float) -> ImageStar:
@@ -97,24 +108,24 @@ class PenDecoder:
         input_star = Star(lb, ub)
 
         # FC1 + ReLU
-        W1 = self.decoder_weights["fc1.weight"].cpu().numpy()
-        b1 = self.decoder_weights["fc1.bias"].cpu().numpy()
+        W1 = self._weights["fc1.weight"].cpu().numpy()
+        b1 = self._weights["fc1.bias"].cpu().numpy()
         L_fc_1 = FullyConnectedLayer([W1, b1])
         R_fc_1 = L_fc_1.reach([input_star])
         L_relu_1 = ReLULayer()
         R_relu_1 = L_relu_1.reach(R_fc_1[0], method='approx')
 
         # FC2 + ReLU
-        W2 = self.decoder_weights["fc2.weight"].cpu().numpy()
-        b2 = self.decoder_weights["fc2.bias"].cpu().numpy()
+        W2 = self._weights["fc2.weight"].cpu().numpy()
+        b2 = self._weights["fc2.bias"].cpu().numpy()
         L_fc_2 = FullyConnectedLayer([W2, b2])
         R_fc_2 = L_fc_2.reach([R_relu_1])
         L_relu_2 = ReLULayer()
         R_relu_2 = L_relu_2.reach(R_fc_2[0], method='approx')
 
         # FC3 + ReLU
-        W3 = self.decoder_weights["fc3.weight"].cpu().numpy()
-        b3 = self.decoder_weights["fc3.bias"].cpu().numpy()
+        W3 = self._weights["fc3.weight"].cpu().numpy()
+        b3 = self._weights["fc3.bias"].cpu().numpy()
         L_fc_3 = FullyConnectedLayer([W3, b3])
         R_fc_3 = L_fc_3.reach([R_relu_2])
         L_relu_3 = ReLULayer()
@@ -126,8 +137,8 @@ class PenDecoder:
         IM = ImageStar(V4, R_relu_3.C, R_relu_3.d, R_relu_3.pred_lb, R_relu_3.pred_ub)
 
         # ConvTranspose1 + ReLU
-        w_dec_conv1 = self.decoder_weights["dec_conv1.weight"].cpu().numpy()
-        b_dec_conv1 = self.decoder_weights["dec_conv1.bias"].cpu().numpy()
+        w_dec_conv1 = self._weights["dec_conv1.weight"].cpu().numpy()
+        b_dec_conv1 = self._weights["dec_conv1.bias"].cpu().numpy()
         w_dec_conv1 = np.transpose(w_dec_conv1, (2, 3, 1, 0))
         L_convt_1 = ConvTranspose2DLayer([w_dec_conv1, b_dec_conv1], [2, 2], [1, 1, 1, 1], [1, 1])
         R_convt_1 = L_convt_1.reach(IM, method='approx')
@@ -137,8 +148,8 @@ class PenDecoder:
         R_convt_1 = R_star_relu_convt_1.toImageStar(image_shape=(24, 24, 4))
 
         # ConvTranspose2 + ReLU
-        w_dec_conv2 = self.decoder_weights["dec_conv2.weight"].cpu().numpy()
-        b_dec_conv2 = self.decoder_weights["dec_conv2.bias"].cpu().numpy()
+        w_dec_conv2 = self._weights["dec_conv2.weight"].cpu().numpy()
+        b_dec_conv2 = self._weights["dec_conv2.bias"].cpu().numpy()
         w_dec_conv2 = np.transpose(w_dec_conv2, (2, 3, 1, 0))
         L_convt_2 = ConvTranspose2DLayer([w_dec_conv2, b_dec_conv2], [2, 2], [1, 1, 1, 1], [1, 1])
         R_convt_2 = L_convt_2.reach(R_convt_1, method='approx')
@@ -148,8 +159,8 @@ class PenDecoder:
         R_convt_2 = R_star_relu_convt_2.toImageStar(image_shape=(48, 48, 8))
 
         # ConvTranspose3
-        w_dec_conv3 = self.decoder_weights["dec_conv3.weight"].cpu().numpy()
-        b_dec_conv3 = self.decoder_weights["dec_conv3.bias"].cpu().numpy()
+        w_dec_conv3 = self._weights["dec_conv3.weight"].cpu().numpy()
+        b_dec_conv3 = self._weights["dec_conv3.bias"].cpu().numpy()
         w_dec_conv3 = np.transpose(w_dec_conv3, (2, 3, 1, 0))
         L_convt_3 = ConvTranspose2DLayer([w_dec_conv3, b_dec_conv3], [2, 2], [1, 1, 1, 1], [1, 1])
         R_convt_3 = L_convt_3.reach(R_convt_2, method='approx')
@@ -189,10 +200,10 @@ class Pendulum(Verifer):
         theta_min, theta_max = theta_bound
         omega_min, omega_max = omega_bound
         # Verify decoder
-        image_star = self.decoder.verify(*theta_bound, *omega_bound)
+        image_star = self.decoder(*theta_bound, *omega_bound)
 
         # Verify controller and get action Star
-        IM_action = self.controller.verify(image_star)
+        IM_action = self.controller(image_star)
         x_min, x_max = IM_action.getRanges(lp_solver='gurobi')
 
         # Compute sin(theta) using SinLayer
@@ -292,15 +303,15 @@ class Pendulum(Verifer):
         return reached_goal
     
 # ============ StarV Neural Network Verifier ============
-class MCController:
+class MCController(Module):
     def __init__(self, controller_path: str):
-        self.controller_weights = torch.load(controller_path, map_location="cpu", weights_only=True)
+        super().__init__(controller_path)
 
     def verify(self, image_star: ImageStar) -> Tuple[float, float]:
         """Verify controller network using StarV framework"""
         # Conv1 + ReLU
-        w_conv1 = self.controller_weights['conv1.weight'].cpu().numpy()
-        b_conv1 = self.controller_weights['conv1.bias'].cpu().numpy()
+        w_conv1 = self._weights['conv1.weight'].cpu().numpy()
+        b_conv1 = self._weights['conv1.bias'].cpu().numpy()
         w_conv1 = np.transpose(w_conv1, (2, 3, 1, 0))
         L_conv1 = Conv2DLayer([w_conv1, b_conv1], [2, 2], [1, 1, 1, 1], [1, 1])
 
@@ -313,8 +324,8 @@ class MCController:
         IM_relu_conv1 = R_relu_conv1.toImageStar(image_shape=(48, 48, 4))
 
         # Conv2 + ReLU
-        w_conv2 = self.controller_weights['conv2.weight'].cpu().numpy()
-        b_conv2 = self.controller_weights['conv2.bias'].cpu().numpy()
+        w_conv2 = self._weights['conv2.weight'].cpu().numpy()
+        b_conv2 = self._weights['conv2.bias'].cpu().numpy()
         w_conv2 = np.transpose(w_conv2, (2, 3, 1, 0))
         L_conv2 = Conv2DLayer([w_conv2, b_conv2], [2, 2], [1, 1, 1, 1], [1, 1])
 
@@ -326,8 +337,8 @@ class MCController:
         R_relu_conv2 = L_relu_conv2.reach(IM_conv2_star, method='approx')
 
         # FC1 + ReLU
-        Wc1 = self.controller_weights["fc1.weight"].cpu().numpy()
-        bc1 = self.controller_weights["fc1.bias"].cpu().numpy()
+        Wc1 = self._weights["fc1.weight"].cpu().numpy()
+        bc1 = self._weights["fc1.bias"].cpu().numpy()
         L_fc_c1 = FullyConnectedLayer([Wc1, bc1])
         R_fc_c1 = L_fc_c1.reach([R_relu_conv2])
         star_fc_c1 = R_fc_c1[0]
@@ -336,8 +347,8 @@ class MCController:
         R_relu_fc1 = L_relu_fc1.reach(star_fc_c1, method='approx')
 
         # FC2
-        Wc2 = self.controller_weights["fc2.weight"].cpu().numpy()
-        bc2 = self.controller_weights["fc2.bias"].cpu().numpy()
+        Wc2 = self._weights["fc2.weight"].cpu().numpy()
+        bc2 = self._weights["fc2.bias"].cpu().numpy()
         L_fc_c2 = FullyConnectedLayer([Wc2, bc2])
         R_fc_c2 = L_fc_c2.reach([R_relu_fc1])
         star_fc_c2 = R_fc_c2[0]
@@ -350,9 +361,9 @@ class MCController:
         y_min, y_max = R_tanh.getRanges('gurobi')
         return float(y_min[0]), float(y_max[0])
     
-class MCDecoder:
+class MCDecoder(Module):
     def __init__(self, decoder_path: str):
-        self.decoder_weights = torch.load(decoder_path, map_location="cpu", weights_only=True)
+        super().__init__(decoder_path)
 
     def verify(self, pos_min: float, pos_max: float,
                vel_min: float, vel_max: float) -> ImageStar:
@@ -365,8 +376,8 @@ class MCDecoder:
         # ---- Decoder Verification Pipeline ----
 
         # FC1 + ReLU
-        W1 = self.decoder_weights["fc1.weight"].cpu().numpy()
-        b1 = self.decoder_weights["fc1.bias"].cpu().numpy()
+        W1 = self._weights["fc1.weight"].cpu().numpy()
+        b1 = self._weights["fc1.bias"].cpu().numpy()
         L_fc_1 = FullyConnectedLayer([W1, b1])
         R_fc_1 = L_fc_1.reach([input_star])
 
@@ -374,8 +385,8 @@ class MCDecoder:
         R_relu_1 = L_relu_1.reach(R_fc_1[0], method='approx')
 
         # FC2 + ReLU
-        W2 = self.decoder_weights["fc2.weight"].cpu().numpy()
-        b2 = self.decoder_weights["fc2.bias"].cpu().numpy()
+        W2 = self._weights["fc2.weight"].cpu().numpy()
+        b2 = self._weights["fc2.bias"].cpu().numpy()
         L_fc_2 = FullyConnectedLayer([W2, b2])
         R_fc_2 = L_fc_2.reach([R_relu_1])
 
@@ -383,8 +394,8 @@ class MCDecoder:
         R_relu_2 = L_relu_2.reach(R_fc_2[0], method='approx')
 
         # FC3 + ReLU
-        W3 = self.decoder_weights["fc3.weight"].cpu().numpy()
-        b3 = self.decoder_weights["fc3.bias"].cpu().numpy()
+        W3 = self._weights["fc3.weight"].cpu().numpy()
+        b3 = self._weights["fc3.bias"].cpu().numpy()
         L_fc_3 = FullyConnectedLayer([W3, b3])
         R_fc_3 = L_fc_3.reach([R_relu_2])
 
@@ -397,8 +408,8 @@ class MCDecoder:
         IM = ImageStar(V4, R_relu_3.C, R_relu_3.d, R_relu_3.pred_lb, R_relu_3.pred_ub)
 
         # ConvTranspose1 + ReLU
-        w_dec_conv1 = self.decoder_weights["dec_conv1.weight"].cpu().numpy()
-        b_dec_conv1 = self.decoder_weights["dec_conv1.bias"].cpu().numpy()
+        w_dec_conv1 = self._weights["dec_conv1.weight"].cpu().numpy()
+        b_dec_conv1 = self._weights["dec_conv1.bias"].cpu().numpy()
         w_dec_conv1 = np.transpose(w_dec_conv1, (2, 3, 1, 0))
         L_convt_1 = ConvTranspose2DLayer([w_dec_conv1, b_dec_conv1], [2, 2], [1, 1, 1, 1], [1, 1])
 
@@ -409,8 +420,8 @@ class MCDecoder:
         R_convt_1 = R_star_relu_convt_1.toImageStar(image_shape=(24, 24, 4))
 
         # ConvTranspose2 + ReLU
-        w_dec_conv2 = self.decoder_weights["dec_conv2.weight"].cpu().numpy()
-        b_dec_conv2 = self.decoder_weights["dec_conv2.bias"].cpu().numpy()
+        w_dec_conv2 = self._weights["dec_conv2.weight"].cpu().numpy()
+        b_dec_conv2 = self._weights["dec_conv2.bias"].cpu().numpy()
         w_dec_conv2 = np.transpose(w_dec_conv2, (2, 3, 1, 0))
         L_convt_2 = ConvTranspose2DLayer([w_dec_conv2, b_dec_conv2], [2, 2], [1, 1, 1, 1], [1, 1])
 
@@ -421,8 +432,8 @@ class MCDecoder:
         R_convt_2 = R_star_relu_convt_2.toImageStar(image_shape=(48, 48, 8))
 
         # ConvTranspose3
-        w_dec_conv3 = self.decoder_weights["dec_conv3.weight"].cpu().numpy()
-        b_dec_conv3 = self.decoder_weights["dec_conv3.bias"].cpu().numpy()
+        w_dec_conv3 = self._weights["dec_conv3.weight"].cpu().numpy()
+        b_dec_conv3 = self._weights["dec_conv3.bias"].cpu().numpy()
         w_dec_conv3 = np.transpose(w_dec_conv3, (2, 3, 1, 0))
         L_convt_3 = ConvTranspose2DLayer([w_dec_conv3, b_dec_conv3], [2, 2], [1, 1, 1, 1], [1, 1])
 
@@ -491,10 +502,10 @@ class MountainCar(Verifer):
                            vel_min: float, vel_max: float) -> Dict:
         """Perform single-step verification: state -> action -> next_state"""
         # Step 1: Verify decoder
-        image_star = self.decoder.verify(pos_min, pos_max, vel_min, vel_max)
+        image_star = self.decoder(pos_min, pos_max, vel_min, vel_max)
 
         # Step 2: Verify controller
-        action_min, action_max = self.controller.verify(image_star)
+        action_min, action_max = self.controller(image_star)
 
         # Step 3: Compute next state bounds
         (pos_next_min, pos_next_max), (vel_next_min, vel_next_max) = self.step_bounds_dynamics(
