@@ -1,0 +1,4 @@
+results/
+weights/
+verify.sh
+__pycache__/

@@ -1,0 +1,29 @@
+{
+    "verifier": {
+        "name": "_Test",
+        "args": [
+            
+        ],
+        "kwargs": {
+            "raise_error": false
+        }
+    },
+    "grid": {
+        "dims": [
+            {
+                "name": "dim1",
+                "start": 1.00,
+                "stop": 1.50,
+                "num": 50
+            },
+            {
+                "name": "dim2",
+                "start": 4.00,
+                "stop": 4.50,
+                "num": 50
+            }
+        ]
+    },
+    "num_steps": 20,
+    "output_prefix": "results/test/safety_result"
+}

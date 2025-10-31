@@ -1,0 +1,30 @@
+{
+    "verifier": {
+        "name": "MountainCar",
+        "args": [
+            "weights/mountain_car/decoder.pth",
+            "weights/mountain_car/controller.pth"
+        ],
+        "kwargs": {
+            "goal_position_threshold": 0.6
+        }
+    },
+    "grid": {
+        "dims": [
+            {
+                "name": "pos",
+                "start": -0.20,
+                "stop": 0.60,
+                "num": 80
+            },
+            {
+                "name": "vel",
+                "start": 0.000,
+                "stop": 0.080,
+                "num": 80
+            }
+        ]
+    },
+    "num_steps": 20,
+    "output_prefix": "results/mountain_car/safety_result"
+}

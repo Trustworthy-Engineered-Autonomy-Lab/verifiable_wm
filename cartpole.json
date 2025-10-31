@@ -1,0 +1,29 @@
+{
+    "verifier": {
+        "name": "Cartpole",
+        "args": [
+            "weights/cartpole/decoder.pth",
+            "weights/cartpole/controller.pth"
+        ],
+        "kwargs": {
+        }
+    },
+    "grid": {
+        "dims": [
+            {
+                "name": "pos",
+                "start": 1.00,
+                "stop": 1.01,
+                "num": 1
+            },
+            {
+                "name": "angle",
+                "start": 4.00,
+                "stop": 4.01,
+                "num": 1
+            }
+        ]
+    },
+    "num_steps": 20,
+    "output_prefix": "results/cartpole/safety_result"
+}
