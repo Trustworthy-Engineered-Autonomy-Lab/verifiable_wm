@@ -147,12 +147,11 @@ if __name__ == "__main__":
     try:
         module = importlib.import_module("verifiers")
         verifier_cls = getattr(module, verifier_cfg['name'])
-    except (ModuleNotFoundError, AttributeError) as e:
+        verifier = verifier_cls(*(verifier_cfg.get('args') or []), **(verifier_cfg.get('kwargs') or {}))
+    except Exception as e:
         if comm.rank == 0:
-            print(f"Cannot find a verifier named {verifier_cfg['name']}: {e}")
+            print(f"Failed to create verifier {verifier_cfg['name']}: {e}")
         sys.exit(1)
-    
-    verifier = verifier_cls(*(verifier_cfg.get('args') or []), **(verifier_cfg.get('kwargs') or {}))
 
     comm.barrier()
 

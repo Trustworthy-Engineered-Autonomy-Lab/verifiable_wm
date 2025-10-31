@@ -33,21 +33,9 @@ class Pendulum(Verifer):
     """StarV-based Neural Network Verification for Pendulum System"""
 
     def __init__(self, decoder_path: str, controller_path: str, goal_angle_threshold = 0.15):
-        self.decoder_path = decoder_path
-        self.controller_path = controller_path
 
-        # Load neural networks
-        self.decoder = PenDecoder()
-        self.controller = PenController()
-
-        dec_state = torch.load(decoder_path, map_location="cpu", weights_only=False)
-        ctrl_state = torch.load(controller_path, map_location="cpu", weights_only=False)
-
-        self.decoder.load_state_dict(dec_state)
-        self.controller.load_state_dict(ctrl_state)
-
-        self.decoder_weights = self.decoder.state_dict()
-        self.controller_weights = self.controller.state_dict()
+        self.decoder_weights = torch.load(decoder_path, map_location="cpu", weights_only=True)
+        self.controller_weights = torch.load(controller_path, map_location="cpu", weights_only=True)
 
         self.goal_angle_threshold = goal_angle_threshold
 
@@ -303,23 +291,10 @@ class MountainCar(Verifer):
     """StarV-based Neural Network Verification for Mountain Car System"""
 
     def __init__(self, decoder_path: str, controller_path: str, goal_position_threshold = 0.6):
-        self.decoder_path = decoder_path
-        self.controller_path = controller_path
-
-        # Load neural networks
-        self.decoder = MCDecoder()
-        self.controller = MCController()
 
         # Load pre-trained weights
-        dec_state = torch.load(decoder_path, map_location="cpu", weights_only=False)
-        ctrl_state = torch.load(controller_path, map_location="cpu", weights_only=False)
-
-        self.decoder.load_state_dict(dec_state)
-        self.controller.load_state_dict(ctrl_state)
-
-        # Get state dictionaries for layer construction
-        self.decoder_weights = self.decoder.state_dict()
-        self.controller_weights = self.controller.state_dict()
+        self.decoder_weights = torch.load(decoder_path, map_location="cpu", weights_only=True)
+        self.controller_weights = torch.load(controller_path, map_location="cpu", weights_only=True)
 
         # Safety condition: BOTH min and max position >= 0.6
         self.goal_position_threshold = goal_position_threshold

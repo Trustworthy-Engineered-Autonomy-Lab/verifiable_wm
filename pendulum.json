@@ -1,0 +1,30 @@
+{
+    "verifier": {
+        "name": "Pendulum",
+        "args": [
+            "weights/pendulum/decoder.pth",
+            "weights/pendulum/controller.pth"
+        ],
+        "kwargs": {
+            "goal_angle_threshold": 0.15
+        }
+    },
+    "grid": {
+        "dims": [
+            {
+                "name": "theta",
+                "start": 1.00,
+                "stop": 2.00,
+                "num": 100
+            },
+            {
+                "name": "omega",
+                "start": 4.00,
+                "stop": 4.50,
+                "num": 50
+            }
+        ]
+    },
+    "num_steps": 20,
+    "output_prefix": "results/pendulum/safety_result"
+}
