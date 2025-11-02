@@ -1,6 +1,6 @@
 {
     "verifier": {
-        "name": "Pendulum",
+        "name": "PendulumVerifier",
         "args": [
             "weights/pendulum/decoder.pth",
             "weights/pendulum/controller.pth"

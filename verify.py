@@ -16,7 +16,7 @@ import argparse
 
 from mpi4py import MPI
 
-from verifiers import Verifer
+from verifiers import Verifier
     
 def generate_grid_cells(grid: Dict, comm = MPI.COMM_WORLD) -> List[Dict]:
     """Generate grid cells for verification"""
@@ -56,7 +56,7 @@ def generate_grid_cells(grid: Dict, comm = MPI.COMM_WORLD) -> List[Dict]:
         for cell in local_cells
     ]
 
-def run_full_verification(verifier: Verifer, cells: List[Dict], 
+def run_full_verification(verifier: Verifier, cells: List[Dict], 
                           num_steps: int = 20):
     """Run complete multi-cell verification"""
 

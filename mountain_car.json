@@ -1,6 +1,6 @@
 {
     "verifier": {
-        "name": "MountainCar",
+        "name": "MountainCarVerifier",
         "args": [
             "weights/mountain_car/decoder.pth",
             "weights/mountain_car/controller.pth"
