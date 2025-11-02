@@ -2,3 +2,4 @@ results/
 weights/
 verify.sh
 __pycache__/
+*.ipynb

@@ -2,8 +2,7 @@
     "verifier": {
         "name": "PendulumVerifier",
         "args": [
-            "weights/pendulum/decoder.pth",
-            "weights/pendulum/controller.pth"
+            "weights/pendulum.pth"
         ],
         "kwargs": {
             "goal_angle_threshold": 0.15
