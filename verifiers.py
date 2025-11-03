@@ -30,72 +30,62 @@ class PendulumVerifier(Verifier):
         weights = torch.load(weights_path, 'cpu', weights_only=True)
         self.nnmodel.load_state_dict(weights)
 
-    def verify_single_step(self, theta_bound: Sequence[float], omega_bound: Sequence[float]) -> Dict:
+    def verify_single_step(self, bound: np.ndarray) -> Dict:
         """
         Perform single-step verification with pendulum dynamics
         theta' = theta + 0.05 * omega + 0.0075 * u + 0.0375 * sin(theta)
         omega' = omega + 0.15 * u + 0.75 * sin(theta), clipped to [-8, 8]
         """
-        # Create initial Star set
-        theta_min, theta_max = theta_bound
-        omega_min, omega_max = omega_bound
-        
-        lb = np.array([theta_min, omega_min], dtype=np.float32)
-        ub = np.array([theta_max, omega_max], dtype=np.float32)
-        state_star = Star(lb, ub)
+        # bound: theta, omega
+        state_star = Star(bound[0], bound[1])
         # Verify the model
         action_star = self.nnmodel.reach(state_star)
-
-        action_bound = np.concatenate(action_star.getRanges(lp_solver='gurobi'))
+        action_bound = np.array(action_star.getRanges(lp_solver='gurobi'))
+        bound = np.concatenate([bound, action_bound], axis=1) # theta omega action
 
         # Verfity the pendulum dynamic system
-        next_theta_bound, next_omega_bound = self.pendulum.reach(theta_bound, omega_bound, action_bound)
+        new_bound = self.pendulum.reach(bound) # theta omega
 
-        return next_theta_bound, next_omega_bound
-
-    def split_merge_bounds(self, theta_bounds_list, omega_bounds_list):
-        splited_theta_bounds_list = []
-        splited_omega_bounds_list = []
-        for theta_bound, omega_bound in zip(theta_bounds_list, omega_bounds_list):
+        return new_bound
+    def split_merge_bounds(self, bounds):
+        splited_bounds = []
+        for bound in bounds:
+            theta_bound = bound[:,0]
+            omega_bound = bound[:,1]
             theta_min, theta_max = theta_bound
+            omega_min, omega_max = omega_bound
             if theta_min > theta_max:
-                splited_theta_bounds_list += [[theta_min, np.pi], [-np.pi, theta_max]]
-                splited_omega_bounds_list += [omega_bound, omega_bound]
+                # If the theta range is wrapped around, break the bound into two bounds
+                splited_bounds.append(np.array([[theta_min, omega_min], [np.pi, omega_max]]))
+                splited_bounds.append(np.array([[-np.pi, omega_min], [theta_max, omega_max]]))
             else:
-                splited_omega_bounds_list.append(omega_bound)
-                splited_theta_bounds_list.append(theta_bound)
+                splited_bounds.append(bound)
 
-        splited_theta_bounds = np.array(splited_theta_bounds_list, dtype=np.float32)
-        splited_omega_bounds = np.array(splited_omega_bounds_list, dtype=np.float32)
-        return splited_theta_bounds, splited_omega_bounds
+        return splited_bounds
 
     def verify_single_cell(self, cell: Dict, num_steps: int = 20) -> bool:
         """Verify a single cell for the specified number of steps (early-stop when |theta| <= 0.15).
         Only keep the final step's bounds to save memory.
         """
         # Current state bounds
-        theta_bounds = np.array([cell['theta']])
-        omega_bounds = np.array([cell['omega']])
+        current_bounds = [np.array([cell['theta'], cell['omega']]).T]
 
         # Safety tracking (reach goal if BOTH bounds are within ±0.15)
         reached_goal = False
 
         # Perform verification steps with early-stop
         for step in range(1, num_steps + 1):
-            theta_bound_list = []
-            omega_bound_list = []
-
-            for theta_bound, omega_bound in zip(theta_bounds, omega_bounds): 
+            new_bounds = []
+            for bound in current_bounds: 
                 
-                    new_theta_bound, new_omega_bound = self.verify_single_step(theta_bound, omega_bound)
-                    theta_bound_list.append(new_theta_bound)
-                    omega_bound_list.append(new_omega_bound)
+                    new_bound = self.verify_single_step(bound)
+                    new_bounds.append(new_bound)
             
             # Update current state (we only keep the latest bounds)
-            theta_bounds, omega_bounds = self.split_merge_bounds(theta_bound_list, omega_bound_list)
+            current_bounds = self.split_merge_bounds(new_bounds)
             
-            # EARLY STOP: if BOTH |theta_min| and |theta_max| <= 0.15, treat as SAFE and stop.
-            if np.max(np.abs(theta_bounds)) <= self.goal_angle_threshold:
+            # EARLY STOP: if BOTH |theta_min| and |theta_max| <= 0.15, treat as SAFE and stop. 
+            if np.max(np.abs(np.array(current_bounds)[:,0,:])) <= self.goal_angle_threshold:
                 reached_goal = True
                 break
 
@@ -116,30 +106,24 @@ class MountainCarVerifier(Verifier):
         self.nnmodel.load_state_dict(weights)
 
 
-    def verify_single_step(self, pos_bound: Sequence[float], vel_bound: Sequence[float]) -> Dict:
+    def verify_single_step(self, bound: np.ndarray) -> Dict:
         """Perform single-step verification: state -> action -> next_state"""
-        pos_min, pos_max = pos_bound
-        vel_min, vel_max = vel_bound
-        # Create the initial star set
-        lb = np.array([pos_min, vel_min], dtype=np.float32)
-        ub = np.array([pos_max, vel_max], dtype=np.float32)
 
-        input_star = Star(lb, ub)
+        input_star = Star(bound[0], bound[1])
 
         # Verify the model
         output_star = self.nnmodel.reach(input_star)
-        action_bound = np.concatenate(output_star.getRanges('gurobi'))
-
+        action_bound = np.array(output_star.getRanges('gurobi'))
+        bound = np.concatenate([bound, action_bound], axis=1)
         # Step 3: Compute next state bounds
-        next_pos_bound, next_vel_bound = self.mountain_car.reach(pos_bound, vel_bound, action_bound)
+        new_bound = self.mountain_car.reach(bound)
 
-        return next_pos_bound, next_vel_bound
+        return new_bound
     
     def verify_single_cell(self, cell: Dict, num_steps: int = 30) -> Dict:
         """Verify a single cell for the specified number of steps"""
         # Current state bounds
-        current_pos_bound = cell['pos']
-        current_vel_bound = cell['vel']
+        current_bound = np.array([cell['pos'], cell['vel']]).T
 
         # Safety tracking
         reached_goal = False
@@ -147,15 +131,12 @@ class MountainCarVerifier(Verifier):
         # Perform verification steps
         for step in range(1, num_steps + 1):
             # Single step verification
-            next_pos_bound, next_vel_bound = self.verify_single_step(current_pos_bound, current_vel_bound)
+            current_bound = self.verify_single_step(current_bound)
 
             # Check safety condition: BOTH min and max position must be >= threshold
-            if min(current_pos_bound) >= self.goal_position_threshold:
+            if np.min(current_bound[:,0]) >= self.goal_position_threshold:
                 reached_goal = True
                 break
-
-            current_pos_bound = next_pos_bound
-            current_vel_bound = next_vel_bound
 
         return reached_goal
     

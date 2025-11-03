@@ -225,11 +225,9 @@ class Pendulum(Module):
         """Normalize angle to [-π, π] range"""
         return ((x + np.pi) % (2 * np.pi)) - np.pi
 
-    def reach(self, theta_bound: Sequence[float], omega_bound: Sequence[float], action_bound: Sequence[float]):
+    def reach(self, bound: np.ndarray):
         # Compute sin(theta) using SinLayer
-        theta_min, theta_max = theta_bound
-        omega_min, omega_max = omega_bound
-        action_min, action_max = action_bound
+        theta_min, theta_max = bound[:,0]
 
         L_sin = SinLayer()
         lb_theta = np.array([theta_min], dtype=np.float32)
@@ -237,12 +235,10 @@ class Pendulum(Module):
         S_theta = Star(lb_theta, ub_theta)
 
         IM_sin = L_sin.reach(S_theta, method='approx', lp_solver='gurobi', RF=0.0)
-        z_min, z_max = np.concatenate(IM_sin.getRanges(lp_solver='gurobi'))
+        z_bound = np.array(IM_sin.getRanges(lp_solver='gurobi'))
 
-        lb_full = np.array([theta_min, omega_min, action_min, z_min], dtype=np.float32)
-        ub_full = np.array([theta_max, omega_max, action_max, z_max], dtype=np.float32)
-
-        S_full = Star(lb_full, ub_full)
+        full_bound = np.concatenate([bound, z_bound], axis = 1)
+        S_full = Star(full_bound[0], full_bound[1])
 
         # Apply dynamics
         M = np.array([[1.0, 0.05, 0.0075, 0.0375],
@@ -251,16 +247,15 @@ class Pendulum(Module):
         S_next = S_full.affineMap(M, b_dyn)
 
         # Step 7: Get bounds BEFORE clipping
-        lb_next, ub_next = S_next.getRanges('gurobi', RF=0.0)
-        bound = np.array([lb_next, ub_next]).T
+        next_bound = np.array(S_next.getRanges('gurobi', RF=0.0))
 
         # Clip omega' to [-8, 8]
-        next_omega_bound = np.clip(bound[1], -8.0, 8.0)
+        next_bound[:,1] = np.clip(next_bound[:,1], -8.0, 8.0)
 
         # Normalize theta to [-π, π]
-        next_theta_bound = self.angle_normalize(bound[0])
+        next_bound[:,0] = self.angle_normalize(next_bound[:,0])
 
-        return list(next_theta_bound), list(next_omega_bound)
+        return next_bound
     
 class MountainCar(Module):
     def __init__(self):
@@ -276,36 +271,29 @@ class MountainCar(Module):
     def forward(self):
         pass
 
-    def reach(self, pos_bound: Sequence[float], vel_bound: Sequence[float], action_bound: Sequence[float]):
+    def reach(self, bound: np.ndarray):
         # Cosine term bounds: cos(3*pos)
-        pos_min, pos_max = pos_bound
-        vel_min, vel_max = vel_bound
-        action_min, action_max = action_bound
+        pos_bound = bound[:,0]
+        vel_bound = bound[:,1]
+        action_bound = bound[:,2]
 
-        cos_3p_min = math.cos(3.0 * pos_min)
-        cos_3p_max = math.cos(3.0 * pos_max)
-        cos_min = min(cos_3p_min, cos_3p_max)
-        cos_max = max(cos_3p_min, cos_3p_max)
+        cos_3p = np.sort(np.cos(3.0 * pos_bound))[::-1]
 
         # Velocity update: v' = v + action*POWER - 0.0025*cos(3*pos)
-        vel_next_min = vel_min + action_min * self.POWER - 0.0025 * cos_max
-        vel_next_max = vel_max + action_max * self.POWER - 0.0025 * cos_min
+        vel_bound = vel_bound + action_bound * self.POWER - 0.0025 * cos_3p
 
         # Velocity clipping: both bounds must respect speed limits
-        vel_next_min = max(self.MIN_SPEED, min(self.MAX_SPEED, vel_next_min))
-        vel_next_max = max(self.MIN_SPEED, min(self.MAX_SPEED, vel_next_max))
+        vel_bound = np.clip(vel_bound, self.MIN_SPEED, self.MAX_SPEED)
 
         # Ensure velocity bounds are valid (min <= max)
-        if vel_next_min > vel_next_max:
-            vel_next_min, vel_next_max = vel_next_max, vel_next_min
+        vel_bound = np.sort(vel_bound)
 
         # Position update: pos' = pos + v'
-        pos_next_min = pos_min + vel_next_min
-        pos_next_max = pos_max + vel_next_max
+        pos_bound = pos_bound + vel_bound
 
         # Ensure position bounds are valid (min <= max)
         # if pos_next_min > pos_next_max:
         #     pos_next_min, pos_next_max = pos_next_max, pos_next_min
 
-        return [pos_next_min, pos_next_max], [vel_next_min, vel_next_max]
+        return np.array([pos_bound, vel_bound]).T
 
