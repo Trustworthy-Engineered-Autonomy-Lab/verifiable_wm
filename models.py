@@ -45,12 +45,12 @@ class Decoder(Module):
         x = self.dec_conv3(x)
         return torch.clamp(x, 0.0, 1.0)
     
-    def reach(self, input_star: Star) -> ImageStar:
+    def reach(self, state_star: Star) -> ImageStar:
         # FC1 + ReLU
         W1 = self.fc1.weight.detach().cpu().numpy()
         b1 = self.fc1.bias.detach().cpu().numpy()
         L_fc_1 = FullyConnectedLayer([W1, b1])
-        R_fc_1 = L_fc_1.reach([input_star])
+        R_fc_1 = L_fc_1.reach([state_star])
         L_relu_1 = ReLULayer()
         R_relu_1 = L_relu_1.reach(R_fc_1[0], method='approx')
 
@@ -108,18 +108,29 @@ class Decoder(Module):
         S1 = R_convt_3.toStar()
         L_satlin = SatLinLayer()
         IM_satlin_list = L_satlin.reach(S1, method='approx', lp_solver='gurobi')
-        IM_satlin = IM_satlin_list.toImageStar(image_shape=(96, 96, 1))
+        image_star = IM_satlin_list.toImageStar(image_shape=(96, 96, 1))
 
-        return IM_satlin
+        return image_star
 
 
 class Controller(Module):
-    def __init__(self):
+    def __init__(self, activation = 'tanh', output_factor = 1):
         super().__init__()
         self.conv1 = nn.Conv2d(1, 4, kernel_size=4, stride=2, padding=1)
         self.conv2 = nn.Conv2d(4, 1, kernel_size=4, stride=2, padding=1)
         self.fc1 = nn.Linear(24 * 24, 64)
         self.fc2 = nn.Linear(64, 1)
+
+        if activation == 'sigmoid':
+            self.act = torch.sigmoid
+            self.starv_act = SatLinLayer()
+        elif activation == 'tanh':
+            self.act = torch.tanh
+            self.starv_act = TanSigLayer()
+        else:
+            raise ValueError(f'Activation function {activation} is not supported')
+        
+        self.output_factor = output_factor
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -127,7 +138,7 @@ class Controller(Module):
         x = x.view(x.size(0), -1)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
-        return torch.tanh(x)
+        return self.act(x)
     
     def reach(self, image_star: ImageStar) -> Star:
         # Conv1 + ReLU
@@ -173,15 +184,22 @@ class Controller(Module):
         star_fc_c2 = R_fc_c2[0]
 
         # Tanh activation
-        L_tanh = TanSigLayer()
-        IM_tanh = L_tanh.reach(star_fc_c2, method='approx', RF=0.0)
+        IM_act = self.starv_act.reach(star_fc_c2, method='approx', RF=0.0)
 
-        return IM_tanh
+        if self.output_factor != 1:
+            d = IM_act.dim
+            A = self.output_factor * np.eye(d, dtype=np.float32)
+            b = np.zeros(d, dtype=np.float32)
+            action_star = IM_act.affineMap(A, b)
+        else:
+            action_star = IM_act
 
-class WorldModel(Module):
-    def __init__(self):
+        return action_star
+
+class NNModel(Module):
+    def __init__(self, activation = 'tanh', output_factor = 1.0):
         super().__init__()
-        self.controller = Controller()
+        self.controller = Controller(activation, output_factor)
         self.decoder = Decoder()
 
     def forward(self, x):
@@ -190,6 +208,7 @@ class WorldModel(Module):
         return out
     
     def reach(self, input_star: Star) -> Star:
+
         image_star = self.decoder.reach(input_star)
         output_star = self.controller.reach(image_star)
 

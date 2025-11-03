@@ -5,7 +5,7 @@ from typing import Sequence, Dict, Tuple
 from abc import ABC, abstractmethod
 import random
 
-from models import WorldModel, Pendulum, MountainCar
+from models import NNModel, Pendulum, MountainCar
 
 from StarV.set.star import Star
 
@@ -23,12 +23,12 @@ class PendulumVerifier(Verifier):
 
     def __init__(self, weights_path: str, goal_angle_threshold = 0.15):
         # Create the controller and decoder
-        self.worldmodel = WorldModel()
+        self.nnmodel = NNModel('tanh', 2.0)
         self.pendulum = Pendulum()
         self.goal_angle_threshold = goal_angle_threshold
 
         weights = torch.load(weights_path, 'cpu', weights_only=True)
-        self.worldmodel.load_state_dict(weights)
+        self.nnmodel.load_state_dict(weights)
 
     def verify_single_step(self, theta_bound: Sequence[float], omega_bound: Sequence[float]) -> Dict:
         """
@@ -42,15 +42,11 @@ class PendulumVerifier(Verifier):
         
         lb = np.array([theta_min, omega_min], dtype=np.float32)
         ub = np.array([theta_max, omega_max], dtype=np.float32)
-        input_star = Star(lb, ub)
+        state_star = Star(lb, ub)
         # Verify the model
-        output_star = self.worldmodel.reach(input_star)
+        action_star = self.nnmodel.reach(state_star)
 
-        d = output_star.dim
-        A = 2.0 * np.eye(d, dtype=np.float32)
-        b = np.zeros(d, dtype=np.float32)
-        action = output_star.affineMap(A, b)
-        action_bound = np.concatenate(action.getRanges(lp_solver='gurobi'))
+        action_bound = np.concatenate(action_star.getRanges(lp_solver='gurobi'))
 
         # Verfity the pendulum dynamic system
         next_theta_bound, next_omega_bound = self.pendulum.reach(theta_bound, omega_bound, action_bound)
@@ -110,14 +106,14 @@ class MountainCarVerifier(Verifier):
 
     def __init__(self, weights_path: str, goal_position_threshold = 0.6):
         # Create the controller and decoder
-        self.worldmodel = WorldModel()
+        self.nnmodel = NNModel('tanh', 1.0)
         self.mountain_car = MountainCar()
 
         # Safety condition: BOTH min and max position >= 0.6
         self.goal_position_threshold = goal_position_threshold
 
         weights = torch.load(weights_path, 'cpu', weights_only=True)
-        self.worldmodel.load_state_dict(weights)
+        self.nnmodel.load_state_dict(weights)
 
 
     def verify_single_step(self, pos_bound: Sequence[float], vel_bound: Sequence[float]) -> Dict:
@@ -131,7 +127,7 @@ class MountainCarVerifier(Verifier):
         input_star = Star(lb, ub)
 
         # Verify the model
-        output_star = self.worldmodel.reach(input_star)
+        output_star = self.nnmodel.reach(input_star)
         action_bound = np.concatenate(output_star.getRanges('gurobi'))
 
         # Step 3: Compute next state bounds
