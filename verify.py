@@ -57,7 +57,7 @@ def generate_grid_cells(grid: Dict, comm = MPI.COMM_WORLD) -> List[Dict]:
     ]
 
 def run_full_verification(verifier: Verifier, cells: List[Dict], 
-                          num_steps: int = 20):
+                          num_steps: int = 20, early_stop = True):
     """Run complete multi-cell verification"""
 
     for idx, cell in enumerate(cells):
@@ -67,9 +67,14 @@ def run_full_verification(verifier: Verifier, cells: List[Dict],
             task_str += f" {k}∈[{v[0]},{v[1]}]"
         
         try:
-            result = verifier.verify_single_cell(cell, num_steps)
+            step = 1
+            for result in verifier.verify_single_cell(cell):
+                if (result and early_stop) or step >= num_steps:
+                    break
+                step += 1
+
         except KeyboardInterrupt as e:
-            break
+            sys.exit(1)
         except Exception as e:
             result = False
             cell['error_msg'] = str(e)
@@ -114,6 +119,9 @@ def load_input(file_path: str):
     if 'num_steps' not in config:
         print(f"The number of steps is not specified, default to 20")
         config['num_steps'] = 20
+
+    if 'early_stop' not in config:
+        config['early_stop'] = True
 
     return config
 

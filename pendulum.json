@@ -24,5 +24,6 @@
         ]
     },
     "num_steps": 20,
+    "early_stop": true,
     "output_prefix": "results/pendulum/safety_result"
 }

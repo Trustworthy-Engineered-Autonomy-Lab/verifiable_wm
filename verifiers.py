@@ -14,7 +14,7 @@ class Verifier(ABC):
         pass
 
     @abstractmethod
-    def verify_single_cell(self, cell: Dict, num_steps: int = 20) -> bool:
+    def verify_single_cell(self, cell: Dict) -> bool:
         pass
 
 # ============ Pendulum Neural Network Verifier ============
@@ -42,7 +42,7 @@ class PendulumVerifier(Verifier):
 
         return splited_bounds
 
-    def verify_single_cell(self, cell: Dict, num_steps: int = 20) -> bool:
+    def verify_single_cell(self, cell: Dict):
         """Verify a single cell for the specified number of steps (early-stop when |theta| <= 0.15).
         Only keep the final step's bounds to save memory.
         """
@@ -53,7 +53,7 @@ class PendulumVerifier(Verifier):
         reached_goal = False
 
         # Perform verification steps with early-stop
-        for step in range(1, num_steps + 1):
+        while True:
             new_bounds = []
             for bound in current_bounds: 
                 
@@ -67,9 +67,8 @@ class PendulumVerifier(Verifier):
             theta_bounds = np.array(current_bounds)[:,:,0]
             if np.max(np.abs(theta_bounds)) <= self.goal_angle_threshold:
                 reached_goal = True
-                break
-
-        return reached_goal
+            
+            yield reached_goal
 
 class MountainCarVerifier(Verifier):
     """StarV-based Neural Network Verification for Mountain Car System"""
@@ -79,7 +78,7 @@ class MountainCarVerifier(Verifier):
         self.goal_position_threshold = goal_position_threshold
         self.fullmodel = FullModel('mountain_car')
     
-    def verify_single_cell(self, cell: Dict, num_steps: int = 30) -> Dict:
+    def verify_single_cell(self, cell: Dict):
         """Verify a single cell for the specified number of steps"""
         # Current state bounds
         current_bound = np.array([cell['pos'], cell['vel']]).T
@@ -88,16 +87,15 @@ class MountainCarVerifier(Verifier):
         reached_goal = False
 
         # Perform verification steps
-        for step in range(1, num_steps + 1):
+        while True:
             # Single step verification
             current_bound = self.fullmodel.reach(current_bound)
 
             # Check safety condition: BOTH min and max position must be >= threshold
             if np.min(current_bound[:,0]) >= self.goal_position_threshold:
                 reached_goal = True
-                break
-
-        return reached_goal
+                
+            yield reached_goal
     
 class Cartpole(Verifier):
     def __init__(self, decoder_path: str, controller_path: str):
@@ -117,9 +115,10 @@ class _Test(Verifier):
     def __init__(self, raise_error = True):
         self.raise_error = raise_error
 
-    def verify_single_cell(self, cell, num_steps = 20):
+    def verify_single_cell(self, cell):
         if self.raise_error:
             raise RuntimeError("Error raised to test the program")
         
-        return random.choice([True, False])
+        while True:
+            yield random.choice([True, False])
         
