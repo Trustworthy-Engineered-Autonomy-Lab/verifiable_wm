@@ -2,7 +2,6 @@
     "verifier": {
         "name": "MountainCarVerifier",
         "args": [
-            "weights/mountain_car.pth"
         ],
         "kwargs": {
             "goal_position_threshold": 0.6

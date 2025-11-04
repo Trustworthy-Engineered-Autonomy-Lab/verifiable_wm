@@ -5,7 +5,7 @@ from typing import Sequence, Dict, Tuple
 from abc import ABC, abstractmethod
 import random
 
-from models import NNModel, Pendulum, MountainCar
+from models import FullModel
 
 from StarV.set.star import Star
 
@@ -21,32 +21,11 @@ class Verifier(ABC):
 class PendulumVerifier(Verifier):
     """StarV-based Neural Network Verification for Pendulum System"""
 
-    def __init__(self, weights_path: str, goal_angle_threshold = 0.15):
+    def __init__(self, goal_angle_threshold = 0.15):
         # Create the controller and decoder
-        self.nnmodel = NNModel('tanh', 2.0)
-        self.pendulum = Pendulum()
         self.goal_angle_threshold = goal_angle_threshold
+        self.fullmodel = FullModel('pendulum')
 
-        weights = torch.load(weights_path, 'cpu', weights_only=True)
-        self.nnmodel.load_state_dict(weights)
-
-    def verify_single_step(self, bound: np.ndarray) -> Dict:
-        """
-        Perform single-step verification with pendulum dynamics
-        theta' = theta + 0.05 * omega + 0.0075 * u + 0.0375 * sin(theta)
-        omega' = omega + 0.15 * u + 0.75 * sin(theta), clipped to [-8, 8]
-        """
-        # bound: theta, omega
-        state_star = Star(bound[0], bound[1])
-        # Verify the model
-        action_star = self.nnmodel.reach(state_star)
-        action_bound = np.array(action_star.getRanges(lp_solver='gurobi'))
-        bound = np.concatenate([bound, action_bound], axis=1) # theta omega action
-
-        # Verfity the pendulum dynamic system
-        new_bound = self.pendulum.reach(bound) # theta omega
-
-        return new_bound
     def split_merge_bounds(self, bounds):
         splited_bounds = []
         for bound in bounds:
@@ -78,14 +57,15 @@ class PendulumVerifier(Verifier):
             new_bounds = []
             for bound in current_bounds: 
                 
-                    new_bound = self.verify_single_step(bound)
+                    new_bound = self.fullmodel.reach(bound)
                     new_bounds.append(new_bound)
             
             # Update current state (we only keep the latest bounds)
             current_bounds = self.split_merge_bounds(new_bounds)
             
             # EARLY STOP: if BOTH |theta_min| and |theta_max| <= 0.15, treat as SAFE and stop. 
-            if np.max(np.abs(np.array(current_bounds)[:,0,:])) <= self.goal_angle_threshold:
+            theta_bounds = np.array(current_bounds)[:,:,0]
+            if np.max(np.abs(theta_bounds)) <= self.goal_angle_threshold:
                 reached_goal = True
                 break
 
@@ -94,31 +74,10 @@ class PendulumVerifier(Verifier):
 class MountainCarVerifier(Verifier):
     """StarV-based Neural Network Verification for Mountain Car System"""
 
-    def __init__(self, weights_path: str, goal_position_threshold = 0.6):
-        # Create the controller and decoder
-        self.nnmodel = NNModel('tanh', 1.0)
-        self.mountain_car = MountainCar()
-
+    def __init__(self, goal_position_threshold = 0.6):
         # Safety condition: BOTH min and max position >= 0.6
         self.goal_position_threshold = goal_position_threshold
-
-        weights = torch.load(weights_path, 'cpu', weights_only=True)
-        self.nnmodel.load_state_dict(weights)
-
-
-    def verify_single_step(self, bound: np.ndarray) -> Dict:
-        """Perform single-step verification: state -> action -> next_state"""
-
-        input_star = Star(bound[0], bound[1])
-
-        # Verify the model
-        output_star = self.nnmodel.reach(input_star)
-        action_bound = np.array(output_star.getRanges('gurobi'))
-        bound = np.concatenate([bound, action_bound], axis=1)
-        # Step 3: Compute next state bounds
-        new_bound = self.mountain_car.reach(bound)
-
-        return new_bound
+        self.fullmodel = FullModel('mountain_car')
     
     def verify_single_cell(self, cell: Dict, num_steps: int = 30) -> Dict:
         """Verify a single cell for the specified number of steps"""
@@ -131,7 +90,7 @@ class MountainCarVerifier(Verifier):
         # Perform verification steps
         for step in range(1, num_steps + 1):
             # Single step verification
-            current_bound = self.verify_single_step(current_bound)
+            current_bound = self.fullmodel.reach(current_bound)
 
             # Check safety condition: BOTH min and max position must be >= threshold
             if np.min(current_bound[:,0]) >= self.goal_position_threshold:

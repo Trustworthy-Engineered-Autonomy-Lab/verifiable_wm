@@ -207,12 +207,13 @@ class NNModel(Module):
         out = self.controller(out)
         return out
     
-    def reach(self, input_star: Star) -> Star:
+    def reach(self, state_bound: np.ndarray) -> np.ndarray:
+        state_star = Star(state_bound[0], state_bound[1])
+        image_star = self.decoder.reach(state_star)
+        action_star = self.controller.reach(image_star)
+        action_bound = np.array(action_star.getRanges('gurobi'))
 
-        image_star = self.decoder.reach(input_star)
-        output_star = self.controller.reach(image_star)
-
-        return output_star
+        return action_bound
     
 class Pendulum(Module):
     def __init__(self):
@@ -226,6 +227,8 @@ class Pendulum(Module):
         return ((x + np.pi) % (2 * np.pi)) - np.pi
 
     def reach(self, bound: np.ndarray):
+        # theta' = theta + 0.05 * omega + 0.0075 * u + 0.0375 * sin(theta)
+        # omega' = omega + 0.15 * u + 0.75 * sin(theta), clipped to [-8, 8]
         # Compute sin(theta) using SinLayer
         theta_min, theta_max = bound[:,0]
 
@@ -296,4 +299,32 @@ class MountainCar(Module):
         #     pos_next_min, pos_next_max = pos_next_max, pos_next_min
 
         return np.array([pos_bound, vel_bound]).T
+    
+class FullModel(Module):
+    def __init__(self, system, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if system == 'mountain_car':
+            self.dynamic = MountainCar()
+            self.nnmodel = NNModel("tanh", 1.0)
+            weights_path = "weights/mountain_car.pth"
+        elif system == 'pendulum':
+            self.dynamic = Pendulum()
+            self.nnmodel = NNModel("tanh", 2.0)
+            weights_path = "weights/pendulum.pth"
+        else:
+            raise ValueError(f"Unknown system type {system}")
+        
+        weights = torch.load(weights_path, 'cpu', weights_only=True)
+        self.nnmodel.load_state_dict(weights)
+
+    def reach(self, state_bound: np.ndarray) -> np.ndarray:
+        # Verify the model
+        action_bound = self.nnmodel.reach(state_bound)
+        # Combine state bound and action bound
+        combined_bound = np.concatenate([state_bound, action_bound], axis=1)
+        # Compute the next state bound
+        new_state_bound = self.dynamic.reach(combined_bound)
+
+        return new_state_bound
+        
 
