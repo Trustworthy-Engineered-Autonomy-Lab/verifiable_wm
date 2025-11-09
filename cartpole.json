@@ -1,29 +1,29 @@
 {
     "verifier": {
-        "name": "Cartpole",
+        "name": "CartpoleVerifier",
         "args": [
-            "weights/cartpole/decoder.pth",
-            "weights/cartpole/controller.pth"
         ],
         "kwargs": {
+            "goal_angle_threshold" : 0.21
         }
     },
     "grid": {
         "dims": [
             {
                 "name": "pos",
-                "start": 1.00,
-                "stop": 1.01,
+                "start": 0.00,
+                "stop": 0.01,
                 "num": 1
             },
             {
                 "name": "angle",
-                "start": 4.00,
-                "stop": 4.01,
+                "start": 0.099,
+                "stop": 0.100,
                 "num": 1
             }
         ]
     },
     "num_steps": 20,
+    "early_stop": false,
     "output_prefix": "results/cartpole/safety_result"
 }

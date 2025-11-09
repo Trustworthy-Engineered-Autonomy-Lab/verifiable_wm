@@ -1,13 +1,11 @@
 import numpy as np
-import torch
 
-from typing import Sequence, Dict, Tuple
+from typing import Dict
 from abc import ABC, abstractmethod
 import random
 
 from models import FullModel
 
-from StarV.set.star import Star
 
 class Verifier(ABC):
     def __init__(self):
@@ -65,7 +63,7 @@ class PendulumVerifier(Verifier):
             
             # EARLY STOP: if BOTH |theta_min| and |theta_max| <= 0.15, treat as SAFE and stop. 
             theta_bounds = np.array(current_bounds)[:,:,0]
-            if np.max(np.abs(theta_bounds)) <= self.goal_angle_threshold:
+            if np.all(np.abs(theta_bounds) <= self.goal_angle_threshold):
                 reached_goal = True
             
             yield reached_goal
@@ -92,24 +90,35 @@ class MountainCarVerifier(Verifier):
             current_bound = self.fullmodel.reach(current_bound)
 
             # Check safety condition: BOTH min and max position must be >= threshold
-            if np.min(current_bound[:,0]) >= self.goal_position_threshold:
+            if np.all(current_bound[:,0] >= self.goal_position_threshold):
                 reached_goal = True
                 
             yield reached_goal
     
-class Cartpole(Verifier):
-    def __init__(self, decoder_path: str, controller_path: str):
-        pass
+class CartpoleVerifier(Verifier):
+    def __init__(self, goal_angle_threshold = 12):
+        self.goal_angle_threshold = goal_angle_threshold
+        self.fullmodel = FullModel('cartpole')
 
-    def verify_single_cell(self, cell, num_steps = 20):
-        pos_lb, pos_ub = cell['pos']
-        angle_lb, angle_ub = cell['angle']
+    def verify_single_cell(self, cell):
+        current_bound = np.array([cell['pos'], cell['angle']]).T
 
-        reach_goal = False
+        # Safety tracking
+        reached_goal = False
+        cell['history'] = []
 
-        # Note: You don't have to handle exception here
+        # Perform verification steps
+        while True:
+            # Single step verification
+            current_bound = self.fullmodel.reach(current_bound)
+            cell['history'].append(current_bound.tolist())
 
-        return reach_goal
+            # Check safety condition
+            angle_bound = np.array(current_bound)[:,1]
+            if np.all(np.abs(angle_bound) <= self.goal_angle_threshold):
+                reached_goal = True
+                
+            yield reached_goal
 
 class _Test(Verifier):
     def __init__(self, raise_error = True):

@@ -3,3 +3,7 @@ weights/
 verify.sh
 __pycache__/
 *.ipynb
+data/
+.vscode/
+*.out
+*.env

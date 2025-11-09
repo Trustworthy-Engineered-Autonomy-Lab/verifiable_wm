@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 
 import numpy as np
 
@@ -16,8 +16,12 @@ from StarV.set.star import Star
 from StarV.set.imagestar import ImageStar
 from StarV.dynamic.Sine import SinLayer
 
-from typing import Sequence
-import math
+from pybdr.geometry import Geometry, Zonotope, Interval
+from pybdr.model import *
+from pybdr.algorithm import ASB2008CDC
+from pybdr.geometry.operation import boundary, cvt2
+
+from sympy import Matrix, cos, sin
 
 class Module(nn.Module, ABC):
     @abstractmethod
@@ -300,6 +304,81 @@ class MountainCar(Module):
 
         return np.array([pos_bound, vel_bound]).T
     
+class Cartpole(Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self):
+        pass
+
+    @staticmethod
+    def cartpole(x, a):
+        dxdt = [None] * 4
+        a = a[0] * 10.0
+        costheta = cos(x[2])
+        sintheta = sin(x[2])
+        temp = (a + 0.05 * x[3] * x[3] * sintheta) / 1.1
+        thetaacc = (9.8 * sintheta - costheta * temp) / (0.5 * (4.0/3.0 - 0.1 * costheta * costheta / 1.1))
+        xacc = temp - 0.05 * thetaacc * costheta / 1.1
+        
+        dxdt[0] = x[1]
+        dxdt[1] = xacc
+        dxdt[2] = x[3]
+        dxdt[3] = thetaacc
+
+
+        return Matrix(dxdt)
+
+    def reach(self, bound: np.ndarray) -> np.ndarray:
+
+        action_bound = bound[:,-1]
+        state_bound = np.array([
+            bound[:,0],
+            np.array([0.0,0.0]),
+            bound[:,1],
+            np.array([0.0,0.0])
+        ]).T
+
+        options = ASB2008CDC.Options()
+        options.t_end = 0.02
+        options.step = 0.02
+        options.tensor_order = 3
+        options.taylor_terms = 4
+        u=Interval(action_bound[0],action_bound[1])
+        options.u= cvt2(u, Geometry.TYPE.ZONOTOPE)
+        options.u_trans = np.zeros(1)
+
+        Zonotope.REDUCE_METHOD = Zonotope.REDUCE_METHOD.GIRARD
+        Zonotope.ORDER = 50
+
+        z = Interval(
+            state_bound[0],
+            state_bound[1]
+        )
+
+        resolution = 0.15  # controls how finely the interval is decomposed
+        xs = boundary(z, resolution, Geometry.TYPE.ZONOTOPE)
+
+        lower=np.full(4, np.finfo(np.float32).max, dtype=np.float32)
+        upper=np.full(4, np.finfo(np.float32).min, dtype=np.float32)
+        for x in xs:
+            ri_set, rp_set = ASB2008CDC.reach(
+                Cartpole.cartpole, [4, 1], options, x
+            )
+
+            for i in ri_set:
+                interval_i = cvt2(i, Geometry.TYPE.INTERVAL)
+                # print(interval_i.inf)
+                # print(interval_i.sup)
+                
+                for j in range(4):
+                    lower[j]=min(lower[j], interval_i.inf[j])
+                    upper[j]=max(upper[j], interval_i.sup[j])
+
+        next_state_bound = np.array([lower,upper])
+
+        return next_state_bound[:,(0,2)]
+    
 class FullModel(Module):
     def __init__(self, system, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -311,6 +390,10 @@ class FullModel(Module):
             self.dynamic = Pendulum()
             self.nnmodel = NNModel("tanh", 2.0)
             weights_path = "weights/pendulum.pth"
+        elif system == 'cartpole':
+            self.dynamic = Cartpole()
+            self.nnmodel = NNModel("sigmoid", 1.0)
+            weights_path = "weights/cartpole.pth"
         else:
             raise ValueError(f"Unknown system type {system}")
         

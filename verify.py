@@ -73,6 +73,9 @@ def run_full_verification(verifier: Verifier, cells: List[Dict],
                     break
                 step += 1
 
+            if step < num_steps:
+                print(Fore.YELLOW + f"early stop at step {step}" + Style.RESET_ALL)
+
         except KeyboardInterrupt as e:
             sys.exit(1)
         except Exception as e:
@@ -183,7 +186,8 @@ if __name__ == "__main__":
     run_full_verification(
         verifier,
         local_cells,
-        num_steps=config['num_steps']
+        num_steps=config['num_steps'],
+        early_stop=config['early_stop']
     )
 
     end_time = time.time()
