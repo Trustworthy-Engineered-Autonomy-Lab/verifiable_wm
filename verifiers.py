@@ -1,6 +1,6 @@
 import numpy as np
 
-from typing import Dict
+from typing import Dict, List
 from abc import ABC, abstractmethod
 import random
 
@@ -11,9 +11,35 @@ class Verifier(ABC):
     def __init__(self):
         pass
 
+    def verify_single_cell(self, cell: Dict):
+        current_bounds = [np.array(list(cell['init_bound'].values())).T]
+
+        # Perform verification steps
+        while True:
+            current_bounds = self.verify_single_step(current_bounds)
+
+            yield self.criteria(current_bounds)
+    
+    def split_merge_bounds(self, bounds: List[np.ndarray]) -> List[np.ndarray]:
+        return bounds
+    
     @abstractmethod
-    def verify_single_cell(self, cell: Dict) -> bool:
+    def criteria(self, bounds: List[np.ndarray]) -> bool:
         pass
+
+    @abstractmethod
+    def verify_single_bound(self, bound: np.ndarray) -> np.ndarray:
+        pass
+
+    def verify_single_step(self, bounds: List[np.ndarray]) -> List[np.ndarray]:
+        new_bounds = []
+        for bound in bounds: 
+            
+            new_bound = self.verify_single_bound(bound)
+            new_bounds.append(new_bound)
+        
+        new_bounds = self.split_merge_bounds(new_bounds)
+        return new_bounds
 
 # ============ Pendulum Neural Network Verifier ============
 class PendulumVerifier(Verifier):
@@ -39,34 +65,15 @@ class PendulumVerifier(Verifier):
                 splited_bounds.append(bound)
 
         return splited_bounds
+    
+    def verify_single_bound(self, bound: np.ndarray):
+        return self.fullmodel.reach(bound)
+    
+    def criteria(self, bounds: List[np.ndarray]) -> bool:
+        # if BOTH |theta_min| and |theta_max| <= 0.15, treat as SAFE.
+        theta_bounds = np.array(bounds)[:,:,0]
+        return True if np.all(np.abs(theta_bounds) <= self.goal_angle_threshold) else False
 
-    def verify_single_cell(self, cell: Dict):
-        """Verify a single cell for the specified number of steps (early-stop when |theta| <= 0.15).
-        Only keep the final step's bounds to save memory.
-        """
-        # Current state bounds
-        current_bounds = [np.array([cell['theta'], cell['omega']]).T]
-
-        # Safety tracking (reach goal if BOTH bounds are within ±0.15)
-        reached_goal = False
-
-        # Perform verification steps with early-stop
-        while True:
-            new_bounds = []
-            for bound in current_bounds: 
-                
-                    new_bound = self.fullmodel.reach(bound)
-                    new_bounds.append(new_bound)
-            
-            # Update current state (we only keep the latest bounds)
-            current_bounds = self.split_merge_bounds(new_bounds)
-            
-            # EARLY STOP: if BOTH |theta_min| and |theta_max| <= 0.15, treat as SAFE and stop. 
-            theta_bounds = np.array(current_bounds)[:,:,0]
-            if np.all(np.abs(theta_bounds) <= self.goal_angle_threshold):
-                reached_goal = True
-            
-            yield reached_goal
 
 class MountainCarVerifier(Verifier):
     """StarV-based Neural Network Verification for Mountain Car System"""
@@ -75,50 +82,27 @@ class MountainCarVerifier(Verifier):
         # Safety condition: BOTH min and max position >= 0.6
         self.goal_position_threshold = goal_position_threshold
         self.fullmodel = FullModel('mountain_car')
-    
-    def verify_single_cell(self, cell: Dict):
-        """Verify a single cell for the specified number of steps"""
-        # Current state bounds
-        current_bound = np.array([cell['pos'], cell['vel']]).T
 
-        # Safety tracking
-        reached_goal = False
+    def verify_single_bound(self, bound: np.ndarray):
+        return self.fullmodel.reach(bound)
 
-        # Perform verification steps
-        while True:
-            # Single step verification
-            current_bound = self.fullmodel.reach(current_bound)
-
-            # Check safety condition: BOTH min and max position must be >= threshold
-            if np.all(current_bound[:,0] >= self.goal_position_threshold):
-                reached_goal = True
-                
-            yield reached_goal
+    def criteria(self, bounds: List[np.ndarray]) -> bool:
+        # Check safety condition: BOTH min and max position must be >= threshold
+        pos_bound = bounds[0][:,0]
+        return True if np.all(pos_bound >= self.goal_position_threshold) else False
     
 class CartpoleVerifier(Verifier):
     def __init__(self, goal_angle_threshold = 12):
         self.goal_angle_threshold = goal_angle_threshold
         self.fullmodel = FullModel('cartpole')
 
-    def verify_single_cell(self, cell):
-        current_bound = np.array([cell['pos'], cell['angle']]).T
+    def verify_single_bound(self, bound: np.ndarray):
+        return self.fullmodel.reach(bound)
 
-        # Safety tracking
-        reached_goal = False
-        cell['history'] = []
-
-        # Perform verification steps
-        while True:
-            # Single step verification
-            current_bound = self.fullmodel.reach(current_bound)
-            cell['history'].append(current_bound.tolist())
-
-            # Check safety condition
-            angle_bound = np.array(current_bound)[:,1]
-            if np.all(np.abs(angle_bound) <= self.goal_angle_threshold):
-                reached_goal = True
-                
-            yield reached_goal
+    def criteria(self, bounds: List[np.ndarray]) -> bool:
+        # Check safety condition
+        angle_bound = bounds[0][:,1]
+        return True if np.all(np.abs(angle_bound) <= self.goal_angle_threshold) else False
 
 class _Test(Verifier):
     def __init__(self, raise_error = True):

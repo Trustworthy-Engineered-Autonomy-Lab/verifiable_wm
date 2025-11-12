@@ -12,6 +12,7 @@ from StarV.layer.ReLULayer import ReLULayer
 from StarV.layer.Conv2DLayer import Conv2DLayer
 from StarV.layer.SatLinLayer import SatLinLayer
 from StarV.layer.TanSigLayer import TanSigLayer
+from StarV.layer.LogSigLayer import LogSigLayer
 from StarV.set.star import Star
 from StarV.set.imagestar import ImageStar
 from StarV.dynamic.Sine import SinLayer
@@ -127,7 +128,7 @@ class Controller(Module):
 
         if activation == 'sigmoid':
             self.act = torch.sigmoid
-            self.starv_act = SatLinLayer()
+            self.starv_act = LogSigLayer()
         elif activation == 'tanh':
             self.act = torch.tanh
             self.starv_act = TanSigLayer()

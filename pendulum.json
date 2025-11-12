@@ -17,8 +17,8 @@
             },
             {
                 "name": "omega",
-                "start": 4.00,
-                "stop": 4.50,
+                "start": 4.50,
+                "stop": 5.00,
                 "num": 50
             }
         ]

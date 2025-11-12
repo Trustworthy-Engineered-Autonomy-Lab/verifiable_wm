@@ -4,7 +4,7 @@
         "args": [
         ],
         "kwargs": {
-            "goal_angle_threshold" : 0.21
+            "goal_angle_threshold" : 0.209
         }
     },
     "grid": {
@@ -12,14 +12,14 @@
             {
                 "name": "pos",
                 "start": 0.00,
-                "stop": 0.01,
-                "num": 1
+                "stop": 0.40,
+                "num": 40
             },
             {
                 "name": "angle",
-                "start": 0.099,
-                "stop": 0.100,
-                "num": 1
+                "start": 0.060,
+                "stop": 0.120,
+                "num": 60
             }
         ]
     },

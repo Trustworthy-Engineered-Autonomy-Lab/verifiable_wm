@@ -1,5 +1,4 @@
 import numpy as np
-import pickle
 from typing import List, Dict, Tuple, Sequence
 import time
 import os
@@ -17,6 +16,7 @@ import argparse
 from mpi4py import MPI
 
 from verifiers import Verifier
+from collections import OrderedDict
     
 def generate_grid_cells(grid: Dict, comm = MPI.COMM_WORLD) -> List[Dict]:
     """Generate grid cells for verification"""
@@ -50,7 +50,9 @@ def generate_grid_cells(grid: Dict, comm = MPI.COMM_WORLD) -> List[Dict]:
 
     return [
         {
-            dim['name'] : list(cell[i])  for i, dim in enumerate(grid['dims'])
+            'init_bound' : OrderedDict(
+                {dim['name'] : list(cell[i])  for i, dim in enumerate(grid['dims'])}
+            )
         }
 
         for cell in local_cells
@@ -63,7 +65,8 @@ def run_full_verification(verifier: Verifier, cells: List[Dict],
     for idx, cell in enumerate(cells):
 
         task_str = "Verified:"
-        for k,v in cell.items():
+        
+        for k,v in cell['init_bound'].items():
             task_str += f" {k}∈[{v[0]},{v[1]}]"
         
         try:
