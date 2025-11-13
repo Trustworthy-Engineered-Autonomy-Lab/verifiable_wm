@@ -117,6 +117,70 @@ class Decoder(Module):
 
         return image_star
 
+# MLP-based GAN Generator Baseline Added
+class G_MLP(Module):
+    def __init__(self, state_dim=2, latent_dim=2, output_dim=96*96):
+        super().__init__()
+        input_dim = state_dim + latent_dim  # e.g., (θ, ω, z1, z2) → 4 total
+        
+        # MLP structure: 4 → 256 → 1024 → 4096 → 9216
+        self.fc1 = nn.Linear(input_dim, 256)
+        self.fc2 = nn.Linear(256, 1024)
+        self.fc3 = nn.Linear(1024, 4096)
+        self.fc4 = nn.Linear(4096, output_dim)
+        
+        self.state_dim = state_dim
+        self.latent_dim = latent_dim
+        self.output_dim = output_dim
+
+    def forward(self, state, z):
+        x = torch.cat([state, z], dim=1)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        x = self.fc4(x)
+        return torch.clamp(x, 0.0, 1.0)
+    
+    def reach(self, input_star: Star) -> ImageStar:
+        # FC1 + ReLU
+        W1 = self.fc1.weight.detach().cpu().numpy()
+        b1 = self.fc1.bias.detach().cpu().numpy()
+        L_fc_1 = FullyConnectedLayer([W1, b1])
+        R_fc_1 = L_fc_1.reach([input_star])
+        L_relu_1 = ReLULayer()
+        R_relu_1 = L_relu_1.reach(R_fc_1[0], method='approx')
+
+        # FC2 + ReLU
+        W2 = self.fc2.weight.detach().cpu().numpy()
+        b2 = self.fc2.bias.detach().cpu().numpy()
+        L_fc_2 = FullyConnectedLayer([W2, b2])
+        R_fc_2 = L_fc_2.reach([R_relu_1])
+        L_relu_2 = ReLULayer()
+        R_relu_2 = L_relu_2.reach(R_fc_2[0], method='approx')
+
+        # FC3 + ReLU
+        W3 = self.fc3.weight.detach().cpu().numpy()
+        b3 = self.fc3.bias.detach().cpu().numpy()
+        L_fc_3 = FullyConnectedLayer([W3, b3])
+        R_fc_3 = L_fc_3.reach([R_relu_2])
+        L_relu_3 = ReLULayer()
+        R_relu_3 = L_relu_3.reach(R_fc_3[0], method='approx')
+
+        # FC4
+        W4 = self.fc4.weight.detach().cpu().numpy()
+        b4 = self.fc4.bias.detach().cpu().numpy()
+        L_fc_4 = FullyConnectedLayer([W4, b4])
+        R_fc_4 = L_fc_4.reach([R_relu_3])
+        star_fc_4 = R_fc_4[0]
+
+        # SatLin Layer
+        L_satlin = SatLinLayer()
+        IM_satlin = L_satlin.reach(star_fc_4, method='approx', lp_solver='gurobi')
+        
+        # Convert to ImageStar
+        image_star = IM_satlin.toImageStar(image_shape=(96, 96, 1))
+
+        return image_star
 
 class Controller(Module):
     def __init__(self, activation = 'tanh', output_factor = 1):
@@ -215,6 +279,30 @@ class NNModel(Module):
     def reach(self, state_bound: np.ndarray) -> np.ndarray:
         state_star = Star(state_bound[0], state_bound[1])
         image_star = self.decoder.reach(state_star)
+        action_star = self.controller.reach(image_star)
+        action_bound = np.array(action_star.getRanges('gurobi'))
+
+        return action_bound
+
+# MLP-based GAN Verification Added    
+class G_MLP_Model(Module):
+    def __init__(self, activation='tanh', output_factor=1.0, latent_min=-0.05, latent_max=0.05):
+        super().__init__()
+        self.controller = Controller(activation, output_factor)
+        self.generator = G_MLP(state_dim=2, latent_dim=2, output_dim=96*96)
+        self.latent_min = latent_min
+        self.latent_max = latent_max
+
+    def forward(self, state, z):
+        out = self.generator(state, z)
+        out = self.controller(out)
+        return out
+    
+    def reach(self, state_bound: np.ndarray) -> np.ndarray:
+        lb = np.concatenate([state_bound[0], [self.latent_min, self.latent_min]])
+        ub = np.concatenate([state_bound[1], [self.latent_max, self.latent_max]])
+        state_star = Star(lb, ub)
+        image_star = self.generator.reach(state_star)
         action_star = self.controller.reach(image_star)
         action_bound = np.array(action_star.getRanges('gurobi'))
 
@@ -411,4 +499,33 @@ class FullModel(Module):
 
         return new_state_bound
         
+class G_MLP_FullModel(Module):
+    def __init__(self, system, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if system == 'mountain_car':
+            self.dynamic = MountainCar()
+            self.g_mlp_model = G_MLP_Model("tanh", 1.0)
+            weights_path = "weights/mountain_car/G_mc.pth"
+        elif system == 'pendulum':
+            self.dynamic = Pendulum()
+            self.g_mlp_model = G_MLP_Model("tanh", 2.0)
+            weights_path = "weights/pendulum/G_pen.pth"
+        elif system == 'cartpole':
+            self.dynamic = Cartpole()
+            self.g_mlp_model = G_MLP_Model("sigmoid", 1.0)
+            weights_path = "weights/cartpole/G_cp.pth"
+        else:
+            raise ValueError(f"Unknown system type {system}")
+        
+        weights = torch.load(weights_path, 'cpu', weights_only=True)
+        self.g_mlp_model.load_state_dict(weights)
 
+    def reach(self, state_bound: np.ndarray) -> np.ndarray:
+        # Verify the model
+        action_bound = self.g_mlp_model.reach(state_bound)
+        # Combine state bound and action bound
+        combined_bound = np.concatenate([state_bound, action_bound], axis=1)
+        # Compute the next state bound
+        new_state_bound = self.dynamic.reach(combined_bound)
+
+        return new_state_bound
