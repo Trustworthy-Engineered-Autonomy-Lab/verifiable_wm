@@ -1,4 +1,18 @@
 {
+    "layers" : {
+        "Decoder" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "weights/pendulum/decoder.pth"
+            }
+        },
+        "Controller" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "weights/pendulum/controller.pth"
+            }
+        }
+    },
     "verifier": {
         "name": "PendulumVerifier",
         "args": [

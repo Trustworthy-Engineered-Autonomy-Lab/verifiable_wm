@@ -1,4 +1,18 @@
 {
+    "layers" : {
+        "Decoder" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "weights/cartpole/decoder.pth"
+            }
+        },
+        "Controller" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "weights/cartpole/controller.pth"
+            }
+        }
+    },
     "verifier": {
         "name": "CartpoleVerifier",
         "args": [
