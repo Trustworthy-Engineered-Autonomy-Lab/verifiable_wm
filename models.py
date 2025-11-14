@@ -296,49 +296,6 @@ class Controller(Module):
             action_star = IM_act
 
         return action_star
-
-# class NNModel(Module):
-#     def __init__(self, activation = 'tanh', output_factor = 1.0):
-#         super().__init__()
-#         self.controller = Controller(activation, output_factor)
-#         self.decoder = Decoder()
-
-#     def forward(self, x):
-#         out = self.decoder(x)
-#         out = self.controller(out)
-#         return out
-    
-#     def reach(self, state_bound: np.ndarray) -> np.ndarray:
-#         state_star = Star(state_bound[0], state_bound[1])
-#         image_star = self.decoder.reach(state_star)
-#         action_star = self.controller.reach(image_star)
-#         action_bound = np.array(action_star.getRanges('gurobi'))
-
-#         return action_bound
-
-# MLP-based GAN Verification Added    
-# class G_MLP_Model(Module):
-#     def __init__(self, activation='tanh', output_factor=1.0, latent_min=-0.05, latent_max=0.05):
-#         super().__init__()
-#         self.controller = Controller(activation, output_factor)
-#         self.generator = G_MLP(state_dim=2, latent_dim=2, output_dim=96*96)
-#         self.latent_min = latent_min
-#         self.latent_max = latent_max
-
-#     def forward(self, state, z):
-#         out = self.generator(state, z)
-#         out = self.controller(out)
-#         return out
-    
-#     def reach(self, state_bound: np.ndarray) -> np.ndarray:
-#         lb = np.concatenate([state_bound[0], [self.latent_min, self.latent_min]])
-#         ub = np.concatenate([state_bound[1], [self.latent_max, self.latent_max]])
-#         state_star = Star(lb, ub)
-#         image_star = self.generator.reach(state_star)
-#         action_star = self.controller.reach(image_star)
-#         action_bound = np.array(action_star.getRanges('gurobi'))
-
-#         return action_bound
     
 class Pendulum(Module):
     def __init__(self, *args, **kwargs):
@@ -428,6 +385,8 @@ class MountainCar(Module):
 class Cartpole(Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.vel_bound = np.array([0.0,0.0])
+        self.avel_bound = np.array([0.0,0.0])
 
     def forward(self):
         pass
@@ -453,12 +412,7 @@ class Cartpole(Module):
     def reach(self, bound: np.ndarray) -> np.ndarray:
 
         action_bound = bound[:,-1]
-        state_bound = np.array([
-            bound[:,0],
-            np.array([0.0,0.0]),
-            bound[:,1],
-            np.array([0.0,0.0])
-        ]).T
+        state_bound = bound[:,0:4]
 
         options = ASB2008CDC.Options()
         options.t_end = 0.02
@@ -498,38 +452,7 @@ class Cartpole(Module):
 
         next_state_bound = np.array([lower,upper])
 
-        return next_state_bound[:,(0,2)]
-    
-# class FullModel(Module):
-#     def __init__(self, system, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         if system == 'mountain_car':
-#             self.dynamic = MountainCar()
-#             self.nnmodel = NNModel("tanh", 1.0)
-#             weights_path = "weights/mountain_car.pth"
-#         elif system == 'pendulum':
-#             self.dynamic = Pendulum()
-#             self.nnmodel = NNModel("tanh", 2.0)
-#             weights_path = "weights/pendulum.pth"
-#         elif system == 'cartpole':
-#             self.dynamic = Cartpole()
-#             self.nnmodel = NNModel("sigmoid", 1.0)
-#             weights_path = "weights/cartpole.pth"
-#         else:
-#             raise ValueError(f"Unknown system type {system}")
-        
-#         weights = torch.load(weights_path, 'cpu', weights_only=True)
-#         self.nnmodel.load_state_dict(weights)
-
-#     def reach(self, state_bound: np.ndarray) -> np.ndarray:
-#         # Verify the model
-#         action_bound = self.nnmodel.reach(state_bound)
-#         # Combine state bound and action bound
-#         combined_bound = np.concatenate([state_bound, action_bound], axis=1)
-#         # Compute the next state bound
-#         new_state_bound = self.dynamic.reach(combined_bound)
-
-#         return new_state_bound
+        return next_state_bound
         
 class FullModel(Module):
     def __init__(self, layers: OrderedDict, *args, **kwargs):

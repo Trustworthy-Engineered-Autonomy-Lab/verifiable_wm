@@ -103,6 +103,11 @@ class CartpoleVerifier(Verifier):
         self.goal_angle_threshold = goal_angle_threshold
         self.dynamic = Cartpole()
 
+    def verify_single_bound(self, model: FullModel, state_bound: np.ndarray) -> np.ndarray:
+        action_bound = model.reach(state_bound[:,(0,2)])
+        combined_bound = np.concatenate([state_bound, action_bound], axis=1)
+        return self.dynamic_step(combined_bound)
+
     def dynamic_step(self, bound: np.ndarray):
         return self.dynamic.reach(bound)
 
