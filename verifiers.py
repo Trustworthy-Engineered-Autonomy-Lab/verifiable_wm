@@ -94,7 +94,7 @@ class MountainCarVerifier(Verifier):
 
     def criteria(self, bounds: List[np.ndarray]) -> bool:
         # Check safety condition: BOTH min and max position must be >= threshold
-        pos_bound = bounds[0][:,0]
+        pos_bound = np.array(bounds)[:,:,0]
         return True if np.all(pos_bound >= self.goal_position_threshold) else False
     
 class CartpoleVerifier(Verifier):
@@ -113,7 +113,7 @@ class CartpoleVerifier(Verifier):
 
     def criteria(self, bounds: List[np.ndarray]) -> bool:
         # Check safety condition
-        angle_bound = bounds[0][:,1]
+        angle_bound = np.array(bounds)[:,:,2]
         return True if np.all(np.abs(angle_bound) <= self.goal_angle_threshold) else False
 
 # class _Test(Verifier):
