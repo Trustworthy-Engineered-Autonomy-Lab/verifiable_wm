@@ -4,20 +4,21 @@ from typing import Dict, List
 from abc import ABC, abstractmethod
 import random
 
-from models import FullModel
+from models import Pendulum, MountainCar, Cartpole, FullModel
 
 
 class Verifier(ABC):
-    def __init__(self):
-        pass
+    def __init__(self, save_history = False):
+        self.save_history = save_history
 
-    def verify_single_cell(self, cell: Dict):
+    def verify_single_cell(self, model: FullModel, cell: Dict):
         current_bounds = [np.array(list(cell['init_bound'].values())).T]
-
+        cell['history'] = []
         # Perform verification steps
         while True:
-            current_bounds = self.verify_single_step(current_bounds)
-
+            current_bounds = self.verify_single_step(model, current_bounds)
+            if self.save_history:
+                cell['history'].append([bound.tolist() for bound in current_bounds])
             yield self.criteria(current_bounds)
     
     def split_merge_bounds(self, bounds: List[np.ndarray]) -> List[np.ndarray]:
@@ -28,14 +29,19 @@ class Verifier(ABC):
         pass
 
     @abstractmethod
-    def verify_single_bound(self, bound: np.ndarray) -> np.ndarray:
+    def dynamic_step(self, combined_bound: np.ndarray) -> np.ndarray:
         pass
 
-    def verify_single_step(self, bounds: List[np.ndarray]) -> List[np.ndarray]:
+    def verify_single_bound(self, model: FullModel, state_bound: np.ndarray) -> np.ndarray:
+        action_bound = model.reach(state_bound)
+        combined_bound = np.concatenate([state_bound, action_bound], axis=1)
+        return self.dynamic_step(combined_bound)
+
+    def verify_single_step(self, model: FullModel, bounds: List[np.ndarray]) -> List[np.ndarray]:
         new_bounds = []
         for bound in bounds: 
-            
-            new_bound = self.verify_single_bound(bound)
+
+            new_bound = self.verify_single_bound(model, bound)
             new_bounds.append(new_bound)
         
         new_bounds = self.split_merge_bounds(new_bounds)
@@ -45,10 +51,10 @@ class Verifier(ABC):
 class PendulumVerifier(Verifier):
     """StarV-based Neural Network Verification for Pendulum System"""
 
-    def __init__(self, goal_angle_threshold = 0.15):
-        # Create the controller and decoder
+    def __init__(self, goal_angle_threshold = 0.15, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.goal_angle_threshold = goal_angle_threshold
-        self.fullmodel = FullModel('pendulum')
+        self.dynamic = Pendulum()
 
     def split_merge_bounds(self, bounds):
         splited_bounds = []
@@ -66,8 +72,8 @@ class PendulumVerifier(Verifier):
 
         return splited_bounds
     
-    def verify_single_bound(self, bound: np.ndarray):
-        return self.fullmodel.reach(bound)
+    def dynamic_step(self, bound: np.ndarray):
+        return self.dynamic.reach(bound)
     
     def criteria(self, bounds: List[np.ndarray]) -> bool:
         # if BOTH |theta_min| and |theta_max| <= 0.15, treat as SAFE.
@@ -78,13 +84,13 @@ class PendulumVerifier(Verifier):
 class MountainCarVerifier(Verifier):
     """StarV-based Neural Network Verification for Mountain Car System"""
 
-    def __init__(self, goal_position_threshold = 0.6):
-        # Safety condition: BOTH min and max position >= 0.6
+    def __init__(self, goal_position_threshold = 0.6, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.goal_position_threshold = goal_position_threshold
-        self.fullmodel = FullModel('mountain_car')
+        self.dynamic = MountainCar()
 
-    def verify_single_bound(self, bound: np.ndarray):
-        return self.fullmodel.reach(bound)
+    def dynamic_step(self, bound: np.ndarray):
+        return self.dynamic.reach(bound)
 
     def criteria(self, bounds: List[np.ndarray]) -> bool:
         # Check safety condition: BOTH min and max position must be >= threshold
@@ -92,26 +98,32 @@ class MountainCarVerifier(Verifier):
         return True if np.all(pos_bound >= self.goal_position_threshold) else False
     
 class CartpoleVerifier(Verifier):
-    def __init__(self, goal_angle_threshold = 12):
+    def __init__(self, goal_angle_threshold = 12, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.goal_angle_threshold = goal_angle_threshold
-        self.fullmodel = FullModel('cartpole')
+        self.dynamic = Cartpole()
 
-    def verify_single_bound(self, bound: np.ndarray):
-        return self.fullmodel.reach(bound)
+    def verify_single_bound(self, model: FullModel, state_bound: np.ndarray) -> np.ndarray:
+        action_bound = model.reach(state_bound[:,(0,2)])
+        combined_bound = np.concatenate([state_bound, action_bound], axis=1)
+        return self.dynamic_step(combined_bound)
+
+    def dynamic_step(self, bound: np.ndarray):
+        return self.dynamic.reach(bound)
 
     def criteria(self, bounds: List[np.ndarray]) -> bool:
         # Check safety condition
         angle_bound = bounds[0][:,1]
         return True if np.all(np.abs(angle_bound) <= self.goal_angle_threshold) else False
 
-class _Test(Verifier):
-    def __init__(self, raise_error = True):
-        self.raise_error = raise_error
+# class _Test(Verifier):
+    # def __init__(self, raise_error = True):
+    #     self.raise_error = raise_error
 
-    def verify_single_cell(self, cell):
-        if self.raise_error:
-            raise RuntimeError("Error raised to test the program")
+    # def verify_single_cell(self, cell):
+    #     if self.raise_error:
+    #         raise RuntimeError("Error raised to test the program")
         
-        while True:
-            yield random.choice([True, False])
+    #     while True:
+    #         yield random.choice([True, False])
         

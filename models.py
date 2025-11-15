@@ -23,21 +23,29 @@ from pybdr.algorithm import ASB2008CDC
 from pybdr.geometry.operation import boundary, cvt2
 
 from sympy import Matrix, cos, sin
+from typing import Dict, List
+from collections import OrderedDict
 
 class Module(nn.Module, ABC):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        pass
+
     @abstractmethod
     def reach(self, *args, **kwargs):
         pass
 
 class Decoder(Module):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, weights, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.fc1 = nn.Linear(2, 32)
         self.fc2 = nn.Linear(32, 64)
         self.fc3 = nn.Linear(64, 3 * 12 * 12)
         self.dec_conv1 = nn.ConvTranspose2d(3, 4, kernel_size=4, stride=2, padding=1)
         self.dec_conv2 = nn.ConvTranspose2d(4, 8, kernel_size=4, stride=2, padding=1)
         self.dec_conv3 = nn.ConvTranspose2d(8, 1, kernel_size=4, stride=2, padding=1)
+
+        self.load_state_dict(torch.load(weights, 'cpu', weights_only=True))
 
     def forward(self, states):
         b = states.size(0)
@@ -50,7 +58,11 @@ class Decoder(Module):
         x = self.dec_conv3(x)
         return torch.clamp(x, 0.0, 1.0)
     
-    def reach(self, state_star: Star) -> ImageStar:
+    def reach(self, state_bound: np.ndarray) -> ImageStar:
+        state_star = Star(state_bound[0], state_bound[1])
+        return self.star_reach(state_star)
+    
+    def star_reach(self, state_star: Star) -> ImageStar:
         # FC1 + ReLU
         W1 = self.fc1.weight.detach().cpu().numpy()
         b1 = self.fc1.bias.detach().cpu().numpy()
@@ -117,14 +129,93 @@ class Decoder(Module):
 
         return image_star
 
+# MLP-based GAN Generator Baseline Added
+class G_MLP(Module):
+    def __init__(self, weights, state_dim=2, latent_dim=2, output_dim=96*96, latent_min=-0.05, latent_max=0.05, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        input_dim = state_dim + latent_dim  # e.g., (θ, ω, z1, z2) → 4 total
+        
+        # MLP structure: 4 → 256 → 1024 → 4096 → 9216
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 4096),
+            nn.ReLU(),
+            nn.Linear(4096, output_dim),
+        )
+
+        self.load_state_dict(torch.load(weights, 'cpu', weights_only=True))
+        
+        self.state_dim = state_dim
+        self.latent_dim = latent_dim
+        self.output_dim = output_dim
+
+        self.latent_min = latent_min
+        self.latent_max = latent_max
+
+    def forward(self, state, z):
+        x = torch.cat([state, z], dim=1)
+        x = self.net(x)
+        return torch.clamp(x, 0.0, 1.0)
+    
+    def reach(self, state_bound: np.ndarray) -> ImageStar:
+        lb = np.concatenate([state_bound[0], np.array([self.latent_min, self.latent_min])])
+        ub = np.concatenate([state_bound[1], np.array([self.latent_max, self.latent_max])])
+        state_star = Star(lb, ub)
+        return self.star_reach(state_star)
+    
+    def star_reach(self, input_star: Star) -> ImageStar:
+        # FC1 + ReLU
+        W1 = self.net[0].weight.detach().cpu().numpy()
+        b1 = self.net[0].bias.detach().cpu().numpy()
+        L_fc_1 = FullyConnectedLayer([W1, b1])
+        R_fc_1 = L_fc_1.reach([input_star])
+        L_relu_1 = ReLULayer()
+        R_relu_1 = L_relu_1.reach(R_fc_1[0], method='approx')
+
+        # FC2 + ReLU
+        W2 = self.net[2].weight.detach().cpu().numpy()
+        b2 = self.net[2].bias.detach().cpu().numpy()
+        L_fc_2 = FullyConnectedLayer([W2, b2])
+        R_fc_2 = L_fc_2.reach([R_relu_1])
+        L_relu_2 = ReLULayer()
+        R_relu_2 = L_relu_2.reach(R_fc_2[0], method='approx')
+
+        # FC3 + ReLU
+        W3 = self.net[4].weight.detach().cpu().numpy()
+        b3 = self.net[4].bias.detach().cpu().numpy()
+        L_fc_3 = FullyConnectedLayer([W3, b3])
+        R_fc_3 = L_fc_3.reach([R_relu_2])
+        L_relu_3 = ReLULayer()
+        R_relu_3 = L_relu_3.reach(R_fc_3[0], method='approx')
+
+        # FC4
+        W4 = self.net[6].weight.detach().cpu().numpy()
+        b4 = self.net[6].bias.detach().cpu().numpy()
+        L_fc_4 = FullyConnectedLayer([W4, b4])
+        R_fc_4 = L_fc_4.reach([R_relu_3])
+        star_fc_4 = R_fc_4[0]
+
+        # SatLin Layer
+        L_satlin = SatLinLayer()
+        IM_satlin = L_satlin.reach(star_fc_4, method='approx', lp_solver='gurobi')
+        
+        # Convert to ImageStar
+        image_star = IM_satlin.toImageStar(image_shape=(96, 96, 1))
+
+        return image_star
 
 class Controller(Module):
-    def __init__(self, activation = 'tanh', output_factor = 1):
-        super().__init__()
+    def __init__(self, weights, activation = 'tanh', output_factor = 1, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.conv1 = nn.Conv2d(1, 4, kernel_size=4, stride=2, padding=1)
         self.conv2 = nn.Conv2d(4, 1, kernel_size=4, stride=2, padding=1)
         self.fc1 = nn.Linear(24 * 24, 64)
         self.fc2 = nn.Linear(64, 1)
+
+        self.load_state_dict(torch.load(weights, 'cpu', weights_only=True))
 
         if activation == 'sigmoid':
             self.act = torch.sigmoid
@@ -145,7 +236,12 @@ class Controller(Module):
         x = self.fc2(x)
         return self.act(x)
     
-    def reach(self, image_star: ImageStar) -> Star:
+    def reach(self, image_star: ImageStar) -> np.ndarray:
+        action_star = self.star_reach(image_star)
+        action_bound = np.array(action_star.getRanges('gurobi'))
+        return action_bound
+    
+    def star_reach(self, image_star: ImageStar) -> Star:
         # Conv1 + ReLU
         w_conv1 = self.conv1.weight.detach().cpu().numpy()
         b_conv1 = self.conv1.bias.detach().cpu().numpy()
@@ -200,29 +296,10 @@ class Controller(Module):
             action_star = IM_act
 
         return action_star
-
-class NNModel(Module):
-    def __init__(self, activation = 'tanh', output_factor = 1.0):
-        super().__init__()
-        self.controller = Controller(activation, output_factor)
-        self.decoder = Decoder()
-
-    def forward(self, x):
-        out = self.decoder(x)
-        out = self.controller(out)
-        return out
-    
-    def reach(self, state_bound: np.ndarray) -> np.ndarray:
-        state_star = Star(state_bound[0], state_bound[1])
-        image_star = self.decoder.reach(state_star)
-        action_star = self.controller.reach(image_star)
-        action_bound = np.array(action_star.getRanges('gurobi'))
-
-        return action_bound
     
 class Pendulum(Module):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def forward(self):
         pass
@@ -266,8 +343,8 @@ class Pendulum(Module):
         return next_bound
     
 class MountainCar(Module):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         # Mountain Car dynamics constants
         self.MIN_POS = -1.2
@@ -306,8 +383,10 @@ class MountainCar(Module):
         return np.array([pos_bound, vel_bound]).T
     
 class Cartpole(Module):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.vel_bound = np.array([0.0,0.0])
+        self.avel_bound = np.array([0.0,0.0])
 
     def forward(self):
         pass
@@ -333,12 +412,7 @@ class Cartpole(Module):
     def reach(self, bound: np.ndarray) -> np.ndarray:
 
         action_bound = bound[:,-1]
-        state_bound = np.array([
-            bound[:,0],
-            np.array([0.0,0.0]),
-            bound[:,1],
-            np.array([0.0,0.0])
-        ]).T
+        state_bound = bound[:,0:4]
 
         options = ASB2008CDC.Options()
         options.t_end = 0.02
@@ -378,37 +452,23 @@ class Cartpole(Module):
 
         next_state_bound = np.array([lower,upper])
 
-        return next_state_bound[:,(0,2)]
-    
-class FullModel(Module):
-    def __init__(self, system, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if system == 'mountain_car':
-            self.dynamic = MountainCar()
-            self.nnmodel = NNModel("tanh", 1.0)
-            weights_path = "weights/mountain_car.pth"
-        elif system == 'pendulum':
-            self.dynamic = Pendulum()
-            self.nnmodel = NNModel("tanh", 2.0)
-            weights_path = "weights/pendulum.pth"
-        elif system == 'cartpole':
-            self.dynamic = Cartpole()
-            self.nnmodel = NNModel("sigmoid", 1.0)
-            weights_path = "weights/cartpole.pth"
-        else:
-            raise ValueError(f"Unknown system type {system}")
+        return next_state_bound
         
-        weights = torch.load(weights_path, 'cpu', weights_only=True)
-        self.nnmodel.load_state_dict(weights)
+class FullModel(Module):
+    def __init__(self, layers: OrderedDict, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.layers = []
+        for k,v in layers.items():
+            module = globals()[k]
+            self.layers.append(module(*v['args'], **v['kwargs']))
 
     def reach(self, state_bound: np.ndarray) -> np.ndarray:
-        # Verify the model
-        action_bound = self.nnmodel.reach(state_bound)
-        # Combine state bound and action bound
-        combined_bound = np.concatenate([state_bound, action_bound], axis=1)
-        # Compute the next state bound
-        new_state_bound = self.dynamic.reach(combined_bound)
 
-        return new_state_bound
-        
+        layer_in = state_bound
+        for layer in self.layers:
+            layer_in = layer.reach(layer_in) 
 
+        action_bound = layer_in
+        return action_bound
+    

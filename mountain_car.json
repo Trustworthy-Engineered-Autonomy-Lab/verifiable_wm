@@ -1,4 +1,18 @@
 {
+    "layers" : {
+        "G_MLP" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "weights/mountain_car/g_mlp.pth"
+            }
+        },
+        "Controller" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "weights/mountain_car/controller.pth"
+            }
+        }
+    },
     "verifier": {
         "name": "MountainCarVerifier",
         "args": [
@@ -25,5 +39,5 @@
     },
     "num_steps": 20,
     "early_stop": true,
-    "output_prefix": "results/mountain_car/safety_result"
+    "output_prefix": "results/mountain_car/safety_result_g_mlp"
 }

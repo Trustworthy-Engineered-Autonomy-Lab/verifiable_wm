@@ -15,6 +15,7 @@ import argparse
 
 from mpi4py import MPI
 
+from models import FullModel
 from verifiers import Verifier
 from collections import OrderedDict
     
@@ -58,7 +59,7 @@ def generate_grid_cells(grid: Dict, comm = MPI.COMM_WORLD) -> List[Dict]:
         for cell in local_cells
     ]
 
-def run_full_verification(verifier: Verifier, cells: List[Dict], 
+def run_full_verification(verifier: Verifier, model: FullModel, cells: List[Dict], 
                           num_steps: int = 20, early_stop = True):
     """Run complete multi-cell verification"""
 
@@ -71,7 +72,7 @@ def run_full_verification(verifier: Verifier, cells: List[Dict],
         
         try:
             step = 1
-            for result in verifier.verify_single_cell(cell):
+            for result in verifier.verify_single_cell(model, cell):
                 if (result and early_stop) or step >= num_steps:
                     break
                 step += 1
@@ -115,6 +116,10 @@ def load_input(file_path: str):
         print('Verifier is not specified')
         return None
     
+    if 'layers' not in config:
+        print('Layers are not specified')
+        return None
+    
     if 'grid' not in config:
         print('Grid is not specified')
         return None
@@ -155,6 +160,14 @@ if __name__ == "__main__":
     if config is None:
         sys.exit(1)
 
+    layer_cfg = config['layers']
+    try:
+        model = FullModel(layers=layer_cfg)
+    except Exception as e:
+        if comm.rank == 0:
+            print(f"Failed to create model from layers: {e}")
+        sys.exit()
+
     # Create the verifier
     verifier_cfg = config['verifier']
 
@@ -188,6 +201,7 @@ if __name__ == "__main__":
 
     run_full_verification(
         verifier,
+        model,
         local_cells,
         num_steps=config['num_steps'],
         early_stop=config['early_stop']

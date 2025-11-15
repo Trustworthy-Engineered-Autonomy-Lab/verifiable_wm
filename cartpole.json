@@ -1,4 +1,19 @@
 {
+    "layers" : {
+        "Decoder" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "weights/cartpole/decoder.pth"
+            }
+        },
+        "Controller" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "weights/cartpole/controller.pth",
+                "activation" : "sigmoid"
+            }
+        }
+    },
     "verifier": {
         "name": "CartpoleVerifier",
         "args": [
@@ -11,15 +26,27 @@
         "dims": [
             {
                 "name": "pos",
+                "start": 0.05,
+                "stop": 0.06,
+                "num": 1
+            },
+            {
+                "name": "vel",
                 "start": 0.00,
-                "stop": 0.40,
-                "num": 40
+                "stop": 0.00,
+                "num": 1
             },
             {
                 "name": "angle",
-                "start": 0.060,
-                "stop": 0.120,
-                "num": 60
+                "start": 0.100,
+                "stop": 0.101,
+                "num": 1
+            },
+            {
+                "name": "avel",
+                "start": 0.00,
+                "stop": 0.00,
+                "num": 1
             }
         ]
     },
