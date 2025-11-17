@@ -320,7 +320,10 @@ class Pendulum(Module):
         S_theta = Star(lb_theta, ub_theta)
 
         IM_sin = L_sin.reach(S_theta, method='approx', lp_solver='gurobi', RF=0.0)
-        z_bound = np.array(IM_sin.getRanges(lp_solver='gurobi'))
+        try:
+            z_bound = np.array(IM_sin.getRanges(lp_solver='gurobi'))
+        except Exception as e:
+            z_bound = np.array(IM_sin.getRanges(lp_solver='estimate'))
 
         full_bound = np.concatenate([bound, z_bound], axis = 1)
         S_full = Star(full_bound[0], full_bound[1])
