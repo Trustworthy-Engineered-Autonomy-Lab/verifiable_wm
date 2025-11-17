@@ -6,20 +6,78 @@ import random
 
 from models import Pendulum, MountainCar, Cartpole, FullModel
 
+import traceback
+import shutil
+from colorama import Fore, Style
+import sys
 
 class Verifier(ABC):
-    def __init__(self, save_history = False):
+    def __init__(self, save_history = False, num_steps = 20, early_stop = True):
         self.save_history = save_history
+        self.num_steps = num_steps
+        self.early_stop = early_stop
 
-    def verify_single_cell(self, model: FullModel, cell: Dict):
-        current_bounds = [np.array(list(cell['init_bound'].values())).T]
-        cell['history'] = []
-        # Perform verification steps
-        while True:
-            current_bounds = self.verify_single_step(model, current_bounds)
-            if self.save_history:
-                cell['history'].append([bound.tolist() for bound in current_bounds])
-            yield self.criteria(current_bounds)
+    def verify_cells(self, model: FullModel, cells: List[Dict]):
+
+        for idx, cell in enumerate(cells):
+
+            task_str = "Verified:"
+            
+            dims = []
+            inital_bound = []
+
+            for k,v in cell['bounds'][0].items():
+                task_str += f" {k}∈[{v[0]},{v[1]}]"
+                dims.append(k)
+                inital_bound.append(v)
+
+            inital_bound = np.array(inital_bound).T
+            
+            try:
+                # Verify one cell
+                current_bounds = [inital_bound]
+
+                for step in range(1, self.num_steps + 1):
+                    current_bounds = self.verify_single_step(model, current_bounds)
+                    # Save history if needed
+                    if self.save_history:
+                        cell['bounds'].append(
+                            {
+                                dim:list(bound) for dim,bound in zip(dims, np.concatenate(current_bounds).T)
+                            }
+                        )
+
+                    result = self.criteria(current_bounds)
+                    if result and self.early_stop:
+                        break
+
+                if step < self.num_steps:
+                    print(Fore.YELLOW + f"early stop at step {step}" + Style.RESET_ALL)
+                
+                # If history wasn't saved, save the last bound
+                if not self.save_history:
+                    cell['bounds'].append(
+                        {
+                            dim:list(bound) for dim,bound in zip(dims, np.concatenate(current_bounds).T)
+                        }
+                    )
+
+            except KeyboardInterrupt as e:
+                raise e
+            except Exception as e:
+                result = False
+                cell['error_msg'] = str(e)
+                status_str = "Error"
+                color = Fore.RED
+                traceback.print_exc(file=sys.stderr)
+            else:
+                status_str = "Safe" if result else "Unsafe"
+                color = Fore.GREEN if result else Fore.YELLOW
+            
+            cell['result'] = result
+            ndashs = shutil.get_terminal_size().columns - len(task_str) - len(status_str) - 2
+            
+            print(task_str, '-' * ndashs, color + status_str + Style.RESET_ALL)
     
     def split_merge_bounds(self, bounds: List[np.ndarray]) -> List[np.ndarray]:
         return bounds

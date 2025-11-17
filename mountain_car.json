@@ -18,7 +18,9 @@
         "args": [
         ],
         "kwargs": {
-            "goal_position_threshold": 0.6
+            "goal_position_threshold": 0.6,
+            "num_steps": 30,
+            "early_stop": true
         }
     },
     "grid": {
@@ -37,7 +39,5 @@
             }
         ]
     },
-    "num_steps": 20,
-    "early_stop": true,
     "output_prefix": "results/mountain_car/safety_result_g_mlp"
 }
