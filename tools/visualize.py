@@ -11,6 +11,7 @@ from pathlib import Path
 import argparse
 import sys
 import json
+import os
 
 def _plot_2d_safety_map(x_dim: Dict, y_dim: Dict, safety_matrix: np.ndarray, title = "") -> Tuple[Figure, Axes]:
     """Visualize safety map as a grid heatmap"""
@@ -59,7 +60,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--title", type=str, help="title for the plot", default="")
-    parser.add_argument("--save", type=str, help="filename to save the plot", default=None)
+    parser.add_argument("--save", type=str, help="filename of the result to save", default=None)
     parser.add_argument("--show", action="store_true")
     parser.add_argument("result_file", type=str, help="result file path")
     args = parser.parse_args()
@@ -85,29 +86,53 @@ if __name__ == "__main__":
         cells = result['cells']
 
         dims = grid['dims']
+        effective_dims = []
+        for dim in dims:
+            if dim['num'] != 1:
+                print(f"Ignored dimension {dim['name']} whose num is 1")
+                effective_dims.append(dim)
 
-        if len(dims) != 2:
-            print("Does not support grid whose dimension is not 2")
-            sys.exit(1)
-
-        print(f"Grid size: {dims[0]['num']} × {dims[0]['num']} = {dims[0]['num'] * dims[1]['num']} total cells")
+        print(f"Grid size: {effective_dims[0]['num']} × {effective_dims[0]['num']} = {effective_dims[0]['num'] * effective_dims[1]['num']} total cells")
         
         # Create the safety matrix
-        safety_matrix = _get_safety_matrix(dims, cells).T
-
-        # Count safe and unsafe cells
-        safe_count = int(np.sum(safety_matrix))
-        unsafe_count = int(np.size(safety_matrix) - safe_count)
-        print(f"Summary: {safe_count} safe cells, {unsafe_count} unsafe cells")
-
-        fig, ax = _plot_2d_safety_map(*dims, safety_matrix, title=args.title)
-        if args.show:
-            fig.show()
-
-        if args.save is not None:
-            fig.savefig(args.save, dpi=300, bbox_inches='tight')
-            print(f"Safety map saved to: {args.save}")
-
+        safety_matrix = _get_safety_matrix(effective_dims, cells).T
     except KeyError as e:
         print(f"Could not find field {e.args[0]} in {args.result_file}")
         sys.exit(1)
+
+    # Count safe and unsafe cells
+    safe_count = int(np.sum(safety_matrix))
+    unsafe_count = int(np.size(safety_matrix) - safe_count)
+    print(f"Summary: {safe_count} safe cells, {unsafe_count} unsafe cells")
+
+    save_matrix = False
+    save_plot = False
+
+    if args.save is not None:
+        save_path = Path(args.save)
+        if save_path.name == "":
+            print(f"Invalid path {args.save} to save any result")
+            sys.exit(1)
+        
+        save_folder = save_path.parent
+        os.makedirs(save_folder,exist_ok=True)
+
+        suffix = save_path.suffix.lower().lstrip('.')
+        if suffix in ['png','jpeg','jpg']:
+            save_plot = True
+        elif suffix == 'npy':
+            save_matrix = True
+
+
+    if args.show or save_plot:
+        fig, ax = _plot_2d_safety_map(*effective_dims, safety_matrix, title=args.title)
+        if args.show:
+            fig.show()
+        if save_plot:
+            fig.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Safety map saved to: {args.save}")
+        
+    if save_matrix:
+        np.save(save_path, safety_matrix)
+        print(f"Safety matrix saved to {args.save}")
+        
