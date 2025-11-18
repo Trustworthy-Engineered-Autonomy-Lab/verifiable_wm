@@ -14,6 +14,9 @@ from mpi4py import MPI
 from models import FullModel
 from verifiers import Verifier
 from collections import OrderedDict
+import traceback
+import shutil
+from colorama import Fore, Style
     
 def generate_grid_cells(grid: Dict, comm = MPI.COMM_WORLD) -> List[Dict]:
     """Generate grid cells for verification"""
@@ -47,13 +50,38 @@ def generate_grid_cells(grid: Dict, comm = MPI.COMM_WORLD) -> List[Dict]:
 
     return [
         {
-            'bounds' : [OrderedDict(
-                {dim['name'] : list(cell[i])  for i, dim in enumerate(grid['dims'])}
-            )]
+            'bounds' : [cell]
         }
 
         for cell in local_cells
     ]
+
+def verify_cells(verifier: Verifier, model: FullModel, grid: Dict, cells: List[Dict]):
+
+    names = [dim['name'] for dim in grid['dims']]
+
+    for idx, cell in enumerate(cells):
+
+        task_str = "Verified:"
+        
+        for name,bound in zip(names, cell['bounds'][0]):
+            task_str += f" {name}∈[{bound[0]},{bound[1]}]"
+
+        try:
+            verifier.verify_single_cell(model, cell)
+        except KeyboardInterrupt as e:
+            raise e
+        except Exception as e:
+            cell['error_msg'] = str(e)
+            status_str = "Error"
+            color = Fore.RED
+            traceback.print_exc(file=sys.stderr)
+        else:
+            status_str = "Safe" if cell['result'] else "Unsafe"
+            color = Fore.GREEN if cell['result'] else Fore.YELLOW
+        
+        ndashs = shutil.get_terminal_size().columns - len(task_str) - len(status_str) - 2
+        print(task_str, '-' * ndashs, color + status_str + Style.RESET_ALL)
 
 def load_input(file_path: str):
     input_file_path = pathlib.Path(file_path)
@@ -86,6 +114,12 @@ def load_input(file_path: str):
         config['output_prefix'] = 'result'
 
     return config
+
+class JSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        return super().default(o)
 
 
 # ============ Main Execution ============
@@ -150,8 +184,10 @@ if __name__ == "__main__":
     # Run full verification
     start_time = time.time()
 
-    verifier.verify_cells(
+    verify_cells(
+        verifier,
         model,
+        config['grid'],
         local_cells
     )
 
@@ -171,7 +207,7 @@ if __name__ == "__main__":
         output_path = output_prefix.with_suffix('.json')
 
         with open(output_path, "w") as f:
-            json.dump({**config, "cells": cells}, f)
+            json.dump({**config, "cells": cells}, f, cls=JSONEncoder)
 
         print(f"Verification results saved to {output_path}")
 

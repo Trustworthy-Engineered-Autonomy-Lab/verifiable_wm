@@ -29,8 +29,8 @@
             {
                 "name": "pos",
                 "start": 0.00,
-                "stop": 0.40,
-                "num": 40
+                "stop": 0.60,
+                "num": 60
             },
             {
                 "name": "vel",
