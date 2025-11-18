@@ -19,7 +19,9 @@
         "args": [
         ],
         "kwargs": {
-            "goal_angle_threshold" : 0.209
+            "goal_angle_threshold" : 0.209,
+            "num_steps": 20,
+            "early_stop": false
         }
     },
     "grid": {
@@ -27,8 +29,8 @@
             {
                 "name": "pos",
                 "start": 0.00,
-                "stop": 0.40,
-                "num": 40
+                "stop": 0.60,
+                "num": 60
             },
             {
                 "name": "vel",
@@ -50,7 +52,5 @@
             }
         ]
     },
-    "num_steps": 20,
-    "early_stop": false,
     "output_prefix": "results/cartpole/safety_result"
 }

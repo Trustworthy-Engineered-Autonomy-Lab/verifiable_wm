@@ -7,10 +7,6 @@ import sys
 import pathlib
 import importlib
 
-from colorama import Fore, Style
-
-import traceback
-import shutil
 import argparse
 
 from mpi4py import MPI
@@ -18,6 +14,9 @@ from mpi4py import MPI
 from models import FullModel
 from verifiers import Verifier
 from collections import OrderedDict
+import traceback
+import shutil
+from colorama import Fore, Style
     
 def generate_grid_cells(grid: Dict, comm = MPI.COMM_WORLD) -> List[Dict]:
     """Generate grid cells for verification"""
@@ -51,50 +50,37 @@ def generate_grid_cells(grid: Dict, comm = MPI.COMM_WORLD) -> List[Dict]:
 
     return [
         {
-            'init_bound' : OrderedDict(
-                {dim['name'] : list(cell[i])  for i, dim in enumerate(grid['dims'])}
-            )
+            'bounds' : [cell]
         }
 
         for cell in local_cells
     ]
 
-def run_full_verification(verifier: Verifier, model: FullModel, cells: List[Dict], 
-                          num_steps: int = 20, early_stop = True):
-    """Run complete multi-cell verification"""
+def verify_cells(verifier: Verifier, model: FullModel, grid: Dict, cells: List[Dict]):
+
+    names = [dim['name'] for dim in grid['dims']]
 
     for idx, cell in enumerate(cells):
 
         task_str = "Verified:"
         
-        for k,v in cell['init_bound'].items():
-            task_str += f" {k}∈[{v[0]},{v[1]}]"
-        
+        for name,bound in zip(names, cell['bounds'][0]):
+            task_str += f" {name}∈[{bound[0]},{bound[1]}]"
+
         try:
-            step = 1
-            for result in verifier.verify_single_cell(model, cell):
-                if (result and early_stop) or step >= num_steps:
-                    break
-                step += 1
-
-            if step < num_steps:
-                print(Fore.YELLOW + f"early stop at step {step}" + Style.RESET_ALL)
-
+            verifier.verify_single_cell(model, cell)
         except KeyboardInterrupt as e:
-            sys.exit(1)
+            raise e
         except Exception as e:
-            result = False
             cell['error_msg'] = str(e)
             status_str = "Error"
             color = Fore.RED
             traceback.print_exc(file=sys.stderr)
         else:
-            status_str = "Safe" if result else "Unsafe"
-            color = Fore.GREEN if result else Fore.YELLOW
+            status_str = "Safe" if cell['result'] else "Unsafe"
+            color = Fore.GREEN if cell['result'] else Fore.YELLOW
         
-        cell['result'] = result
         ndashs = shutil.get_terminal_size().columns - len(task_str) - len(status_str) - 2
-        
         print(task_str, '-' * ndashs, color + status_str + Style.RESET_ALL)
 
 def load_input(file_path: str):
@@ -127,14 +113,13 @@ def load_input(file_path: str):
     if 'output_prefix' not in config:
         config['output_prefix'] = 'result'
 
-    if 'num_steps' not in config:
-        print(f"The number of steps is not specified, default to 20")
-        config['num_steps'] = 20
-
-    if 'early_stop' not in config:
-        config['early_stop'] = True
-
     return config
+
+class JSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        return super().default(o)
 
 
 # ============ Main Execution ============
@@ -199,12 +184,11 @@ if __name__ == "__main__":
     # Run full verification
     start_time = time.time()
 
-    run_full_verification(
+    verify_cells(
         verifier,
         model,
-        local_cells,
-        num_steps=config['num_steps'],
-        early_stop=config['early_stop']
+        config['grid'],
+        local_cells
     )
 
     end_time = time.time()
@@ -223,7 +207,7 @@ if __name__ == "__main__":
         output_path = output_prefix.with_suffix('.json')
 
         with open(output_path, "w") as f:
-            json.dump({**config, "cells": cells}, f)
+            json.dump({**config, "cells": cells}, f, cls=JSONEncoder)
 
         print(f"Verification results saved to {output_path}")
 

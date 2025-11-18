@@ -18,7 +18,9 @@
         "args": [
         ],
         "kwargs": {
-            "goal_angle_threshold": 0.15
+            "goal_angle_threshold": 0.15,
+            "num_steps": 20,
+            "early_stop": true
         }
     },
     "grid": {
@@ -37,7 +39,5 @@
             }
         ]
     },
-    "num_steps": 20,
-    "early_stop": true,
     "output_prefix": "results/pendulum/safety_result"
 }
