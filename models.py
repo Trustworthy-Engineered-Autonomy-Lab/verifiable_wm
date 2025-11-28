@@ -383,6 +383,8 @@ class MountainCar(Module):
         # if pos_next_min > pos_next_max:
         #     pos_next_min, pos_next_max = pos_next_max, pos_next_min
 
+        pos_bound = np.clip(pos_bound, -self.MIN_POS, self.MAX_POS)
+
         return np.array([pos_bound, vel_bound]).T
     
 class Cartpole(Module):

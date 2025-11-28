@@ -1,0 +1,56 @@
+{
+    "layers" : {
+        "G_MLP" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "weights/cartpole/g_mlp.pth"
+            }
+        },
+        "Controller" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "weights/cartpole/controller.pth",
+                "activation" : "sigmoid"
+            }
+        }
+    },
+    "verifier": {
+        "name": "CartpoleVerifier",
+        "args": [
+        ],
+        "kwargs": {
+            "goal_angle_threshold" : 0.209,
+            "num_steps": 20,
+            "early_stop": false
+        }
+    },
+    "grid": {
+        "dims": [
+            {
+                "name": "pos",
+                "start": 0.00,
+                "stop": 0.60,
+                "num": 60
+            },
+            {
+                "name": "vel",
+                "start": 0.00,
+                "stop": 0.00,
+                "num": 1
+            },
+            {
+                "name": "angle",
+                "start": 0.060,
+                "stop": 0.120,
+                "num": 60
+            },
+            {
+                "name": "avel",
+                "start": 0.00,
+                "stop": 0.00,
+                "num": 1
+            }
+        ]
+    },
+    "output_prefix": "results/cartpole/safety_result_g_mlp"
+}
