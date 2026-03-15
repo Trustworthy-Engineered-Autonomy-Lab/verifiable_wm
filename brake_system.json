@@ -1,0 +1,45 @@
+{
+    "layers" : {
+        "Decoder" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "weights/brake_system/decoder.pth"
+            }
+        },
+        "Controller" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "weights/brake_system/controller.pth",
+                "activation" : "sigmoid"
+            }
+        }
+    },
+    "verifier": {
+        "name": "BrakeVerifier",
+        "args": [
+        ],
+        "kwargs": {
+            "goal_dis_threshold" : 0.00,
+            "goal_vel_threshold" : 0.00,
+            "num_steps": 20,
+            "early_stop": false
+        }
+    },
+    "grid": {
+        "dims": [
+            {
+                "name": "dis",
+                "start": 0.00,
+                "stop": 0.60,
+                "num": 60
+            },
+            {
+                "name": "vel",
+                "start": 0.00,
+                "stop": 0.00,
+                "num": 1
+            }
+        ]
+    },
+    "output_prefix": "results/brake_system/safety_result"
+}

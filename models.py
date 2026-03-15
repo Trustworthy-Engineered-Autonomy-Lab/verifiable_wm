@@ -456,7 +456,43 @@ class Cartpole(Module):
         next_state_bound = np.array([lower,upper])
 
         return next_state_bound
-        
+
+class Brake(Module):
+    def __init__(self, dt=0.05, distance_scale=60.0, velocity_scale=30.0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dt = dt
+        self.distance_scale = distance_scale
+        self.velocity_scale = velocity_scale
+
+    def forward(self):
+        pass
+
+    def reach(self, bound: np.ndarray) -> np.ndarray:
+        dist_bound = bound[:, 0] * self.distance_scale
+        vel_bound = bound[:, 1] * self.velocity_scale
+        brake_bound = np.clip(bound[:, 2], 0.0, 1.0)
+
+        next_dist_bound = np.array([
+            dist_bound[0] - vel_bound[1] * self.dt,
+            dist_bound[1] - vel_bound[0] * self.dt,
+        ], dtype=np.float32)
+
+        decel_bound = 0.009 * brake_bound + 0.0042
+        next_vel_bound = np.array([
+            vel_bound[0] - decel_bound[1] * self.dt,
+            vel_bound[1] - decel_bound[0] * self.dt,
+        ], dtype=np.float32)
+
+        next_dist_bound = np.clip(next_dist_bound, 0.0, None)
+        next_vel_bound = np.clip(next_vel_bound, 0.0, None)
+
+        next_state_bound = np.array([
+            next_dist_bound / self.distance_scale,
+            next_vel_bound / self.velocity_scale,
+        ], dtype=np.float32).T
+
+        return next_state_bound
+         
 class FullModel(Module):
     def __init__(self, layers: OrderedDict, *args, **kwargs):
         super().__init__(*args, **kwargs)

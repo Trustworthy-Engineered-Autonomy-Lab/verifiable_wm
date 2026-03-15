@@ -4,7 +4,7 @@ from typing import Dict, List
 from abc import ABC, abstractmethod
 import random
 
-from models import Pendulum, MountainCar, Cartpole, FullModel
+from models import Pendulum, MountainCar, Cartpole, Brake, FullModel
 
 from colorama import Fore, Style
 
@@ -133,6 +133,24 @@ class CartpoleVerifier(Verifier):
         # Check safety condition
         angle_bound = np.array(bounds)[:,:,2]
         return True if np.all(np.abs(angle_bound) <= self.goal_angle_threshold) else False
+
+class BrakeVerifier(Verifier):
+    def __init__(self, goal_dis_threshold = 0.0, goal_vel_threshold = 0.0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.goal_dis_threshold = goal_dis_threshold
+        self.goal_vel_threshold = goal_vel_threshold
+        self.dynamic = Brake()
+
+    def dynamic_step(self, bound: np.ndarray):
+        return self.dynamic.reach(bound)
+
+    def criteria(self, bounds: List[np.ndarray]) -> bool:
+        bounds_array = np.array(bounds)
+        dis_bound = bounds_array[:, :, 0]
+        vel_bound = bounds_array[:, :, 1]
+        dis_safe = np.all(dis_bound >= self.goal_dis_threshold)
+        vel_safe = np.all(vel_bound >= self.goal_vel_threshold)
+        return True if dis_safe and vel_safe else False
 
 # class _Test(Verifier):
     # def __init__(self, raise_error = True):
