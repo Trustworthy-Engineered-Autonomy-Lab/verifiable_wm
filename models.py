@@ -38,12 +38,15 @@ class Module(nn.Module, ABC):
 class Decoder(Module):
     def __init__(self, weights, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        state_dict = torch.load(weights, 'cpu', weights_only=True)
         self.fc1 = nn.Linear(2, 32)
         self.fc2 = nn.Linear(32, 64)
         self.fc3 = nn.Linear(64, 3 * 12 * 12)
         self.dec_conv1 = nn.ConvTranspose2d(3, 4, kernel_size=4, stride=2, padding=1)
         self.dec_conv2 = nn.ConvTranspose2d(4, 8, kernel_size=4, stride=2, padding=1)
-        self.dec_conv3 = nn.ConvTranspose2d(8, 1, kernel_size=4, stride=2, padding=1)
+        # self.dec_conv3 = nn.ConvTranspose2d(8, 1, kernel_size=4, stride=2, padding=1)
+        self.output_channels = state_dict['dec_conv3.weight'].shape[1]
+        self.dec_conv3 = nn.ConvTranspose2d(8, self.output_channels,kernel_size=4, stride=2, padding=1)
 
         self.load_state_dict(torch.load(weights, 'cpu', weights_only=True))
 
@@ -125,7 +128,8 @@ class Decoder(Module):
         S1 = R_convt_3.toStar()
         L_satlin = SatLinLayer()
         IM_satlin_list = L_satlin.reach(S1, method='approx', lp_solver='gurobi')
-        image_star = IM_satlin_list.toImageStar(image_shape=(96, 96, 1))
+        # image_star = IM_satlin_list.toImageStar(image_shape=(96, 96, 1))
+        image_star = IM_satlin_list.toImageStar(image_shape=(96, 96, self.output_channels))
 
         return image_star
 
@@ -210,7 +214,10 @@ class G_MLP(Module):
 class Controller(Module):
     def __init__(self, weights, activation = 'tanh', output_factor = 1, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.conv1 = nn.Conv2d(1, 4, kernel_size=4, stride=2, padding=1)
+        state_dict = torch.load(weights, 'cpu', weights_only=True)
+        # self.conv1 = nn.Conv2d(1, 4, kernel_size=4, stride=2, padding=1)
+        self.input_channels = state_dict['conv1.weight'].shape[1]
+        self.conv1 = nn.Conv2d(self.input_channels, 4, kernel_size=4, stride=2, padding=1)
         self.conv2 = nn.Conv2d(4, 1, kernel_size=4, stride=2, padding=1)
         self.fc1 = nn.Linear(24 * 24, 64)
         self.fc2 = nn.Linear(64, 1)
@@ -458,37 +465,54 @@ class Cartpole(Module):
         return next_state_bound
 
 class Brake(Module):
-    def __init__(self, dt=0.05, distance_scale=60.0, velocity_scale=30.0, *args, **kwargs):
+    def __init__(self, dt=0.1, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dt = dt
-        self.distance_scale = distance_scale
-        self.velocity_scale = velocity_scale
 
     def forward(self):
         pass
 
     def reach(self, bound: np.ndarray) -> np.ndarray:
-        dist_bound = bound[:, 0] * self.distance_scale
-        vel_bound = bound[:, 1] * self.velocity_scale
-        brake_bound = np.clip(bound[:, 2], 0.0, 1.0)
+        # bound = [[dis_min, vel_min, action_min],
+        #          [dis_max, vel_max, action_max]]
+        dist_bound = bound[:, 0]
+        vel_bound  = bound[:, 1]
 
+        # FIX 1: remap tanh output [-1,1] -> brake [0,1]
+        # before: brake_bound = np.clip(bound[:, 2], 0.0, 1.0)  -- WRONG
+        action_bound = bound[:, 2]
+        brake_bound  = np.clip(0.5 * (action_bound + 1.0), 0.0, 1.0)
+
+        # Conservative interval arithmetic for distance:
+        # next_dist = dist + (0 - vel) * dt  (v_lead = 0)
+        # To get the tightest over-approximation:
+        #   next_dist_min = dist_min - vel_max * dt
+        #   next_dist_max = dist_max - vel_min * dt
         next_dist_bound = np.array([
             dist_bound[0] - vel_bound[1] * self.dt,
             dist_bound[1] - vel_bound[0] * self.dt,
         ], dtype=np.float32)
 
+        # decel = 0.009 * brake + 0.0042
+        # next_vel = vel - decel * dt
+        #   next_vel_min = vel_min - decel_max * dt
+        #   next_vel_max = vel_max - decel_min * dt
         decel_bound = 0.009 * brake_bound + 0.0042
         next_vel_bound = np.array([
             vel_bound[0] - decel_bound[1] * self.dt,
             vel_bound[1] - decel_bound[0] * self.dt,
         ], dtype=np.float32)
 
-        next_dist_bound = np.clip(next_dist_bound, 0.0, None)
+        # FIX 2: do NOT clip next_dist to [0, None] here.
+        # Clipping hides negative lower bounds, making unsafe cells
+        # appear safe. The BrakeVerifier.is_unsafe() check on dis_lb <= 0
+        # must see the true (possibly negative) lower bound.
+        # Only clip velocity (car cannot go negative speed).
         next_vel_bound = np.clip(next_vel_bound, 0.0, None)
 
         next_state_bound = np.array([
-            next_dist_bound / self.distance_scale,
-            next_vel_bound / self.velocity_scale,
+            next_dist_bound,
+            next_vel_bound,
         ], dtype=np.float32).T
 
         return next_state_bound

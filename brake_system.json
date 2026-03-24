@@ -19,25 +19,24 @@
         "args": [
         ],
         "kwargs": {
-            "goal_dis_threshold" : 0.00,
-            "goal_vel_threshold" : 0.00,
-            "num_steps": 20,
-            "early_stop": false
+            "num_steps": 10,
+            "early_stop": false,
+            "save_history": true
         }
     },
     "grid": {
         "dims": [
             {
                 "name": "dis",
-                "start": 0.00,
-                "stop": 0.60,
-                "num": 60
+                "start": 6.00,
+                "stop": 6.40,
+                "num": 40
             },
             {
                 "name": "vel",
-                "start": 0.00,
-                "stop": 0.00,
-                "num": 1
+                "start": 5.80,
+                "stop": 6.20,
+                "num": 40
             }
         ]
     },

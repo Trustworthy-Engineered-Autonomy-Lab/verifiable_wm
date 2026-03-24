@@ -19,16 +19,19 @@ class Verifier(ABC):
             
         # Verify one cell
         current_bounds = [inital_bound]
+        result = True
 
         for step in range(1, self.num_steps + 1):
             current_bounds = self.verify_single_step(model, current_bounds)
-            # Save history if needed
             if self.save_history:
                 cell['bounds'].append(np.concatenate(current_bounds).T)
 
-            result = self.criteria(current_bounds)
-            if result and self.early_stop:
-                break
+            if self.is_unsafe(current_bounds):
+                result = False
+                if self.early_stop:
+                    break
+            else:
+                result = self.criteria(current_bounds)
 
         if step < self.num_steps:
             print(Fore.YELLOW + f"early stop at step {step}" + Style.RESET_ALL)
@@ -135,22 +138,23 @@ class CartpoleVerifier(Verifier):
         return True if np.all(np.abs(angle_bound) <= self.goal_angle_threshold) else False
 
 class BrakeVerifier(Verifier):
-    def __init__(self, goal_dis_threshold = 0.0, goal_vel_threshold = 0.0, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.goal_dis_threshold = goal_dis_threshold
-        self.goal_vel_threshold = goal_vel_threshold
         self.dynamic = Brake()
 
     def dynamic_step(self, bound: np.ndarray):
         return self.dynamic.reach(bound)
 
+    def is_unsafe(self, bounds: List[np.ndarray]) -> bool:
+        bounds_array = np.array(bounds)
+        dis_bound = bounds_array[:, :, 0]
+        dis_lb = dis_bound[:, 0]
+        return bool(np.any(dis_lb <= 0.0))
+
     def criteria(self, bounds: List[np.ndarray]) -> bool:
         bounds_array = np.array(bounds)
         dis_bound = bounds_array[:, :, 0]
-        vel_bound = bounds_array[:, :, 1]
-        dis_safe = np.all(dis_bound >= self.goal_dis_threshold)
-        vel_safe = np.all(vel_bound >= self.goal_vel_threshold)
-        return True if dis_safe and vel_safe else False
+        return bool(np.all(dis_bound > 0.0))
 
 # class _Test(Verifier):
     # def __init__(self, raise_error = True):

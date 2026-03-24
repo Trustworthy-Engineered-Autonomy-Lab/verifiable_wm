@@ -1,5 +1,0 @@
-StarV
-artifacts
-build
-tests
-tutorials

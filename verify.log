@@ -1,0 +1,1354 @@
+nohup: ignoring input
+Tue Mar 24 01:20:55 AM EDT 2026
+Host: ece-ivan-caf
+Working dir: /home/UFAD/zhou.zhuoyang/verifiable_wm
+CPU total: 256
+Requested MPI processes: 100
+Input file: brake_system.json
+Free memory before run:
+               total        used        free      shared  buff/cache   available
+Mem:           1.1Ti        37Gi       457Gi       2.5Gi       648Gi       1.1Ti
+Swap:          4.0Gi        27Mi       4.0Gi
+Loading the input file brake_system.json
+Created the verifier BrakeVerifier
+dis range: [6.0, 6.4], step: 0.010000000000000009
+vel range: [5.800000000000001, 6.2], step: 0.009999999999999988
+Generated 1600 cells for verification
+Rank 1 process gets 16 cells
+Rank 2 process gets 16 cells
+Rank 3 process gets 16 cells
+Rank 4 process gets 16 cells
+Rank 5 process gets 16 cells
+Rank 6 process gets 16 cells
+Rank 7 process gets 16 cells
+Rank 17 process gets 16 cells
+Rank 18 process gets 16 cells
+Rank 19 process gets 16 cells
+Rank 20 process gets 16 cells
+Rank 0 process gets 16 cells
+Rank 8 process gets 16 cells
+Rank 9 process gets 16 cells
+Rank 10 process gets 16 cells
+Rank 11 process gets 16 cells
+Rank 12 process gets 16 cells
+Rank 13 process gets 16 cells
+Rank 14 process gets 16 cells
+Rank 15 process gets 16 cells
+Rank 16 process gets 16 cells
+Rank 21 process gets 16 cells
+Rank 22 process gets 16 cells
+Rank 23 process gets 16 cells
+Rank 24 process gets 16 cells
+Rank 25 process gets 16 cells
+Rank 26 process gets 16 cells
+Rank 27 process gets 16 cells
+Rank 28 process gets 16 cells
+Rank 29 process gets 16 cells
+Rank 30 process gets 16 cells
+Rank 31 process gets 16 cells
+Rank 32 process gets 16 cells
+Rank 33 process gets 16 cells
+Rank 34 process gets 16 cells
+Rank 35 process gets 16 cells
+Rank 36 process gets 16 cells
+Rank 37 process gets 16 cells
+Rank 38 process gets 16 cells
+Rank 39 process gets 16 cells
+Rank 40 process gets 16 cells
+Rank 41 process gets 16 cells
+Rank 42 process gets 16 cells
+Rank 43 process gets 16 cells
+Rank 44 process gets 16 cells
+Rank 45 process gets 16 cells
+Rank 46 process gets 16 cells
+Rank 47 process gets 16 cells
+Rank 48 process gets 16 cells
+Rank 49 process gets 16 cells
+Rank 50 process gets 16 cells
+Rank 51 process gets 16 cells
+Rank 52 process gets 16 cells
+Rank 53 process gets 16 cells
+Rank 54 process gets 16 cells
+Rank 55 process gets 16 cells
+Rank 56 process gets 16 cells
+Rank 57 process gets 16 cells
+Rank 58 process gets 16 cells
+Rank 59 process gets 16 cells
+Rank 60 process gets 16 cells
+Rank 61 process gets 16 cells
+Rank 62 process gets 16 cells
+Rank 63 process gets 16 cells
+Rank 64 process gets 16 cells
+Rank 65 process gets 16 cells
+Rank 66 process gets 16 cells
+Rank 67 process gets 16 cells
+Rank 68 process gets 16 cells
+Rank 69 process gets 16 cells
+Rank 70 process gets 16 cells
+Rank 71 process gets 16 cells
+Rank 72 process gets 16 cells
+Rank 73 process gets 16 cells
+Rank 74 process gets 16 cells
+Rank 75 process gets 16 cells
+Rank 76 process gets 16 cells
+Rank 77 process gets 16 cells
+Rank 78 process gets 16 cells
+Rank 79 process gets 16 cells
+Rank 80 process gets 16 cells
+Rank 81 process gets 16 cells
+Rank 82 process gets 16 cells
+Rank 83 process gets 16 cells
+Rank 84 process gets 16 cells
+Rank 85 process gets 16 cells
+Rank 86 process gets 16 cells
+Rank 87 process gets 16 cells
+Rank 88 process gets 16 cells
+Rank 89 process gets 16 cells
+Rank 90 process gets 16 cells
+Rank 91 process gets 16 cells
+Rank 92 process gets 16 cells
+Rank 93 process gets 16 cells
+Rank 94 process gets 16 cells
+Rank 95 process gets 16 cells
+Rank 96 process gets 16 cells
+Rank 97 process gets 16 cells
+Rank 98 process gets 16 cells
+Rank 99 process gets 16 cells
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2626755
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[6.040000000000001,6.050000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.03,6.04] vel∈[5.880000000000001,5.8900000000000015] ------ [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[6.040000000000001,6.050000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.120000000000001,6.130000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.120000000000001,6.130000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[6.040000000000001,6.050000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.120000000000001,6.130000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.120000000000001,6.130000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[5.880000000000001,5.8900000000000015] ------ [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.120000000000001,6.130000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.120000000000001,6.130000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[6.040000000000001,6.050000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.120000000000001,6.130000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[5.880000000000001,5.8900000000000015] ------ [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[5.880000000000001,5.8900000000000015] ------ [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[6.040000000000001,6.050000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[6.040000000000001,6.050000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.19,6.2] vel∈[6.040000000000001,6.050000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.19,6.2] vel∈[5.880000000000001,5.8900000000000015] ------- [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[5.880000000000001,5.8900000000000015] ------ [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[6.050000000000001,6.0600000000000005] ---- [33mUnsafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[6.050000000000001,6.0600000000000005] ------ [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[5.8900000000000015,5.900000000000001] ------ [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.130000000000001,6.140000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[6.050000000000001,6.0600000000000005]  [33mUnsafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[5.8900000000000015,5.900000000000001] ------ [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[6.050000000000001,6.0600000000000005]  [33mUnsafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.130000000000001,6.140000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.130000000000001,6.140000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.130000000000001,6.140000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.130000000000001,6.140000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.130000000000001,6.140000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.130000000000001,6.140000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[5.8900000000000015,5.900000000000001] ------ [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[6.050000000000001,6.0600000000000005] ------ [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[6.050000000000001,6.0600000000000005] ------ [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[6.050000000000001,6.0600000000000005] ------ [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.19,6.2] vel∈[6.050000000000001,6.0600000000000005] ------- [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.19,6.2] vel∈[5.8900000000000015,5.900000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[5.8900000000000015,5.900000000000001] ------ [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[5.8900000000000015,5.900000000000001] ------ [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.140000000000001,6.15]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.140000000000001,6.15] ------- [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.140000000000001,6.15]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[6.0600000000000005,6.070000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[6.0600000000000005,6.070000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[6.0600000000000005,6.070000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[6.0600000000000005,6.070000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[6.0600000000000005,6.070000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[6.0600000000000005,6.070000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.140000000000001,6.15] ------- [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[6.0600000000000005,6.070000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.140000000000001,6.15]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.140000000000001,6.15] ------- [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.140000000000001,6.15]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[6.0600000000000005,6.070000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.140000000000001,6.15] ------- [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.140000000000001,6.15] ------- [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[6.0600000000000005,6.070000000000001] ------ [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[6.0600000000000005,6.070000000000001] ---- [33mUnsafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.140000000000001,6.15] ------- [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[6.0600000000000005,6.070000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.140000000000001,6.15] ----- [33mUnsafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.140000000000001,6.15] ------- [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[5.900000000000001,5.910000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[6.0600000000000005,6.070000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.23,6.24] vel∈[5.900000000000001,5.910000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.140000000000001,6.15] ---- [33mUnsafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.140000000000001,6.15] ---- [33mUnsafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[6.0600000000000005,6.070000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[6.0600000000000005,6.070000000000001]  [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.140000000000001,6.15] ------ [33mUnsafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.140000000000001,6.15] ----- [33mUnsafe[0m
+Verified: dis∈[6.19,6.2] vel∈[6.0600000000000005,6.070000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[6.0600000000000005,6.070000000000001] ------ [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.140000000000001,6.15] ----- [33mUnsafe[0m
+Verified: dis∈[6.19,6.2] vel∈[5.900000000000001,5.910000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[6.0600000000000005,6.070000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.140000000000001,6.15] -------- [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.140000000000001,6.15] ---- [33mUnsafe[0m
+Verified: dis∈[6.07,6.08] vel∈[5.900000000000001,5.910000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[6.0600000000000005,6.070000000000001] ------ [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[6.0600000000000005,6.070000000000001] ------ [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.140000000000001,6.15] ----- [33mUnsafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[6.0600000000000005,6.070000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.980000000000001,5.990000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[5.900000000000001,5.910000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[5.900000000000001,5.910000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[5.900000000000001,5.910000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.15,6.160000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.15,6.160000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[6.070000000000001,6.080000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.15,6.160000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[6.070000000000001,6.080000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[6.070000000000001,6.080000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[6.070000000000001,6.080000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[6.070000000000001,6.080000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[6.070000000000001,6.080000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[6.070000000000001,6.080000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.15,6.160000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.15,6.160000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.15,6.160000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.15,6.160000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[6.070000000000001,6.080000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.15,6.160000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.15,6.160000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[6.070000000000001,6.080000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[6.070000000000001,6.080000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.15,6.160000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[6.070000000000001,6.080000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.15,6.160000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.15,6.160000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.23,6.24] vel∈[5.910000000000001,5.920000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[5.910000000000001,5.920000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[6.070000000000001,6.080000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.19,6.2] vel∈[6.070000000000001,6.080000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.15,6.160000000000001] ---- [33mUnsafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[6.070000000000001,6.080000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.19,6.2] vel∈[5.910000000000001,5.920000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.15,6.160000000000001] ---- [33mUnsafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[6.070000000000001,6.080000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[6.070000000000001,6.080000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.15,6.160000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[6.070000000000001,6.080000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.15,6.160000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.15,6.160000000000001] ------ [33mUnsafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.15,6.160000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.15,6.160000000000001] ---- [33mUnsafe[0m
+Verified: dis∈[6.07,6.08] vel∈[6.070000000000001,6.080000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[5.910000000000001,5.920000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[6.070000000000001,6.080000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.15,6.160000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.990000000000001,6.000000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[5.910000000000001,5.920000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[6.070000000000001,6.080000000000001]  [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[5.910000000000001,5.920000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[5.910000000000001,5.920000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.830000000000001,5.840000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.160000000000001,6.170000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.160000000000001,6.170000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[6.080000000000001,6.090000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[6.080000000000001,6.090000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.160000000000001,6.170000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[6.080000000000001,6.090000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[6.080000000000001,6.090000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[6.080000000000001,6.090000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[6.080000000000001,6.090000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[6.080000000000001,6.090000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.160000000000001,6.170000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.160000000000001,6.170000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.160000000000001,6.170000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.160000000000001,6.170000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[6.080000000000001,6.090000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.160000000000001,6.170000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[6.080000000000001,6.090000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.160000000000001,6.170000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[6.080000000000001,6.090000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.160000000000001,6.170000000000001]  [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[6.080000000000001,6.090000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.160000000000001,6.170000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.03,6.04] vel∈[5.920000000000001,5.930000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.160000000000001,6.170000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[6.080000000000001,6.090000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.23,6.24] vel∈[5.920000000000001,5.930000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.19,6.2] vel∈[6.080000000000001,6.090000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.19,6.2] vel∈[5.920000000000001,5.930000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[6.080000000000001,6.090000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.160000000000001,6.170000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.160000000000001,6.170000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[6.080000000000001,6.090000000000001]  [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[6.080000000000001,6.090000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[6.080000000000001,6.090000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.160000000000001,6.170000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.160000000000001,6.170000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.160000000000001,6.170000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.160000000000001,6.170000000000001]  [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.170000000000001,6.180000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.170000000000001,6.180000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.160000000000001,6.170000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.07,6.08] vel∈[6.080000000000001,6.090000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[5.920000000000001,5.930000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.000000000000001,6.010000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.15,6.16] vel∈[6.080000000000001,6.090000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.160000000000001,6.170000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[6.080000000000001,6.090000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.000000000000001,6.010000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[5.920000000000001,5.930000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[5.920000000000001,5.930000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[5.920000000000001,5.930000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.840000000000001,5.850000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[6.090000000000001,6.1000000000000005]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[6.090000000000001,6.1000000000000005]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.170000000000001,6.180000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[6.090000000000001,6.1000000000000005]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[6.090000000000001,6.1000000000000005]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[6.090000000000001,6.1000000000000005]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[6.090000000000001,6.1000000000000005]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[6.090000000000001,6.1000000000000005]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.170000000000001,6.180000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.170000000000001,6.180000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.170000000000001,6.180000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.170000000000001,6.180000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[6.090000000000001,6.1000000000000005]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.180000000000001,6.19] ------- [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.180000000000001,6.19]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.170000000000001,6.180000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[6.090000000000001,6.1000000000000005]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.170000000000001,6.180000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.170000000000001,6.180000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[6.090000000000001,6.1000000000000005] ---- [33mUnsafe[0m
+Verified: dis∈[6.23,6.24] vel∈[6.090000000000001,6.1000000000000005] ------ [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.170000000000001,6.180000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.19,6.2] vel∈[6.090000000000001,6.1000000000000005] ------- [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[5.930000000000001,5.940000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.170000000000001,6.180000000000001]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[6.090000000000001,6.1000000000000005]  [33mUnsafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.19,6.2] vel∈[5.930000000000001,5.940000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.170000000000001,6.180000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[6.1000000000000005,6.110000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.170000000000001,6.180000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[6.090000000000001,6.1000000000000005]  [33mUnsafe[0m
+Verified: dis∈[6.23,6.24] vel∈[5.930000000000001,5.940000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[6.090000000000001,6.1000000000000005]  [33mUnsafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.170000000000001,6.180000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[6.090000000000001,6.1000000000000005]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.180000000000001,6.19]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[6.1000000000000005,6.110000000000001]  [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.170000000000001,6.180000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[6.090000000000001,6.1000000000000005] ------ [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.170000000000001,6.180000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.170000000000001,6.180000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[6.1000000000000005,6.110000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.170000000000001,6.180000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.07,6.08] vel∈[6.090000000000001,6.1000000000000005] ---- [33mUnsafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.010000000000001,6.0200000000000005]  [33mUnsafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[6.1000000000000005,6.110000000000001]  [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[5.930000000000001,5.940000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[6.1000000000000005,6.110000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[6.090000000000001,6.1000000000000005] ------ [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.170000000000001,6.180000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[6.090000000000001,6.1000000000000005]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[5.930000000000001,5.940000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.010000000000001,6.0200000000000005]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[6.1000000000000005,6.110000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[5.930000000000001,5.940000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[6.1000000000000005,6.110000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[5.930000000000001,5.940000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.850000000000001,5.860000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.180000000000001,6.19]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.180000000000001,6.19] ------- [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.180000000000001,6.19] ------- [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.180000000000001,6.19]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[6.1000000000000005,6.110000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.19,6.2] ------- [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.19,6.2] --------------------- [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.19,6.2] ------- [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[6.110000000000001,6.120000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[6.110000000000001,6.120000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[6.110000000000001,6.120000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[6.110000000000001,6.120000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.180000000000001,6.19] ----- [33mUnsafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[6.110000000000001,6.120000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[6.1000000000000005,6.110000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[6.110000000000001,6.120000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.180000000000001,6.19] ----- [33mUnsafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.180000000000001,6.19] ------- [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[6.110000000000001,6.120000000000001]  [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[6.1000000000000005,6.110000000000001] ------ [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[6.1000000000000005,6.110000000000001] ---- [33mUnsafe[0m
+Verified: dis∈[6.19,6.2] vel∈[6.1000000000000005,6.110000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.180000000000001,6.19] ----- [33mUnsafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.0200000000000005,6.030000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.180000000000001,6.19] ------ [33mUnsafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.180000000000001,6.19] ---- [33mUnsafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.180000000000001,6.19] ------- [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[6.1000000000000005,6.110000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.19,6.2] vel∈[5.940000000000001,5.950000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[5.940000000000001,5.950000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[6.1000000000000005,6.110000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[5.940000000000001,5.950000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[6.1000000000000005,6.110000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.180000000000001,6.19] ---- [33mUnsafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.19,6.2] ------- [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[6.1000000000000005,6.110000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[6.1000000000000005,6.110000000000001] ------ [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.180000000000001,6.19] -------- [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.180000000000001,6.19] ----- [33mUnsafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.180000000000001,6.19] ----- [33mUnsafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.0200000000000005,6.030000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.180000000000001,6.19] ---- [33mUnsafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[6.1000000000000005,6.110000000000001] ---- [33mUnsafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[6.1000000000000005,6.110000000000001] ------ [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[5.940000000000001,5.950000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.180000000000001,6.19] ----- [33mUnsafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.19,6.2] --------------------- [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[6.1000000000000005,6.110000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[5.940000000000001,5.950000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.0200000000000005,6.030000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[5.940000000000001,5.950000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[5.940000000000001,5.950000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.860000000000001,5.870000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.19,6.2] --------------------- [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.19,6.2] -------- [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[6.110000000000001,6.120000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.19,6.2] ------------------- [33mUnsafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[6.110000000000001,6.120000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.19,6.2] ------------------- [33mUnsafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.19,6.2] --------------------- [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[6.110000000000001,6.120000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[6.110000000000001,6.120000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.19,6.2] vel∈[6.110000000000001,6.120000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.19,6.2] ------------------- [33mUnsafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.19,6.2] ------------------ [33mUnsafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.19,6.2] --------------------- [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.030000000000001,6.040000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.19,6.2] -------------------- [33mUnsafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[6.110000000000001,6.120000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.19,6.2] vel∈[5.950000000000001,5.960000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[5.950000000000001,5.960000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[6.110000000000001,6.120000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.19,6.2] ------------------ [33mUnsafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[6.110000000000001,6.120000000000001]  [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[5.950000000000001,5.960000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[6.110000000000001,6.120000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.11,6.12] vel∈[6.110000000000001,6.120000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.19,6.2] ---------------------- [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.19,6.2] ------------------- [33mUnsafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.19,6.2] ------------------- [33mUnsafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.19,6.2] ------------------ [33mUnsafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[6.110000000000001,6.120000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.030000000000001,6.040000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[6.110000000000001,6.120000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[5.950000000000001,5.960000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[6.110000000000001,6.120000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.19,6.2] ------------------- [33mUnsafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[5.950000000000001,5.960000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.030000000000001,6.040000000000001]  [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[5.950000000000001,5.960000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[5.950000000000001,5.960000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.870000000000001,5.880000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.300000000000001,6.3100000000000005] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.3500000000000005,6.36] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.28,6.290000000000001] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.36,6.370000000000001] vel∈[5.8900000000000015,5.900000000000001]  [32mSafe[0m
+Verified: dis∈[6.260000000000001,6.2700000000000005] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.32,6.330000000000001] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.330000000000001,6.340000000000001] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.340000000000001,6.3500000000000005] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.16,6.170000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.19,6.2] vel∈[5.800000000000001,5.810000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[5.800000000000001,5.810000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[6.120000000000001,6.130000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.170000000000001,6.180000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.180000000000001,6.19] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.370000000000001,6.380000000000001] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[6.120000000000001,6.130000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.19,6.2] vel∈[6.120000000000001,6.130000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[6.040000000000001,6.050000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.250000000000001,6.260000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.03,6.04] vel∈[5.800000000000001,5.810000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[6.120000000000001,6.130000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[6.040000000000001,6.050000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.03,6.04] vel∈[5.960000000000001,5.970000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.010000000000001,6.0200000000000005] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.19,6.2] vel∈[5.960000000000001,5.970000000000001] -------- [32mSafe[0m
+Verified: dis∈[6.0200000000000005,6.03] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[6.120000000000001,6.130000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.23,6.24] vel∈[5.960000000000001,5.970000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[6.120000000000001,6.130000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.11,6.12] vel∈[5.800000000000001,5.810000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[6.120000000000001,6.130000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.04,6.050000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.050000000000001,6.0600000000000005] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.210000000000001,6.220000000000001] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[5.800000000000001,5.810000000000001]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.220000000000001,6.23] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[6.120000000000001,6.130000000000001] ----- [33mUnsafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[6.040000000000001,6.050000000000001]  [33mUnsafe[0m
+Verified: dis∈[6.07,6.08] vel∈[5.800000000000001,5.810000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.2,6.210000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[6.120000000000001,6.130000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[6.120000000000001,6.130000000000001]  [32mSafe[0m
+Verified: dis∈[6.2700000000000005,6.28] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.1000000000000005,6.11] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.07,6.08] vel∈[5.960000000000001,5.970000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[5.800000000000001,5.810000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.11,6.12] vel∈[5.960000000000001,5.970000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[6.040000000000001,6.050000000000001]  [32mSafe[0m
+Verified: dis∈[6.24,6.250000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.15,6.16] vel∈[5.960000000000001,5.970000000000001] ------- [32mSafe[0m
+Verified: dis∈[6.140000000000001,6.15] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.130000000000001,6.140000000000001] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.08,6.090000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.0600000000000005,6.07] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.090000000000001,6.1000000000000005] vel∈[5.960000000000001,5.970000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[5.810000000000001,5.820000000000001]  [32mSafe[0m
+Verified: dis∈[6.380000000000001,6.390000000000001] vel∈[6.050000000000001,6.0600000000000005]  [32mSafe[0m
+Verified: dis∈[6.0,6.010000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.12,6.130000000000001] vel∈[5.880000000000001,5.8900000000000015]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[5.970000000000001,5.980000000000001]  [32mSafe[0m
+Verified: dis∈[6.390000000000001,6.4] vel∈[6.130000000000001,6.140000000000001]  [32mSafe[0m
+Verified: dis∈[6.3100000000000005,6.32] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m
+Verified: dis∈[6.290000000000001,6.300000000000001] vel∈[5.820000000000001,5.830000000000001]  [32mSafe[0m

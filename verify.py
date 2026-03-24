@@ -26,7 +26,20 @@ def generate_grid_cells(grid: Dict, comm = MPI.COMM_WORLD) -> List[Dict]:
         ends = []
         for dim in grid['dims']:
             vals, step = np.linspace(dim['start'], dim['stop'], dim['num'] + 1, retstep=True)
-            print(f"{dim['name']} range: [{dim['start']}, {dim['stop']}], step: {step}")
+            # print(f"{dim['name']} range: [{dim['start']}, {dim['stop']}], step: {step}")
+            
+            # Handle normalization if scale is provided
+            scale = dim.get('scale', None)
+            if scale is not None:
+                vals = vals / scale
+                step = step / scale
+                print(
+                    f"{dim['name']} raw range: [{dim['start']}, {dim['stop']}], "
+                    f"scale: {scale}, normalized range: [{vals[0]}, {vals[-1]}], step: {step}"
+                )
+            else:
+                print(f"{dim['name']} range: [{dim['start']}, {dim['stop']}], step: {step}")
+            
             dim['step'] = step
             starts.append(vals[0:-1])
             ends.append(vals[1:])
