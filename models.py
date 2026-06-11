@@ -36,9 +36,9 @@ class Module(nn.Module, ABC):
         pass
 
 class Decoder(Module):
-    def __init__(self, weights, *args, **kwargs):
+    def __init__(self, weights, input_dim = 2, method = "approx", lp_solver = "gurobi", relax_factor = 0.0, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fc1 = nn.Linear(2, 32)
+        self.fc1 = nn.Linear(input_dim, 32)
         self.fc2 = nn.Linear(32, 64)
         self.fc3 = nn.Linear(64, 3 * 12 * 12)
         self.dec_conv1 = nn.ConvTranspose2d(3, 4, kernel_size=4, stride=2, padding=1)
@@ -46,6 +46,9 @@ class Decoder(Module):
         self.dec_conv3 = nn.ConvTranspose2d(8, 1, kernel_size=4, stride=2, padding=1)
 
         self.load_state_dict(torch.load(weights, 'cpu', weights_only=True))
+        self.lp_solver = lp_solver
+        self.method = method
+        self.relax_factor = relax_factor
 
     def forward(self, states):
         b = states.size(0)
@@ -124,10 +127,25 @@ class Decoder(Module):
         # SatLin
         S1 = R_convt_3.toStar()
         L_satlin = SatLinLayer()
-        IM_satlin_list = L_satlin.reach(S1, method='approx', lp_solver='gurobi')
+        IM_satlin_list = L_satlin.reach(S1, method=self.method, lp_solver=self.lp_solver, RF=self.relax_factor)
         image_star = IM_satlin_list.toImageStar(image_shape=(96, 96, 1))
 
         return image_star
+    
+class G_Conv(Decoder):
+    def __init__(self, weights, input_dim = 2, *args, **kwargs):
+        super().__init__(weights, input_dim=input_dim+2, *args, **kwargs)
+
+    def forward(self, states):
+        return super().forward(states)
+    
+    def reach(self, state_bound):
+        latent = np.array([
+            [0.0, 0.0],
+            [0.0, 0.0]
+        ])
+        state_bound = np.concatenate([state_bound, latent], axis=1)
+        return super().reach(state_bound)
 
 # MLP-based GAN Generator Baseline Added
 class G_MLP(Module):

@@ -1,10 +1,9 @@
 {
     "layers" : {
-        "G_MLP" : {
+        "G_Conv" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "weights/cartpole/g_mlp.pth",
-                "lp_solver" : "estimate"
+                "weights" : "weights/cartpole/g_conv.pth"
             }
         },
         "Controller" : {
@@ -53,5 +52,5 @@
             }
         ]
     },
-    "output_prefix": "results/cartpole/safety_result_g_mlp"
+    "output_prefix": "results/cartpole/safety_result_g_conv"
 }
