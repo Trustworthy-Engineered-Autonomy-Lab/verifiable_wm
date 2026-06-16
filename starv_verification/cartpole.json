@@ -3,13 +3,13 @@
         "Decoder" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "weights/cartpole/decoder.pth"
+                "weights" : "../weights/cartpole/decoder.pth"
             }
         },
         "Controller" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "weights/cartpole/controller.pth",
+                "weights" : "../weights/cartpole/controller.pth",
                 "activation" : "sigmoid"
             }
         }

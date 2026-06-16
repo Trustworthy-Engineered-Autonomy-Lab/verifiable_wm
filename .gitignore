@@ -7,5 +7,6 @@ data/
 .vscode/
 *.out
 *.env
+*.json
 .ipynb_checkpoints/
 logs/
