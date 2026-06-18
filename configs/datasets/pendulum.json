@@ -1,0 +1,22 @@
+{
+  "env": "pendulum",
+  "dataset_name": "dataset_v1",
+  "seed_pool": 2025,
+  "seed_test": 2026,
+  "num_pool": 2000,
+  "num_train": 1600,
+  "num_val": 400,
+  "num_test": 400,
+  "rollout_steps": 30,
+  "device": "auto",
+  "render_batch_size": 64,
+  "state_space": [
+    {"name": "theta", "low": -3.141592653589793, "high": 3.141592653589793},
+    {"name": "omega", "low": -8.0, "high": 8.0}
+  ],
+  "weights": {
+    "decoder": "datasets/pendulum/decoder_pen.pth",
+    "controller": "datasets/pendulum/controller_pen.pth"
+  },
+  "output_dir": "datasets/pendulum/data/dataset_v1"
+}

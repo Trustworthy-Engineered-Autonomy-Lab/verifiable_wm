@@ -4,6 +4,8 @@ verify.sh
 __pycache__/
 *.ipynb
 data/
+datasets/*/data/
+datasets/**/*.pth
 .vscode/
 *.out
 *.env

@@ -1,0 +1,22 @@
+{
+  "env": "mountain_car",
+  "dataset_name": "dataset_v1",
+  "seed_pool": 2025,
+  "seed_test": 2026,
+  "num_pool": 2000,
+  "num_train": 1600,
+  "num_val": 400,
+  "num_test": 400,
+  "rollout_steps": 30,
+  "device": "auto",
+  "render_batch_size": 64,
+  "state_space": [
+    {"name": "position", "low": -1.2, "high": 0.6},
+    {"name": "velocity", "low": -0.07, "high": 0.07}
+  ],
+  "weights": {
+    "decoder": "datasets/mountain_car/decoder_mc.pth",
+    "controller": "datasets/mountain_car/controller_mc.pth"
+  },
+  "output_dir": "datasets/mountain_car/data/dataset_v1"
+}

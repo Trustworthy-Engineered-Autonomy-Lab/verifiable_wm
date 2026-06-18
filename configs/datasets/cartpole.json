@@ -1,0 +1,24 @@
+{
+  "env": "cartpole",
+  "dataset_name": "dataset_v1",
+  "seed_pool": 2025,
+  "seed_test": 2026,
+  "num_pool": 2000,
+  "num_train": 1600,
+  "num_val": 400,
+  "num_test": 400,
+  "rollout_steps": 30,
+  "device": "auto",
+  "render_batch_size": 64,
+  "state_space": [
+    {"name": "position", "low": -2.4, "high": 2.4},
+    {"name": "velocity", "low": -1.0, "high": 1.0},
+    {"name": "angle", "low": -0.2095, "high": 0.2095},
+    {"name": "angular_velocity", "low": -1.0, "high": 1.0}
+  ],
+  "weights": {
+    "decoder": "datasets/cartpole/decoder_cp.pth",
+    "controller": "datasets/cartpole/controller_cp.pth"
+  },
+  "output_dir": "datasets/cartpole/data/dataset_v1"
+}
