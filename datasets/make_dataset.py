@@ -9,67 +9,15 @@ os.environ.setdefault("PYGLET_HEADLESS", "True")
 import gym
 import numpy as np
 import torch
-import torch.nn as nn
+import torch
 import torch.nn.functional as F
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "datasets" / "mountain_car.json"
-
-MIN_ACTION, MAX_ACTION = -1.0, 1.0
-MIN_POS, MAX_POS = -1.2, 0.6
-MIN_SPEED, MAX_SPEED = -0.07, 0.07
-POWER = 0.0015
-ENV_ID = "MountainCarContinuous-v0"
-
-
-class MCController(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 4, kernel_size=4, stride=2, padding=1)
-        self.conv2 = nn.Conv2d(4, 1, kernel_size=4, stride=2, padding=1)
-        self.fc1 = nn.Linear(24 * 24, 64)
-        self.fc2 = nn.Linear(64, 1)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return torch.tanh(x)
-
-
-class MCDecoder(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.fc1 = nn.Linear(2, 32)
-        self.fc2 = nn.Linear(32, 64)
-        self.fc3 = nn.Linear(64, 3 * 12 * 12)
-        self.dec_conv1 = nn.ConvTranspose2d(3, 4, kernel_size=4, stride=2, padding=1)
-        self.dec_conv2 = nn.ConvTranspose2d(4, 8, kernel_size=4, stride=2, padding=1)
-        self.dec_conv3 = nn.ConvTranspose2d(8, 1, kernel_size=4, stride=2, padding=1)
-
-    def forward(self, states):
-        batch_size = states.size(0)
-        x = F.relu(self.fc1(states))
-        x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
-        x = x.view(batch_size, 3, 12, 12)
-        x = F.relu(self.dec_conv1(x))
-        x = F.relu(self.dec_conv2(x))
-        return torch.sigmoid(self.dec_conv3(x))
-
-
-def resolve_path(path):
-    path = Path(path)
-    if path.is_absolute():
-        return path
-    return (PROJECT_ROOT / path).resolve()
+from model import *
+from dynamic import *
 
 
 def load_config(path):
-    with resolve_path(path).open("r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -98,10 +46,23 @@ def load_state_dict(path, device):
 
 
 def load_models(config, device):
-    decoder = MCDecoder().to(device).eval()
-    controller = MCController().to(device).eval()
-    decoder.load_state_dict(load_state_dict(resolve_path(config["weights"]["decoder"]), device))
-    controller.load_state_dict(load_state_dict(resolve_path(config["weights"]["controller"]), device))
+    # Parse model configs
+    decoder_config = config["decoder"]
+    controller_config = config["controller"]
+    decoder_name = decoder_config["name"]
+    controller_name = controller_config["name"]
+    decoder_cls = globals().get(decoder_name)
+    controller_cls = globals().get(controller_name)
+    decoder_args = decoder_config.get("args", {})
+    controller_args = controller_config.get("args", {})
+    # Create model instances
+    decoder = decoder_cls(**decoder_args).to(device).eval()
+    controller = controller_cls(**controller_args).to(device).eval()
+    # Load weights
+    decoder.load_state_dict(load_state_dict(decoder_config["weights"], device))
+    controller.load_state_dict(load_state_dict(controller_config["weights"], device))
+    print(f"[Load] {decoder_name}={decoder_config['weights']}")
+    print(f"[Load] {controller_name}={controller_config['weights']}")
     return decoder, controller
 
 
@@ -137,20 +98,6 @@ def build_initial_state_splits(config, device):
     }
 
 
-@torch.no_grad()
-def one_step(states, actions):
-    pos = states[:, 0]
-    vel = states[:, 1]
-    force = torch.clamp(actions.squeeze(1), MIN_ACTION, MAX_ACTION)
-
-    vel = vel + force * POWER - 0.0025 * torch.cos(3.0 * pos)
-    vel = torch.clamp(vel, MIN_SPEED, MAX_SPEED)
-    pos = pos + vel
-    pos = torch.clamp(pos, MIN_POS, MAX_POS)
-    vel = torch.where((pos == MIN_POS) & (vel < 0), torch.zeros_like(vel), vel)
-    return torch.stack([pos, vel], dim=1)
-
-
 def rgb_to_gray_01(frames_rgb):
     frames = frames_rgb.astype(np.float32)
     return (
@@ -161,14 +108,13 @@ def rgb_to_gray_01(frames_rgb):
 
 
 @torch.no_grad()
-def render_images(env, states, device, render_batch_size):
+def render_images(dynamic, states, device, render_batch_size):
     states_np = states.detach().cpu().numpy()
     chunks = []
     for start in range(0, states_np.shape[0], render_batch_size):
         frames = []
         for state in states_np[start : start + render_batch_size]:
-            env.unwrapped.state = np.array(state, dtype=np.float32)
-            frames.append(env.render(mode="rgb_array"))
+            frames.append(dynamic.render(state))
         gray = rgb_to_gray_01(np.stack(frames, axis=0))
         images = torch.from_numpy(gray[:, None, :, :]).to(device)
         images = F.interpolate(images, size=(96, 96), mode="bilinear", align_corners=False)
@@ -177,17 +123,33 @@ def render_images(env, states, device, render_batch_size):
 
 
 @torch.no_grad()
-def rollout_real(states0, steps, controller, env, device, render_batch_size):
-    return rollout(states0, steps, controller, env, device, render_batch_size, decoder=None)
+def rollout_real(states0, steps, controller, dynamic, device, render_batch_size):
+    return rollout(
+        states0,
+        steps,
+        controller,
+        dynamic,
+        device,
+        render_batch_size,
+        decoder=None,
+    )
 
 
 @torch.no_grad()
-def rollout_dwm(states0, steps, decoder, controller, device):
-    return rollout(states0, steps, controller, env=None, device=device, render_batch_size=None, decoder=decoder)
+def rollout_dwm(states0, steps, decoder, controller, dynamic, device):
+    return rollout(
+        states0,
+        steps,
+        controller,
+        dynamic,
+        device=device,
+        render_batch_size=None,
+        decoder=decoder,
+    )
 
 
 @torch.no_grad()
-def rollout(states0, steps, controller, env, device, render_batch_size, decoder):
+def rollout(states0, steps, controller, dynamic, device, render_batch_size, decoder):
     num_samples, state_dim = states0.shape
     trajectories = torch.empty(num_samples, steps + 1, state_dim, device=device)
     actions = torch.empty(num_samples, steps, 1, device=device)
@@ -196,29 +158,14 @@ def rollout(states0, steps, controller, env, device, render_batch_size, decoder)
     trajectories[:, 0, :] = states
     for step in range(steps):
         if decoder is None:
-            images = render_images(env, states, device, render_batch_size)
+            images = render_images(dynamic, states, device, render_batch_size)
         else:
             images = decoder(states)
         action = controller(images)
-        states = one_step(states, action)
+        states = dynamic.step(states, action)
         actions[:, step, :] = action
         trajectories[:, step + 1, :] = states
     return trajectories, actions
-
-
-def safe_close_env(env):
-    try:
-        if hasattr(env, "unwrapped") and hasattr(env.unwrapped, "viewer"):
-            viewer = env.unwrapped.viewer
-            if viewer is not None:
-                viewer.close()
-                env.unwrapped.viewer = None
-    except Exception:
-        pass
-    try:
-        env.close()
-    except Exception:
-        pass
 
 
 def to_numpy(tensor):
@@ -226,7 +173,7 @@ def to_numpy(tensor):
 
 
 def save_dataset(config, initial_splits, trajectory_splits):
-    output_dir = resolve_path(config["output_dir"])
+    output_dir = Path(config["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
 
     np.savez_compressed(
@@ -246,7 +193,7 @@ def save_dataset(config, initial_splits, trajectory_splits):
     np.savez_compressed(output_dir / "trajectories.npz", **arrays)
 
     metadata = {
-        "env": config["env"],
+        **config,
         "dataset_name": config["dataset_name"],
         "seed_pool": config["seed_pool"],
         "seed_test": config["seed_test"],
@@ -256,7 +203,6 @@ def save_dataset(config, initial_splits, trajectory_splits):
         "num_test": config["num_test"],
         "rollout_steps": config["rollout_steps"],
         "state_space": config["state_space"],
-        "weights": config["weights"],
         "files": {
             "initial_states": "initial_states.npz",
             "trajectories": "trajectories.npz",
@@ -267,7 +213,6 @@ def save_dataset(config, initial_splits, trajectory_splits):
         json.dump(metadata, f, indent=2)
     return output_dir
 
-
 def generate_dataset(config):
     device = resolve_device(config.get("device", "auto"))
     decoder, controller = load_models(config, device)
@@ -275,15 +220,22 @@ def generate_dataset(config):
     steps = int(config["rollout_steps"])
     render_batch_size = int(config.get("render_batch_size", 64))
 
-    env = gym.make(ENV_ID)
-    env.reset()
+    dynamic = globals()[config["dynamic"]["name"]](**config["dynamic"].get("args", {}))
+    print(f"[Dynamic] {config['dynamic']['name']}")
     try:
         trajectory_splits = {}
         for split_name in ("train", "val", "test"):
             states = initial_splits[f"{split_name}_states"]
             print(f"[Rollout] {split_name}: states={tuple(states.shape)}, steps={steps}")
-            real_traj, real_actions = rollout_real(states, steps, controller, env, device, render_batch_size)
-            dwm_traj, dwm_actions = rollout_dwm(states, steps, decoder, controller, device)
+            real_traj, real_actions = rollout_real(
+                states,
+                steps,
+                controller,
+                dynamic,
+                device,
+                render_batch_size,
+            )
+            dwm_traj, dwm_actions = rollout_dwm(states, steps, decoder, controller, dynamic, device)
             trajectory_splits[split_name] = {
                 "real_traj": real_traj,
                 "dwm_traj": dwm_traj,
@@ -291,24 +243,21 @@ def generate_dataset(config):
                 "dwm_actions": dwm_actions,
             }
     finally:
-        safe_close_env(env)
+        pass
 
     return save_dataset(config, initial_splits, trajectory_splits)
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate MountainCar train/val/test trajectory dataset.")
-    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument("config", type=Path)
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
     config = load_config(args.config)
-    print(f"[Config] {resolve_path(args.config)}")
-    print(f"[Env] {config['env']}")
-    print(f"[Load] decoder={resolve_path(config['weights']['decoder'])}")
-    print(f"[Load] controller={resolve_path(config['weights']['controller'])}")
+    print(f"[Config] {args.config}")
     output_dir = generate_dataset(config)
     print(f"[Done] dataset saved to {output_dir}")
 

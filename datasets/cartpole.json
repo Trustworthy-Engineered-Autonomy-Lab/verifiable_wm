@@ -1,5 +1,4 @@
 {
-  "env": "cartpole",
   "dataset_name": "dataset_v1",
   "seed_pool": 2025,
   "seed_test": 2026,
@@ -16,9 +15,16 @@
     {"name": "angle", "low": -0.2095, "high": 0.2095},
     {"name": "angular_velocity", "low": -1.0, "high": 1.0}
   ],
-  "weights": {
-    "decoder": "datasets/cartpole/decoder_cp.pth",
-    "controller": "datasets/cartpole/controller_cp.pth"
+  "controller": {
+    "name": "CartPoleController",
+    "weights": "../weights/cartpole/controller_cp.pth"
+  },
+  "decoder": {
+    "name": "CartPoleDecoder",
+    "weights": "../weights/cartpole/decoder_cp.pth"
+  },
+  "dynamic": {
+    "name": "CartPole"
   },
   "output_dir": "datasets/cartpole/data/dataset_v1"
 }
