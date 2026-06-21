@@ -16,14 +16,14 @@
   ],
   "controller": {
     "name": "Controller",
-    "weights": "../weights/pendulum/controller_pen.pth",
+    "weights": "weights/pendulum/controller_pen.pth",
     "args": {
-      "last_act": "tanh"
+      "activation": "tanh"
     }
   },
   "decoder": {
-    "name": "PenDecoder",
-    "weights": "../weights/pendulum/decoder_pen.pth"
+    "name": "Decoder",
+    "weights": "weights/pendulum/decoder_pen.pth"
   },
   "dynamic": {
     "name": "Pendulum"

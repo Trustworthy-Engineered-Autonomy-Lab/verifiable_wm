@@ -11,8 +11,8 @@ import argparse
 
 from mpi4py import MPI
 
-from models import FullModel
-from verifiers import Verifier
+from starv_verification.model import FullModel
+from starv_verification.verifiers import Verifier
 from collections import OrderedDict
 import traceback
 import shutil
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     verifier_cfg = config['verifier']
 
     try:
-        module = importlib.import_module("verifiers")
+        module = importlib.import_module("starv_verification.verifiers")
         verifier_cls = getattr(module, verifier_cfg['name'])
         verifier = verifier_cls(*(verifier_cfg.get('args') or []), **(verifier_cfg.get('kwargs') or {}))
     except Exception as e:

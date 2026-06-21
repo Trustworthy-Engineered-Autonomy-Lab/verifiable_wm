@@ -17,14 +17,14 @@
   ],
   "controller": {
     "name": "Controller",
-    "weights": "../weights/cartpole/controller_cp.pth",
+    "weights": "weights/cartpole/controller_cp.pth",
     "args": {
-      "last_act": "sigmoid"
+      "activation": "sigmoid"
     }
   },
   "decoder": {
-    "name": "CartPoleDecoder",
-    "weights": "../weights/cartpole/decoder_cp.pth"
+    "name": "Decoder",
+    "weights": "weights/cartpole/decoder_cp.pth"
   },
   "dynamic": {
     "name": "CartPole"

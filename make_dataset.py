@@ -13,7 +13,7 @@ import torch
 import torch.nn.functional as F
 
 from model import *
-from dynamic import *
+from dynamic import *  
 
 
 def load_config(path):

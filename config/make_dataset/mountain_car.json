@@ -14,14 +14,14 @@
     {"name": "velocity", "low": -0.07, "high": 0.07}
   ],
   "decoder": {
-    "name": "MCDecoder",
-    "weights": "../weights/mountain_car/decoder_mc.pth"
+    "name": "Decoder",
+    "weights": "weights/mountain_car/decoder_mc.pth"
   },
   "controller": {
     "name": "Controller",
-    "weights": "../weights/mountain_car/controller_mc.pth",
+    "weights": "weights/mountain_car/controller_mc.pth",
     "args": {
-      "last_act": "tanh"
+      "activation": "tanh"
     }
   },
   "dynamic": {

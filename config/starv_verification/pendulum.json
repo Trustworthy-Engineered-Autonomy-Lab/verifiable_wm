@@ -3,13 +3,13 @@
         "Decoder" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "../weights/pendulum/decoder.pth"
+                "weights" : "weights/pendulum/decoder_pen.pth"
             }
         },
         "Controller" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "../weights/pendulum/controller.pth"
+                "weights" : "weights/pendulum/controller_pen.pth"
             }
         }
     },
