@@ -15,8 +15,11 @@
     {"name": "omega", "low": -8.0, "high": 8.0}
   ],
   "controller": {
-    "name": "PenController",
-    "weights": "../weights/pendulum/controller_pen.pth"
+    "name": "Controller",
+    "weights": "../weights/pendulum/controller_pen.pth",
+    "args": {
+      "last_act": "tanh"
+    }
   },
   "decoder": {
     "name": "PenDecoder",

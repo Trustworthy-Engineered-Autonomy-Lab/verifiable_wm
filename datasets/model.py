@@ -2,13 +2,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class MCController(nn.Module):
-    def __init__(self):
+class Controller(nn.Module):
+    def __init__(self, last_act='relu'):
         super().__init__()
         self.conv1 = nn.Conv2d(1, 4, kernel_size=4, stride=2, padding=1)
         self.conv2 = nn.Conv2d(4, 1, kernel_size=4, stride=2, padding=1)
         self.fc1 = nn.Linear(24 * 24, 64)
         self.fc2 = nn.Linear(64, 1)
+        if last_act == 'relu':
+            self.act = nn.ReLU()
+        elif last_act == 'tanh':
+            self.act = nn.Tanh()
+        elif last_act == 'sigmoid':
+            self.act = nn.Sigmoid()
+        else:
+            raise ValueError("Unsupported activation function: {}".format(last_act))
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -16,8 +24,7 @@ class MCController(nn.Module):
         x = x.view(x.size(0), -1)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
-        return torch.tanh(x)
-bin
+        return self.act(x)
 
 class MCDecoder(nn.Module):
     def __init__(self):
@@ -38,22 +45,6 @@ class MCDecoder(nn.Module):
         x = F.relu(self.dec_conv1(x))
         x = F.relu(self.dec_conv2(x))
         return torch.sigmoid(self.dec_conv3(x))
-    
-class PenController(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 4, kernel_size=4, stride=2, padding=1)
-        self.conv2 = nn.Conv2d(4, 1, kernel_size=4, stride=2, padding=1)
-        self.fc1 = nn.Linear(24 * 24, 64)
-        self.fc2 = nn.Linear(64, 1)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return torch.tanh(x)
 
 
 class PenDecoder(nn.Module):
@@ -97,29 +88,10 @@ class CartPoleDecoder(nn.Module):
         x = F.relu(self.dec_conv2(x))
         return torch.clamp(self.dec_conv3(x), 0.0, 1.0)
 
-
-class CartPoleController(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 4, kernel_size=4, stride=2, padding=1)
-        self.conv2 = nn.Conv2d(4, 1, kernel_size=4, stride=2, padding=1)
-        self.fc1 = nn.Linear(24 * 24, 64)
-        self.fc2 = nn.Linear(64, 1)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return torch.sigmoid(x)
-
     
 __all__ = [
-    "MCController", 
+    "Controller", 
     "MCDecoder",
-    "PenController",
     "PenDecoder",
-    "CartPoleDecoder",
-    "CartPoleController"
+    "CartPoleDecoder"
 ]

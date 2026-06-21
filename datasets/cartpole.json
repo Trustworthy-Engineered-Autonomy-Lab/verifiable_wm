@@ -16,8 +16,11 @@
     {"name": "angular_velocity", "low": -1.0, "high": 1.0}
   ],
   "controller": {
-    "name": "CartPoleController",
-    "weights": "../weights/cartpole/controller_cp.pth"
+    "name": "Controller",
+    "weights": "../weights/cartpole/controller_cp.pth",
+    "args": {
+      "last_act": "sigmoid"
+    }
   },
   "decoder": {
     "name": "CartPoleDecoder",
