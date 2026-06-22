@@ -24,8 +24,8 @@ class DynmaicModel(ABC):
 
 class MountainCar(DynmaicModel):
     def __init__(self, 
-            min_pos=-1.2, 
-            max_pos=0.6, 
+            # min_pos=-1.2, 
+            # max_pos=0.6, 
             min_speed=-0.07, 
             max_speed=0.07, 
             min_action=-1.0,
@@ -33,8 +33,8 @@ class MountainCar(DynmaicModel):
             power=0.0015
         ):
         super().__init__()
-        self.min_pos = min_pos
-        self.max_pos = max_pos
+        # self.min_pos = min_pos
+        # self.max_pos = max_pos
         self.min_speed = min_speed
         self.max_speed = max_speed
         self.power = power
@@ -53,8 +53,8 @@ class MountainCar(DynmaicModel):
         vel = vel + force * self.power - 0.0025 * torch.cos(3.0 * pos)
         vel = torch.clamp(vel, self.min_speed, self.max_speed)
         pos = pos + vel
-        pos = torch.clamp(pos, self.min_pos, self.max_pos)
-        vel = torch.where((pos == self.min_pos) & (vel < 0), torch.zeros_like(vel), vel)
+        # pos = torch.clamp(pos, self.min_pos, self.max_pos)
+        # vel = torch.where((pos == self.min_pos) & (vel < 0), torch.zeros_like(vel), vel)
         return torch.stack([pos, vel], dim=1)
     
     def render(self, state: NDArray) -> NDArray:
