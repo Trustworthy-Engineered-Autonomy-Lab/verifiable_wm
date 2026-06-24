@@ -15,11 +15,11 @@
   ],
   "decoder": {
     "name": "Decoder",
-    "weights": "weights/mountain_car/decoder_mc.pth"
+    "weights": "weights/mountain_car/decoder.pth"
   },
   "controller": {
     "name": "Controller",
-    "weights": "weights/mountain_car/controller_mc.pth",
+    "weights": "weights/mountain_car/controller.pth",
     "args": {
       "activation": "tanh"
     }

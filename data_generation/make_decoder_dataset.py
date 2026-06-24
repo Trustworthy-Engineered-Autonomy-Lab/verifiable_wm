@@ -7,8 +7,8 @@ os.environ.setdefault("PYGLET_HEADLESS", "True")
 
 import numpy as np
 
-from dynamic import *
-from utils import (
+from simulation.dynamic import *
+from data_generation.utils import (
     load_config,
     set_seed,
     resolve_device,

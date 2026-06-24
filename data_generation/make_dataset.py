@@ -12,8 +12,8 @@ import torch
 import torch
 import torch.nn.functional as F
 
-from model import *
-from dynamic import *  
+from simulation.model import *
+from simulation.dynamic import *  
 
 
 def load_config(path):

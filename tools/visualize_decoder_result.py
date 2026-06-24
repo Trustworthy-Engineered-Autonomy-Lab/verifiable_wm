@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
-from model import Decoder
+from simulation.model import Decoder
 
 
 def main():

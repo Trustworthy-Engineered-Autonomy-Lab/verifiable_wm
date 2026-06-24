@@ -8,9 +8,9 @@ os.environ.setdefault("PYGLET_HEADLESS", "True")
 import numpy as np
 import torch
 
-from model import *
-from dynamic import *
-from utils import (
+from simulation.model import *
+from simulation.dynamic import *
+from data_generation.utils import (
     load_config,
     set_seed,
     resolve_device,

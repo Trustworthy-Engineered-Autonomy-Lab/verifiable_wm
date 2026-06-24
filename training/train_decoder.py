@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from model import Decoder
+from simulation.model import Decoder
 
 
 def load_dataset(path):

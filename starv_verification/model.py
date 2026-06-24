@@ -19,7 +19,7 @@ from StarV.set.imagestar import ImageStar
 from typing import Dict, List
 from collections import OrderedDict
 
-import model
+import simulation.model as model
 
 class Decoder(model.Decoder):
     def __init__(self, weights, *args, **kwargs):

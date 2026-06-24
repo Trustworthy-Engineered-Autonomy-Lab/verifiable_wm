@@ -10,7 +10,7 @@ from StarV.dynamic.Sine import SinLayer
 
 from sympy import Matrix, cos, sin
 
-import dynamic
+import simulation.dynamic as dynamic
 
 class Pendulum(dynamic.Pendulum):
     def __init__(self, *args, **kwargs):

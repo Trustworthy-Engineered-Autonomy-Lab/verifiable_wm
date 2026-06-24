@@ -8,7 +8,7 @@ import gym
 import numpy as np
 from numpy.typing import NDArray
 
-from env import ContinuousCartPoleEnv
+from simulation.env import ContinuousCartPoleEnv
 
 class DynmaicModel(ABC):
     def __init__(self):
