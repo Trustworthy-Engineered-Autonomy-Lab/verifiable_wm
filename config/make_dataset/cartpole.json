@@ -1,7 +1,9 @@
 {
   "dataset_name": "dataset_v1",
   "seed_pool": 2025,
-  "seed_test": 2026,
+  "seed_train": 2025,
+  "seed_val": 2026,
+  "seed_test": 2027,
   "num_pool": 2000,
   "num_train": 1600,
   "num_val": 400,
@@ -18,14 +20,14 @@
   ],
   "controller": {
     "name": "Controller",
-    "weights": "weights/cartpole/controller.pth",
+    "weights": "weights/cartpole/controller_cp.pth",
     "args": {
       "activation": "sigmoid"
     }
   },
   "decoder": {
     "name": "Decoder",
-    "weights": "weights/cartpole/decoder.pth"
+    "weights": "weights/cartpole/decoder_cp.pth"
   },
   "dynamic": {
     "name": "CartPole"

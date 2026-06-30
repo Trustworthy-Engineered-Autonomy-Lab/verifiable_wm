@@ -1,8 +1,10 @@
 {
   "env": "pendulum",
   "dataset_name": "dataset_v1",
-  "seed_pool": 2025,
-  "seed_test": 2026,
+  "seed_pool": 2024,
+  "seed_train": 2025,
+  "seed_val": 2026,
+  "seed_test": 2027,
   "num_pool": 2000,
   "num_train": 1600,
   "num_val": 400,
@@ -16,14 +18,14 @@
   ],
   "controller": {
     "name": "Controller",
-    "weights": "weights/pendulum/controller.pth",
+    "weights": "weights/pendulum/controller_pen.pth",
     "args": {
       "activation": "tanh"
     }
   },
   "decoder": {
     "name": "Decoder",
-    "weights": "weights/pendulum/decoder.pth"
+    "weights": "weights/pendulum/decoder_pen.pth"
   },
   "dynamic": {
     "name": "Pendulum"

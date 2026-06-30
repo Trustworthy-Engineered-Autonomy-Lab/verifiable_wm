@@ -1,7 +1,9 @@
 {
   "dataset_name": "dataset_v1",
   "seed_pool": 2025,
-  "seed_test": 2026,
+  "seed_train": 2025,
+  "seed_val": 2026,
+  "seed_test": 2027,
   "num_pool": 2000,
   "num_train": 1600,
   "num_val": 400,
@@ -15,11 +17,11 @@
   ],
   "decoder": {
     "name": "Decoder",
-    "weights": "weights/mountain_car/decoder.pth"
+    "weights": "weights/mountain_car/decoder_mc.pth"
   },
   "controller": {
     "name": "Controller",
-    "weights": "weights/mountain_car/controller.pth",
+    "weights": "weights/mountain_car/controller_mc.pth",
     "args": {
       "activation": "tanh"
     }
