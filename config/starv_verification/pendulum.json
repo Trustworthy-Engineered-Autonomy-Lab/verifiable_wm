@@ -3,13 +3,13 @@
         "Decoder" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "weights/pendulum/decoder_pen.pth"
+                "weights" : "/home/tealab_shared/starv/weights/pendulum/decoder_pen.pth"
             }
         },
         "Controller" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "weights/pendulum/controller_pen.pth"
+                "weights" : "/home/tealab_shared/starv/weights/pendulum/controller_pen.pth"
             }
         }
     },

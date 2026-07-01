@@ -3,13 +3,13 @@
         "Decoder" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "weights/cartpole/decoder_cp.pth"
+                "weights" : "/home/tealab_shared/starv/weights/cartpole/decoder_cp.pth"
             }
         },
         "Controller" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "weights/cartpole/controller_cp.pth",
+                "weights" : "/home/tealab_shared/starv/weights/cartpole/controller_cp.pth",
                 "activation" : "sigmoid"
             }
         }

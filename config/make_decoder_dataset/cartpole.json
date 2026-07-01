@@ -1,7 +1,9 @@
 {
   "dataset_name": "dataset_v1",
-  "seed_pool": 2025,
-  "seed_test": 2026,
+  "seed_pool": 2024,
+  "seed_train": 2025,
+  "seed_val": 2026,
+  "seed_test": 2027,
   "num_pool": 2000,
   "num_train": 1600,
   "num_val": 400,
@@ -9,6 +11,7 @@
   "rollout_steps": 30,
   "device": "auto",
   "render_batch_size": 64,
+  "decoder_state_indices": [0, 2],
   "state_space": [
     {"name": "position", "low": -2.4, "high": 2.4},
     {"name": "velocity", "low": -1.0, "high": 1.0},
@@ -17,14 +20,14 @@
   ],
   "controller": {
     "name": "Controller",
-    "weights": "weights/cartpole/controller_cp.pth",
+    "weights": "/home/tealab_shared/starv/weights/cartpole/controller_cp.pth",
     "args": {
       "activation": "sigmoid"
     }
   },
   "decoder": {
     "name": "Decoder",
-    "weights": "weights/cartpole/decoder_cp.pth"
+    "weights": "/home/tealab_shared/starv/weights/cartpole/decoder_cp.pth"
   },
   "dynamic": {
     "name": "CartPole"
