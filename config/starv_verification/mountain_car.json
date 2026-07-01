@@ -3,13 +3,13 @@
         "Decoder" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "weights/mountain_car/decoder_mc.pth"
+                "weights" : "/home/tealab_shared/starv/weights/mountain_car/decoder_mc.pth"
             }
         },
         "Controller" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "weights/mountain_car/controller_mc.pth"
+                "weights" : "/home/tealab_shared/starv/weights/mountain_car/controller_mc.pth"
             }
         }
     },
