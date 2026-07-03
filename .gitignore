@@ -2,7 +2,6 @@ results/
 weights/
 verify.sh
 __pycache__/
-*.ipynb
 data/
 datasets/*/data/
 datasets/**/*.pth
@@ -12,3 +11,6 @@ datasets/**/*.pth
 *.json
 .ipynb_checkpoints/
 logs/
+*.pth
+*.pdf
+chat_history_exports

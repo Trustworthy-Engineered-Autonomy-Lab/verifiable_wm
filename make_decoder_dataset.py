@@ -6,7 +6,9 @@ from pathlib import Path
 os.environ.setdefault("PYGLET_HEADLESS", "True")
 
 import numpy as np
+import torch
 
+from model import *
 from dynamic import *
 from utils import (
     load_config,
@@ -16,6 +18,26 @@ from utils import (
     render_images,
     to_numpy,
 )
+
+
+def load_state_dict(path, device):
+    try:
+        return torch.load(path, map_location=device, weights_only=True)
+    except TypeError:
+        return torch.load(path, map_location=device)
+
+
+def load_controller(config, device):
+    controller_config = config["controller"]
+    controller_name = controller_config["name"]
+    controller_cls = globals()[controller_name]
+    controller_args = controller_config.get("args", {})
+
+    controller = controller_cls(**controller_args).to(device).eval()
+    controller.load_state_dict(load_state_dict(controller_config["weights"], device))
+
+    print(f"[Load] {controller_name}={controller_config['weights']}")
+    return controller
 
 
 def build_initial_state_splits(config, device):
@@ -69,14 +91,51 @@ def save_dataset(config, splits):
 
     return output_dir
 
+
+def save_real_trajectories(config, trajectory_splits):
+    output_dir = Path(config["output_dir"])
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    arrays = {}
+    for split_name, split_data in trajectory_splits.items():
+        arrays[f"{split_name}_traj"] = to_numpy(split_data["traj"])
+        arrays[f"{split_name}_actions"] = to_numpy(split_data["actions"])
+
+    np.savez_compressed(output_dir / "real_trajectories.npz", **arrays)
+
+
 def select_decoder_states(states, config):
     indices = config.get("decoder_state_indices", None)
     if indices is None:
         return states
     return states[:, indices]
 
+
+@torch.no_grad()
+def rollout_real_trajectory(states0, steps, controller, dynamic, device, render_batch_size):
+    num_samples, state_dim = states0.shape
+    trajectories = torch.empty(num_samples, steps + 1, state_dim, device=device)
+    action_steps = []
+
+    states = states0.clone()
+    trajectories[:, 0, :] = states
+
+    for step in range(steps):
+        images = render_images(dynamic, states, device, render_batch_size)
+        actions = controller(images)
+        states = dynamic.step(states, actions)
+
+        action_steps.append(actions)
+        trajectories[:, step + 1, :] = states
+
+    actions = torch.stack(action_steps, dim=1)
+    return trajectories, actions
+
+
 def generate_dataset(config):
     device = resolve_device(config.get("device", "auto"))
+    controller = load_controller(config, device)
+    steps = int(config["rollout_steps"])
     render_batch_size = int(config.get("render_batch_size", 64))
 
     dynamic = globals()[config["dynamic"]["name"]](**config["dynamic"].get("args", {}))
@@ -85,6 +144,7 @@ def generate_dataset(config):
     state_splits = build_initial_state_splits(config, device)
 
     dataset = {}
+    trajectory_splits = {}
     for split_name in ("train_states", "val_states", "test_states"):
         states = state_splits[split_name]
         images = render_images(dynamic, states, device, render_batch_size)
@@ -97,7 +157,28 @@ def generate_dataset(config):
 
         print(f"[Render] {prefix}: states={tuple(states.shape)}, images={tuple(images.shape)}")
 
-    return save_dataset(config, dataset)
+        traj, actions = rollout_real_trajectory(
+            states,
+            steps,
+            controller,
+            dynamic,
+            device,
+            render_batch_size,
+        )
+        trajectory_splits[prefix] = {
+            "traj": traj,
+            "actions": actions,
+        }
+
+        print(
+            f"[Trajectory] {prefix}: "
+            f"traj={tuple(traj.shape)}, "
+            f"actions={tuple(actions.shape)}"
+        )
+
+    output_dir = save_dataset(config, dataset)
+    save_real_trajectories(config, trajectory_splits)
+    return output_dir
 
 
 def main():
