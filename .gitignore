@@ -11,6 +11,13 @@ datasets/**/*.pth
 *.json
 .ipynb_checkpoints/
 logs/
+report/
 *.pth
 *.pdf
 chat_history_exports
+saliance_map/output/**
+!saliance_map/output/
+!saliance_map/output/**/
+!saliance_map/output/**/.gitkeep
+*.png
+.gitkeep

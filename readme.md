@@ -2,7 +2,8 @@
 ## 环境启动
 conda activate /home/tealab_shared/starv/env/starv_shared
 
-## 目录结构（按当前目录顺序）
+## 目录结构
+
 
 ```
 verifiable_wm/
@@ -15,7 +16,7 @@ verifiable_wm/
 ├── make_decoder_dataset.py   # 生成训练 decoder(wm) 用的数据集
 ├── model.py                  # Controller / Decoder 网络结构
 ├── readme.md
-├── saliance_map/             # 热力图等可视化代码（待完善）
+├── saliance_map/             # saliency/heatmap 脚本与生成输出
 ├── sampling.py                # 用真实渲染器采样，同时生成转移数据集和 wm 驱动的验证轨迹
 ├── starv_verification/        # 基于 StarV（区间/星集）的安全验证部分
 ├── tools/                     # 可视化工具（红绿安全图）
@@ -75,7 +76,13 @@ verifiable_wm/
 
 ### `saliance_map/`
 
-用来放置热力图等可视化代码，目前为空，待完善。
+用来放置 CartPole controller saliency / heatmap 相关脚本和输出。当前约定：
+
+- `saliance_map/scripts/` — 放可运行的审计、preview、heatmap 计算脚本。
+- `saliance_map/output/` — 放所有生成产物，包括图片、`.npz`、audit summary 等。
+- `.npz` 数据集和训练/评估中间数据放在 `datasets/`；`saliance_map/output/` 只放可视化图、对比图和 audit summary。
+
+主方法暂定为 occlusion-white saliency；IG-white² 作为 sanity check；SmoothGrad / Grad-CAM 只作为可视化参考。
 
 ### `sampling.py`
 
