@@ -93,7 +93,7 @@ def parse_args():
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("saliance_map/output/diagnostics/cartpole_render_preview"),
+        default=Path("saliency_map/output/diagnostics/previews"),
     )
     return parser.parse_args()
 
@@ -119,7 +119,8 @@ def main():
             if env is not None:
                 env.close()
 
-    output_path = args.output_dir / f"{args.split}_preview.png"
+    suffix = "saved_vs_current" if args.render_current else "saved"
+    output_path = args.output_dir / f"cartpole_render_{args.split}_{suffix}.png"
     save_preview(saved_images, rerendered, output_path)
     print(f"[saved] {output_path}")
 

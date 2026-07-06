@@ -16,7 +16,7 @@ verifiable_wm/
 ├── make_decoder_dataset.py   # 生成训练 decoder(wm) 用的数据集
 ├── model.py                  # Controller / Decoder 网络结构
 ├── readme.md
-├── saliance_map/             # saliency/heatmap 脚本与生成输出
+├── saliency_map/             # saliency/heatmap 脚本与临时可视化输出
 ├── sampling.py                # 用真实渲染器采样，同时生成转移数据集和 wm 驱动的验证轨迹
 ├── starv_verification/        # 基于 StarV（区间/星集）的安全验证部分
 ├── tools/                     # 可视化工具（红绿安全图）
@@ -74,15 +74,16 @@ verifiable_wm/
 
 训练脚本和验证脚本用的都是这两个类的结构，`starv_verification` 里会继承过去改写 `forward`，换成用区间去算。
 
-### `saliance_map/`
+### `saliency_map/`
 
-用来放置 CartPole controller saliency / heatmap 相关脚本和输出。当前约定：
+用来放置不同 study case 的 controller saliency / heatmap 相关脚本和临时输出。当前约定：
 
-- `saliance_map/scripts/` — 放可运行的审计、preview、heatmap 计算脚本。
-- `saliance_map/output/` — 放所有生成产物，包括图片、`.npz`、audit summary 等。
-- `.npz` 数据集和训练/评估中间数据放在 `datasets/`；`saliance_map/output/` 只放可视化图、对比图和 audit summary。
+- `saliency_map/scripts/` — 放主线 saliency map 计算脚本。
+- `saliency_map/scripts/diagnostics/` — 放临时 preview、方法可视化检查脚本。
+- `saliency_map/output/diagnostics/previews/` — 放临时图片，靠文件名区分 study case 和用途。
+- 训练用的 `.npz` 放回对应的 `datasets/<env>/data/<version>/`，不要放在 `saliency_map/output/`。
 
-主方法暂定为 occlusion-white saliency；IG-white² 作为 sanity check；SmoothGrad / Grad-CAM 只作为可视化参考。
+主方法先按 study case 检查后再定，不强行要求所有环境都用同一个 saliency 算法。
 
 ### `sampling.py`
 

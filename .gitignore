@@ -15,9 +15,12 @@ report/
 *.pth
 *.pdf
 chat_history_exports
-saliance_map/output/**
-!saliance_map/output/
-!saliance_map/output/**/
-!saliance_map/output/**/.gitkeep
+saliency_map/output/**
+!saliency_map/output/
+!saliency_map/output/**/
+!saliency_map/output/**/.gitkeep
 *.png
 .gitkeep
+!saliency_map/output/**/.gitkeep
+!saliency_map/scripts/.gitkeep
+!saliency_map/scripts/diagnostics/.gitkeep

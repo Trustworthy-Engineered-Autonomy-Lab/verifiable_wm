@@ -145,7 +145,11 @@ def compute_methods(controller, images, args):
     return outputs, actions
 
 
-def save_overlay_grid(images, actions, outputs, output_path, alpha):
+def infer_case_name(config_path):
+    return config_path.stem
+
+
+def save_overlay_grid(images, actions, outputs, output_path, alpha, title):
     image_np = images.detach().cpu().numpy()[:, 0]
     actions_np = actions.detach().cpu().numpy().reshape(-1)
     method_keys = list(outputs)
@@ -171,7 +175,7 @@ def save_overlay_grid(images, actions, outputs, output_path, alpha):
             axes[row, col].set_xticks([])
             axes[row, col].set_yticks([])
 
-    fig.suptitle("Controller heatmap method comparison", fontsize=11, y=0.995)
+    fig.suptitle(title, fontsize=11, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.985))
     fig.savefig(output_path, dpi=170)
     plt.close(fig)
@@ -202,7 +206,12 @@ def parse_args():
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("saliance_map/output/diagnostics/heatmap_methods_compare"),
+        default=Path("saliency_map/output/diagnostics/previews"),
+    )
+    parser.add_argument(
+        "--output-name",
+        default=None,
+        help="Defaults to <config-stem>_saliency_methods.png.",
     )
     parser.add_argument("--seed", type=int, default=0)
     return parser.parse_args()
@@ -224,9 +233,19 @@ def main():
     outputs, actions = compute_methods(controller, images, args)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    save_overlay_grid(images, actions, outputs, args.output_dir / "heatmap_methods_grid.png", args.overlay_alpha)
+    case_name = infer_case_name(args.config)
+    output_name = args.output_name or f"{case_name}_saliency_methods.png"
+    output_path = args.output_dir / output_name
+    save_overlay_grid(
+        images,
+        actions,
+        outputs,
+        output_path,
+        args.overlay_alpha,
+        title=f"{case_name}: controller saliency method preview",
+    )
 
-    print(f"[saved] {args.output_dir / 'heatmap_methods_grid.png'}")
+    print(f"[saved] {output_path}")
     print("[actions]", actions.detach().cpu().numpy().reshape(-1).round(6).tolist())
 
 

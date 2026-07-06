@@ -1,4 +1,4 @@
-# saliance_map 说明
+# saliency_map 说明
 
 这个目录现在只做一件主线事情：给不同 study case 生成 saliency map / heatmap，后面作为 WM reconstruction loss 的空间权重使用。
 
@@ -7,7 +7,7 @@
 ## 当前结构
 
 ```text
-saliance_map/
+saliency_map/
 ├── README.md
 ├── scripts/
 │   ├── precompute_saliency_maps.py
@@ -16,14 +16,15 @@ saliance_map/
 │       └── preview_cartpole_render.py
 └── output/
     └── diagnostics/
+        └── previews/
 ```
 
 ## 放东西的规则
 
 - 主线脚本放在 `scripts/`。
 - 临时检查、画图、方法对比脚本放在 `scripts/diagnostics/`。
-- 生成给训练用的 `.npz` 不放在 `saliance_map/output/`，而是放回对应的 dataset 目录。
-- `saliance_map/output/` 只放临时图片、grid、preview 这类方便看的东西。
+- 生成给训练用的 `.npz` 不放在 `saliency_map/output/`，而是放回对应的 dataset 目录。
+- `saliency_map/output/diagnostics/previews/` 放临时图片。一般是一张图一个清楚的文件名，不再一张图开一个文件夹。
 
 ## 主线脚本
 
@@ -35,7 +36,7 @@ saliance_map/
 
 ```bash
 /home/tealab_shared/starv/env/starv_shared/bin/python \
-  saliance_map/scripts/precompute_saliency_maps.py
+  saliency_map/scripts/precompute_saliency_maps.py
 ```
 
 默认读取：
@@ -55,7 +56,7 @@ datasets/cartpole/data/dataset_v1/saliency_occlusion.npz
 
 ```bash
 /home/tealab_shared/starv/env/starv_shared/bin/python \
-  saliance_map/scripts/precompute_saliency_maps.py \
+  saliency_map/scripts/precompute_saliency_maps.py \
   --config config/make_decoder_dataset/mountain_car.json
 ```
 
@@ -63,7 +64,7 @@ Pendulum：
 
 ```bash
 /home/tealab_shared/starv/env/starv_shared/bin/python \
-  saliance_map/scripts/precompute_saliency_maps.py \
+  saliency_map/scripts/precompute_saliency_maps.py \
   --config config/make_decoder_dataset/pendulum.json
 ```
 
@@ -95,13 +96,13 @@ state_counterfactual
 
 ```bash
 /home/tealab_shared/starv/env/starv_shared/bin/python \
-  saliance_map/scripts/diagnostics/preview_cartpole_render.py --render-current
+  saliency_map/scripts/diagnostics/preview_cartpole_render.py --render-current
 ```
 
 输出默认在：
 
 ```text
-saliance_map/output/diagnostics/cartpole_render_preview/
+saliency_map/output/diagnostics/previews/cartpole_render_train_saved_vs_current.png
 ```
 
 这个脚本主要是为了防止再次出现旧的黑块数据问题。现在 dataset 已经修好，所以不是每次实验都必须跑。
@@ -125,13 +126,13 @@ Occlusion-white
 
 ```bash
 /home/tealab_shared/starv/env/starv_shared/bin/python \
-  saliance_map/scripts/diagnostics/compare_heatmap_methods.py
+  saliency_map/scripts/diagnostics/compare_heatmap_methods.py
 ```
 
 输出默认在：
 
 ```text
-saliance_map/output/diagnostics/heatmap_methods_compare/
+saliency_map/output/diagnostics/previews/<study_case>_saliency_methods.png
 ```
 
 这个脚本只帮助我们看方法大概长什么样，不应该被写成主要贡献。
@@ -145,4 +146,3 @@ saliance_map/output/diagnostics/heatmap_methods_compare/
 ```
 
 但这不代表所有 case 都必须用同一种 saliency map。MountainCar、Pendulum、Braking 以后可以分别检查，必要时选择不同算法。
-
