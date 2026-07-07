@@ -8,7 +8,6 @@ datasets/**/*.pth
 .vscode/
 *.out
 *.env
-*.json
 .ipynb_checkpoints/
 logs/
 report/
@@ -24,3 +23,4 @@ saliency_map/output/**
 !saliency_map/output/**/.gitkeep
 !saliency_map/scripts/.gitkeep
 !saliency_map/scripts/diagnostics/.gitkeep
+settings.json

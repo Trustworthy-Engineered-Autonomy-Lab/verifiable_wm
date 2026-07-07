@@ -40,16 +40,24 @@ def load_controller(config, device):
     return controller
 
 
+def decoder_variant(config):
+    return config["decoder"].get("variant", "old")
+
+
 def load_decoder(config, device):
     decoder_config = config["decoder"]
     decoder_name = decoder_config["name"]
     decoder_cls = globals()[decoder_name]
     decoder_args = decoder_config.get("args", {})
 
-    decoder = decoder_cls(**decoder_args).to(device).eval()
-    decoder.load_state_dict(load_state_dict(decoder_config["weights"], device))
+    weights = decoder_config["weights"]
+    if isinstance(weights, dict):
+        weights = weights[decoder_variant(config)]
 
-    print(f"[Load] {decoder_name}={decoder_config['weights']}")
+    decoder = decoder_cls(**decoder_args).to(device).eval()
+    decoder.load_state_dict(load_state_dict(weights, device))
+
+    print(f"[Load] {decoder_name}[{decoder_variant(config)}]={weights}")
     return decoder
 
 
@@ -123,7 +131,9 @@ def save_dwm_trajectories(config, trajectory_splits):
         arrays[f"{split_name}_traj"] = to_numpy(split_data["traj"])
         arrays[f"{split_name}_actions"] = to_numpy(split_data["actions"])
 
-    np.savez_compressed(output_dir / "dwm_trajectories.npz", **arrays)
+    output_path = output_dir / f"dwm_trajectories_{decoder_variant(config)}.npz"
+    np.savez_compressed(output_path, **arrays)
+    print(f"[Saved] {output_path}")
 
 
 @torch.no_grad()
@@ -233,6 +243,12 @@ def parse_args():
         type=Path,
         help="Config JSON files.",
     )
+    parser.add_argument(
+        "--decoder-variant",
+        default=None,
+        help="Which decoder weights to roll out with (old / intensity / saliency). "
+        "Overrides the config's decoder.variant.",
+    )
     return parser.parse_args()
 
 
@@ -242,6 +258,8 @@ def main():
     for config_path in args.configs:
         print(f"[Config] {config_path}")
         config = load_config(config_path)
+        if args.decoder_variant is not None:
+            config["decoder"]["variant"] = args.decoder_variant
         output_dir = generate_dataset(config)
         print(f"[Done] transition dataset saved to {output_dir}")
 

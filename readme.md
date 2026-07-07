@@ -12,12 +12,12 @@ verifiable_wm/
 ├── dwm_weight/               # world model 权重（老权重 / 当前权重）
 ├── dynamic.py                # 可微分环境动力学（pytorch tensor 版本）
 ├── env.py                    # 老版本连续动作 CartPole 环境（供渲染用）
-├── generate_dataset.ipynb    # 一键生成 3 个环境 x 2 个脚本共 6 组数据集
-├── make_decoder_dataset.py   # 生成训练 decoder(wm) 用的数据集
+├── make_decoder_dataset.py   # real renderer pipeline：生成 decoder 训练数据和真实闭环轨迹
 ├── model.py                  # Controller / Decoder 网络结构
+├── notebooks/                # 实验用 ipynb（generate_dataset：造 6 组数据集；train_decoder：训三组 decoder + rollout 对比）
 ├── readme.md
 ├── saliency_map/             # saliency/heatmap 脚本与临时可视化输出
-├── sampling.py                # 用真实渲染器采样，同时生成转移数据集和 wm 驱动的验证轨迹
+├── sampling.py                # sampling / DWM pipeline：生成 transition 数据和 DWM 闭环轨迹
 ├── starv_verification/        # 基于 StarV（区间/星集）的安全验证部分
 ├── tools/                     # 可视化工具（红绿安全图）
 ├── utils.py                   # 公共小工具
@@ -30,8 +30,9 @@ verifiable_wm/
 
 存放各脚本需要的 json 配置，按脚本名分子文件夹，每个子文件夹下按环境（cartpole / mountain_car / pendulum）分文件：
 
-- `config/make_decoder_dataset/` — 生成 decoder 训练数据集的配置
-- `config/sampling/` — 生成采样数据集的配置
+- `config/make_decoder_dataset/` — `make_decoder_dataset.py` 用的配置，控制 real renderer pipeline 怎么采样、怎么生成 decoder 训练数据和 real rollout ground truth
+- `config/sampling/` — `sampling.py` 用的配置，控制 transition 数据怎么采样，以及 DWM rollout 用哪个 decoder（old / intensity / saliency）
+- `config/train_decoder/<环境>/` — 训练 decoder 的配置，按环境分子文件夹，每个环境下三份文件对应三组 loss（`intensity.json` = 论文 baseline、`saliency.json` = 我们的方法、`hybrid.json` = 诊断组），三份只差 `weight_mode` 和 `output_dir` 两行；mountain_car / pendulum 是预留位
 - `config/starv_verification/` — 跑安全验证的配置（grid 划分、verifier 选择等）
 
 ### `datasets/`
@@ -57,13 +58,21 @@ verifiable_wm/
 
 老版本连续动作 CartPole 环境（`ContinuousCartPoleEnv`），`dynamic.py` 里 `CartPole` 类的 `render` 靠这个来画图。MountainCar 和 Pendulum 不需要这个文件，直接用 gym 自带的 env 来 render。
 
-### `generate_dataset.ipynb`
+### `notebooks/`
 
-一键跑 cartpole / mountain_car / pendulum 三个环境的 `make_decoder_dataset` 和 `sampling`，一共 6 个 case。
+实验用 notebook，从 `verifiable_wm/` 或 `notebooks/` 目录启动 Jupyter 均可（首个 cell 自动定位仓库根目录）：
+
+- `generate_dataset.ipynb` — 一键跑三个环境的 `make_decoder_dataset` 和 `sampling`（共 6 个 case）；sampling 的 cell 里用 `decoder_variant` 选闭环用哪个 decoder。
+- `train_decoder.ipynb` — 训练三组 decoder（intensity / saliency / hybrid）、汇总 test 指标、α 扫描模板、生成 WM 闭环轨迹并计算 rollout 偏差对比。
 
 ### `make_decoder_dataset.py`
 
-生成训练 wm（decoder）用的数据集。
+这个脚本负责 real renderer pipeline。运行一次会生成两类产物：
+
+- `states.npz` — decoder 训练数据，即真实 renderer 给出的 `(state, image)` 对。
+- `real_trajectories.npz` — 真实 renderer + controller + dynamics 跑出的闭环轨迹，后面算 DWM rollout 偏差时拿它当 ground truth。
+
+训练 decoder 时主要用 `states.npz`；后面做闭环对比时再用 `real_trajectories.npz`。这两份数据都来自同一条 real renderer pipeline，所以放在一个脚本里一起生成。
 
 ### `model.py`
 
@@ -87,7 +96,12 @@ verifiable_wm/
 
 ### `sampling.py`
 
-直接用 camera 生成真实的图片，同时也生成转移数据集和用现有 decoder 跑出来的验证轨迹。
+这个脚本负责 sampling / DWM rollout。运行一次会加载 controller、dynamic 和指定 decoder，然后生成两类产物：
+
+- `transition_dataset.npz` — 用真实 renderer 生成图像，让 controller 选 action，再由 dynamics 得到下一步 state，最后把 rollout 展平成 `(s, a, s')`。
+- `dwm_trajectories_<decoder>.npz` — 用 decoder 生成图像，让 controller 选 action，再由 dynamics 往前推，保留完整 DWM 闭环轨迹。
+
+可以理解成：`transition_dataset.npz` 是按单步转移摊平的数据，`dwm_trajectories_<decoder>.npz` 是保留时间顺序的闭环轨迹。后者就是拿来和 `real_trajectories.npz` 逐步比较 rollout 偏差的。
 
 ### `starv_verification/`
 
@@ -128,7 +142,7 @@ verifiable_wm/
 | `states.npz` | `make_decoder_dataset.py` | decoder 的训练数据。`states` 是精简过的 2 维 state（cartpole 用 `decoder_state_indices=[0,2]` 从 4 维里挑的），`images` 是真实渲染器渲出来的图，一一对应，训练时直接拿 `decoder(states)` 去拟合 `images`。 |
 | `real_trajectories.npz` | `make_decoder_dataset.py` | 真实渲染器 + 训练好的 controller 跑 30 步闭环得到的完整轨迹，31 = 起点 + 30 步。这个算标准答案，留着后面跟 decoder 驱动出来的轨迹做对比用。 |
 | `transition_dataset.npz` | `sampling.py` | 单步转移 `(s, a, s')`，48000 = 1600 条初始状态 x 30 步展平的，不保留轨迹顺序，是训练转移/动力学模型用的数据，跟训练 decoder 没关系。 |
-| `dwm_trajectories.npz` | `sampling.py` | 形状跟 `real_trajectories` 对齐，但每一步的图是 decoder 生成的而不是真实渲染器，再喂给 controller 走出来的轨迹。存在的意义就是拿去跟 `real_trajectories` 逐条对比，差异越小说明 decoder 这个 wm 学得越像真实环境，这也是 verifiable_wm 的核心验证信号，后面应该会喂给 `starv_verification` 用。 |
+| `dwm_trajectories_<decoder>.npz` | `sampling.py` / rollout 评估 | 形状跟 `real_trajectories` 对齐，但每一步的图是 decoder 生成的而不是真实渲染器，再喂给 controller 走出来的轨迹。存在的意义就是拿去跟 `real_trajectories` 逐条对比，差异越小说明 decoder 这个 wm 学得越像真实环境，这也是 verifiable_wm 的核心验证信号，后面应该会喂给 `starv_verification` 用。**命名按生成轨迹用的 decoder 区分**：`_old` = 一代老 decoder（现有文件），`_intensity` / `_saliency` = 本仓库训练的新 decoder（rollout 评估时生成），闭环对比时三方参照。 |
 | `metadata.json` | 两者都会写 | 两个脚本各自把收到的 config 原样 dump 进去，方便回头查这批数据是什么参数生成的。**注意**：现在两个脚本 `output_dir` 是同一个，`metadata.json` 会被后跑的那个覆盖掉，先不管，以后再改。 |
 
 ### npz 文件 key
@@ -157,7 +171,7 @@ verifiable_wm/
 | `{split}_actions` | `(N, action_dim)` | 该步动作 |
 | `{split}_next_states` | `(N, state_dim)` | 单步转移后的 state |
 
-**`dwm_trajectories.npz`**（6 个 key，`sampling.py` 生成）
+**`dwm_trajectories_<decoder>.npz`**（6 个 key；`_old` 为 `sampling.py` 用一代 decoder 生成，`_intensity` / `_saliency` 为 rollout 评估用新 decoder 生成）
 
 | key | shape | 说明 |
 |---|---|---|
