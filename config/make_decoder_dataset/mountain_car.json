@@ -15,10 +15,6 @@
     {"name": "position", "low": -1.2, "high": 0.6},
     {"name": "velocity", "low": -0.07, "high": 0.07}
   ],
-  "decoder": {
-    "name": "Decoder",
-    "weights": "/home/tealab_shared/starv/weights/mountain_car/decoder_mc.pth"
-  },
   "controller": {
     "name": "Controller",
     "weights": "/home/tealab_shared/starv/weights/mountain_car/controller_mc.pth",
