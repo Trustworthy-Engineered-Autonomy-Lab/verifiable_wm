@@ -15,7 +15,7 @@ from utils import (
     set_seed,
     resolve_device,
     sample_uniform_states,
-    render_images,
+    render_images,  
     to_numpy,
 )
 
