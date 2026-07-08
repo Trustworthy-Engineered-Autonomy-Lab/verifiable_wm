@@ -20,7 +20,8 @@
         "kwargs": {
             "goal_position_threshold": 0.6,
             "num_steps": 30,
-            "early_stop": true
+            "early_stop": false,
+            "save_history": true
         }
     },
     "grid": {
