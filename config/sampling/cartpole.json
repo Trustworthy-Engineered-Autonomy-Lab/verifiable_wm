@@ -13,10 +13,10 @@
   "render_batch_size": 64,
   "decoder_state_indices": [0, 2],
   "state_space": [
-    {"name": "position", "low": -2.4, "high": 2.4},
-    {"name": "velocity", "low": -1.0, "high": 1.0},
-    {"name": "angle", "low": -0.2095, "high": 0.2095},
-    {"name": "angular_velocity", "low": -1.0, "high": 1.0}
+    {"name": "position", "low": 0.0, "high": 0.6},
+    {"name": "velocity", "low": 0.0, "high": 0.0},
+    {"name": "angle", "low": 0.06, "high": 0.12},
+    {"name": "angular_velocity", "low": 0.0, "high": 0.0}
   ],
   "controller": {
     "name": "Controller",
@@ -27,7 +27,7 @@
   },
   "decoder": {
     "name": "Decoder",
-    "weights": "/home/tealab_shared/starv/weights/cartpole/decoder_cp.pth"
+    "weights": "/home/UFAD/yanru.li/projects/verifiable_wm/decoder_best_saliency.pth"
   },
   "dynamic": {
     "name": "CartPole"

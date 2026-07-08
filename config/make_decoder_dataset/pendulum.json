@@ -13,8 +13,8 @@
   "device": "auto",
   "render_batch_size": 64,
   "state_space": [
-    {"name": "theta", "low": -3.141592653589793, "high": 3.141592653589793},
-    {"name": "omega", "low": -8.0, "high": 8.0}
+    {"name": "theta", "low": 1.0, "high": 2.0},
+    {"name": "omega", "low": 4.5, "high": 5.0}
   ],
   "controller": {
     "name": "Controller",
