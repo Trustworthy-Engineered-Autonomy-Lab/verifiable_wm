@@ -31,7 +31,7 @@ verifiable_wm/
 存放各脚本需要的 json 配置，按脚本名分子文件夹，每个子文件夹下按环境（cartpole / mountain_car / pendulum）分文件：
 
 - `config/make_decoder_dataset/` — `make_decoder_dataset.py` 用的配置，控制 real renderer pipeline 怎么采样、怎么生成 decoder 训练数据和 real rollout ground truth
-- `config/sampling/` — `sampling.py` 用的配置，控制 transition 数据怎么采样，以及 DWM rollout 用哪个 decoder（old / intensity / saliency）
+- `config/sampling/` — `sampling.py` 用的配置，控制 transition 数据怎么采样，以及 DWM rollout 用哪个 decoder（主线只比较 intensity / saliency）
 - `config/train_decoder/<环境>/` — 训练 decoder 的配置，按环境分子文件夹，每个环境下三份文件对应三组 loss（`intensity.json` = 论文 baseline、`saliency.json` = 我们的方法、`hybrid.json` = 诊断组），三份只差 `weight_mode` 和 `output_dir` 两行；mountain_car / pendulum 是预留位
 - `config/starv_verification/` — 跑安全验证的配置（grid 划分、verifier 选择等）
 
@@ -142,7 +142,7 @@ verifiable_wm/
 | `states.npz` | `make_decoder_dataset.py` | decoder 的训练数据。`states` 是精简过的 2 维 state（cartpole 用 `decoder_state_indices=[0,2]` 从 4 维里挑的），`images` 是真实渲染器渲出来的图，一一对应，训练时直接拿 `decoder(states)` 去拟合 `images`。 |
 | `real_trajectories.npz` | `make_decoder_dataset.py` | 真实渲染器 + 训练好的 controller 跑 30 步闭环得到的完整轨迹，31 = 起点 + 30 步。这个算标准答案，留着后面跟 decoder 驱动出来的轨迹做对比用。 |
 | `transition_dataset.npz` | `sampling.py` | 单步转移 `(s, a, s')`，48000 = 1600 条初始状态 x 30 步展平的，不保留轨迹顺序，是训练转移/动力学模型用的数据，跟训练 decoder 没关系。 |
-| `dwm_trajectories_<decoder>.npz` | `sampling.py` / rollout 评估 | 形状跟 `real_trajectories` 对齐，但每一步的图是 decoder 生成的而不是真实渲染器，再喂给 controller 走出来的轨迹。存在的意义就是拿去跟 `real_trajectories` 逐条对比，差异越小说明 decoder 这个 wm 学得越像真实环境，这也是 verifiable_wm 的核心验证信号，后面应该会喂给 `starv_verification` 用。**命名按生成轨迹用的 decoder 区分**：`_old` = 一代老 decoder（现有文件），`_intensity` / `_saliency` = 本仓库训练的新 decoder（rollout 评估时生成），闭环对比时三方参照。 |
+| `dwm_trajectories_<decoder>.npz` | `sampling.py` / rollout 评估 | 形状跟 `real_trajectories` 对齐，但每一步的图是 decoder 生成的而不是真实渲染器，再喂给 controller 走出来的轨迹。存在的意义就是拿去跟 `real_trajectories` 逐条对比，差异越小说明 decoder 这个 wm 学得越像真实环境，这也是 verifiable_wm 的核心验证信号，后面应该会喂给 `starv_verification` 用。**主线命名按生成轨迹用的 decoder 区分**：`_intensity` = 论文 baseline，`_saliency` = 当前方法。`_old` 和 `_hybrid` 只作为历史/诊断记录，不再进入后续主线对比。 |
 | `metadata.json` | 两者都会写 | 两个脚本各自把收到的 config 原样 dump 进去，方便回头查这批数据是什么参数生成的。**注意**：现在两个脚本 `output_dir` 是同一个，`metadata.json` 会被后跑的那个覆盖掉，先不管，以后再改。 |
 
 ### npz 文件 key
@@ -171,7 +171,7 @@ verifiable_wm/
 | `{split}_actions` | `(N, action_dim)` | 该步动作 |
 | `{split}_next_states` | `(N, state_dim)` | 单步转移后的 state |
 
-**`dwm_trajectories_<decoder>.npz`**（6 个 key；`_old` 为 `sampling.py` 用一代 decoder 生成，`_intensity` / `_saliency` 为 rollout 评估用新 decoder 生成）
+**`dwm_trajectories_<decoder>.npz`**（6 个 key；主线只继续生成 / 比较 `_intensity` 和 `_saliency`，已有 `_old` / `_hybrid` 仅保留作历史记录）
 
 | key | shape | 说明 |
 |---|---|---|

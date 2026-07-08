@@ -68,22 +68,46 @@ def compute_weight(weight_mode, images, heatmaps, weight_cfg):
     return w / w.mean(dim=(1, 2, 3), keepdim=True)
 
 
+def best_checkpoint_name(selection_metric):
+    if selection_metric == "total_loss":
+        return "decoder_best_total.pth"
+    safe_metric = selection_metric.replace("/", "_")
+    return f"decoder_best_{safe_metric}.pth"
+
+
 @torch.no_grad()
-def evaluate(decoder, controller, states, images, heatmaps, device, batch_size,
-             region_threshold):
+def evaluate(
+    decoder,
+    controller,
+    states,
+    images,
+    heatmaps,
+    weights,
+    device,
+    batch_size,
+    region_threshold,
+    lambda_ctrl,
+):
     decoder.eval()
-    sums = {"pixel_mse": 0.0, "ctrl_mse": 0.0, "region_dark_mse": 0.0,
-            "region_sal_mse": 0.0}
+    sums = {
+        "pixel_mse": 0.0,
+        "ctrl_mse": 0.0,
+        "weighted_rec_loss": 0.0,
+        "region_dark_mse": 0.0,
+        "region_sal_mse": 0.0,
+    }
     counts = {"region_dark": 0.0, "region_sal": 0.0}
     n = states.shape[0]
 
     for i in range(0, n, batch_size):
         s = states[i : i + batch_size].to(device)
         target = images[i : i + batch_size].to(device)
+        w = weights[i : i + batch_size].to(device)
         recon = decoder(s)
         err = (recon - target) ** 2
 
         sums["pixel_mse"] += err.mean().item() * s.shape[0]
+        sums["weighted_rec_loss"] += (w * err).mean().item() * s.shape[0]
         ctrl_err = (controller(recon) - controller(target)) ** 2
         sums["ctrl_mse"] += ctrl_err.mean().item() * s.shape[0]
 
@@ -99,8 +123,10 @@ def evaluate(decoder, controller, states, images, heatmaps, device, batch_size,
     metrics = {
         "pixel_mse": sums["pixel_mse"] / n,
         "ctrl_mse": sums["ctrl_mse"] / n,
+        "weighted_rec_loss": sums["weighted_rec_loss"] / n,
         "region_dark_mse": sums["region_dark_mse"] / max(counts["region_dark"], 1.0),
     }
+    metrics["total_loss"] = metrics["weighted_rec_loss"] + lambda_ctrl * metrics["ctrl_mse"]
     if heatmaps is not None:
         metrics["region_sal_mse"] = sums["region_sal_mse"] / max(counts["region_sal"], 1.0)
     return metrics
@@ -123,6 +149,8 @@ def train(config, device):
     test_states, test_images, test_heat = load_split(dataset_dir, saliency_file, "test", eval_mode)
 
     train_weights = compute_weight(weight_mode, train_images, train_heat, weight_cfg)
+    val_weights = compute_weight(weight_mode, val_images, val_heat, weight_cfg)
+    test_weights = compute_weight(weight_mode, test_images, test_heat, weight_cfg)
 
     controller = load_controller(config, device)
     decoder = Decoder().to(device)
@@ -131,11 +159,12 @@ def train(config, device):
     batch_size = train_cfg["batch_size"]
     epochs = train_cfg["epochs"]
     lambda_ctrl = config["lambda_ctrl"]
-    selection_metric = train_cfg.get("selection_metric", "ctrl_mse")
+    selection_metric = train_cfg.get("selection_metric", "total_loss")
     region_threshold = config["weight"].get("threshold", 0.7)
 
     output_dir = Path(config["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
+    best_path = output_dir / best_checkpoint_name(selection_metric)
 
     best = {"epoch": -1, "value": float("inf")}
     history = []
@@ -166,9 +195,14 @@ def train(config, device):
             epoch_ctrl += loss_ctrl.item() * idx.shape[0]
 
         val_metrics = evaluate(
-            decoder, controller, val_states, val_images, val_heat,
-            device, batch_size, region_threshold,
+            decoder, controller, val_states, val_images, val_heat, val_weights,
+            device, batch_size, region_threshold, lambda_ctrl,
         )
+        if selection_metric not in val_metrics:
+            available = ", ".join(sorted(val_metrics))
+            raise KeyError(
+                f"Unknown selection_metric={selection_metric!r}; available: {available}"
+            )
         record = {
             "epoch": epoch,
             "train_rec": epoch_rec / n,
@@ -179,12 +213,13 @@ def train(config, device):
 
         if val_metrics[selection_metric] < best["value"]:
             best = {"epoch": epoch, "value": val_metrics[selection_metric]}
-            torch.save(decoder.state_dict(), output_dir / "decoder_best.pth")
+            torch.save(decoder.state_dict(), best_path)
 
         if epoch % 10 == 0 or epoch == epochs - 1:
             print(
                 f"[epoch {epoch:3d}] rec={record['train_rec']:.5f} "
                 f"ctrl={record['train_ctrl']:.5f} "
+                f"val_total={record['val_total_loss']:.5f} "
                 f"val_pixel={record['val_pixel_mse']:.5f} "
                 f"val_ctrl={record['val_ctrl_mse']:.5f} "
                 f"best@{best['epoch']}"
@@ -192,16 +227,21 @@ def train(config, device):
 
     torch.save(decoder.state_dict(), output_dir / "decoder_last.pth")
 
-    decoder.load_state_dict(load_state_dict(output_dir / "decoder_best.pth", device))
+    decoder.load_state_dict(load_state_dict(best_path, device))
     test_metrics = evaluate(
-        decoder, controller, test_states, test_images, test_heat,
-        device, batch_size, region_threshold,
+        decoder, controller, test_states, test_images, test_heat, test_weights,
+        device, batch_size, region_threshold, lambda_ctrl,
     )
-    print(f"[test:best@{best['epoch']}] " + " ".join(f"{k}={v:.5f}" for k, v in test_metrics.items()))
+    print(
+        f"[test:{best_path.name}@{best['epoch']}] "
+        + " ".join(f"{k}={v:.5f}" for k, v in test_metrics.items())
+    )
 
     results = {
         "config": config,
         "best_epoch": best["epoch"],
+        "best_value": best["value"],
+        "best_checkpoint": best_path.name,
         "selection_metric": selection_metric,
         "test": test_metrics,
         "history": history,

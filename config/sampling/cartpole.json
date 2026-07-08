@@ -27,12 +27,10 @@
   },
   "decoder": {
     "name": "Decoder",
-    "variant": "old",
+    "variant": "intensity",
     "weights": {
-      "old": "/home/tealab_shared/starv/weights/cartpole/decoder_cp.pth",
       "intensity": "dwm_weight/now_weight/cartpole/intensity/decoder_last.pth",
-      "saliency": "dwm_weight/now_weight/cartpole/saliency/decoder_last.pth",
-      "hybrid": "dwm_weight/now_weight/cartpole/hybrid/decoder_last.pth"
+      "saliency": "dwm_weight/now_weight/cartpole/saliency/decoder_last.pth"
     }
   },
   "dynamic": {
