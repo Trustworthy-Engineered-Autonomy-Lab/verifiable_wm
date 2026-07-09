@@ -32,7 +32,7 @@ CartPole decoder 现在主要看两组：
 config/train_decoder/cartpole/saliency.json
 ```
 
-当前参数是 $\alpha=8.0$、$\lambda_{ctrl}=0.1$，best checkpoint 按 `total_loss` 选。
+当前参数是 `alpha=8.0`、`lambda_ctrl=0.1`，best checkpoint 按 `total_loss` 选。
 
 对应权重目录：
 
@@ -172,7 +172,20 @@ $$
 decoder_best_total.pth
 ```
 
-这里的 $s_i$ 是 decoder 输入 state，CartPole 当前只取 `[position, angle]`；$y_i$ 是真实 renderer 图片；$D_\theta$ 是正在训练的 decoder；$C$ 是固定 controller；$H$ 是 saliency heatmap；$B$ 是 batch size；$P$ 是像素数；$A$ 是 action 维度；$\alpha$ 控制 saliency 权重强度；$\lambda_{ctrl}$ 控制 action 一致性项强度。
+变量含义：
+
+| 变量 | 含义 |
+|---|---|
+| `s_i` | decoder 输入 state，CartPole 当前只取 `[position, angle]` |
+| `y_i` | 真实 renderer 图片 |
+| `D_theta` | 正在训练的 decoder |
+| `C` | 固定 controller |
+| `H` | saliency heatmap |
+| `B` | batch size |
+| `P` | 像素数 |
+| `A` | action 维度 |
+| `alpha` | saliency 权重强度 |
+| `lambda_ctrl` | action 一致性项强度 |
 
 `train_decoder.ipynb` 里的 `run_train(...)` 会直接改 config 后调用 `train_decoder.train(...)`。脚本保留 alpha、lambda、seed、output directory 这些 override，主要给 sweep 和补实验用。
 
@@ -312,7 +325,7 @@ CartPole 默认画/check 的维度是 position 和 velocity，也就是 `0 1`。
 
 - `notebooks/generate_dataset.ipynb`：封了 `run_make_decoder_dataset(env_name)` 和 `run_sampling(env_name, decoder_variant)`，现在用于整理数据生成和 rollout 的几个 case。
 - `notebooks/train_decoder.ipynb`：封了 `run_train(env_name, weight_mode, alpha=None, seed=None, output_dir=None)`，也放了 CartPole rollout 和轨迹偏差统计。
-- `report/`：每日实验记录。当前 CartPole 的 $\alpha$、$\lambda_{ctrl}$、rollout 决策都在 2026-07-08 的记录里。
+- `report/`：每日实验记录。当前 CartPole 的 `alpha`、`lambda_ctrl`、rollout 决策都在 2026-07-08 的记录里。
 - `explore.ipynb`：早期探索记录，主要逻辑已经迁到 `compare.py`。
 
 ## 目前还要注意的事
