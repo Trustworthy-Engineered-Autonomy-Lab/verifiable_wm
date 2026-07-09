@@ -25,3 +25,6 @@ saliency_map/output/**
 !saliency_map/scripts/diagnostics/.gitkeep
 settings.json
 metrics.json
+dwm_weight/now_weight/cartpole/intensity/metrics.json
+dwm_weight/now_weight/cartpole/saliency/metrics.json
+explore.ipynb

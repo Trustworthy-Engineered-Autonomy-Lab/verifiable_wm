@@ -20,7 +20,7 @@
         ],
         "kwargs": {
             "goal_angle_threshold" : 0.209,
-            "num_steps": 20,
+            "num_steps": 30,
             "early_stop": false
         }
     },
