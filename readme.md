@@ -4,58 +4,20 @@
 
 当前主线先放在 CartPole 上。MountainCar 和 Pendulum 的数据生成、动力学和验证入口都在，但主要实验还没有像 CartPole 一样完整收口。
 
-## 环境
+## 运行背景
 
-```bash
-conda activate /home/tealab_shared/starv/env/starv_shared
-```
-
-如果要跑 `verify.py`，还需要当前环境里有 `mpi4py`、StarV、pybdr、gurobi 相关依赖。渲染脚本默认设置了 headless：
-
-```python
-PYGLET_HEADLESS=True
-```
-
-所以在服务器上直接跑数据生成一般不需要开图形界面。
+实验默认用 `starv_shared` 环境，也就是 `/home/tealab_shared/starv/env/starv_shared`。`verify.py` 还依赖 `mpi4py`、StarV、pybdr、gurobi。渲染侧在 notebook 和脚本里都按 headless 处理，关键环境变量是 `PYGLET_HEADLESS=True`。
 
 ## 主线流程
 
-一条完整 CartPole 实验大概是这样：
+CartPole 当前的实验链条是：
 
-```text
-1. make_decoder_dataset.py
-   采样 state -> 真实 renderer 出图 -> 保存 decoder 训练数据
-   同时用真实 renderer + controller + dynamics 跑 real trajectory
-
-2. saliency_map/scripts/precompute_saliency_maps.py
-   对 states.npz 里的真实图片算 controller saliency heatmap
-
-3. train_decoder.py
-   训练 Decoder，让它从 state 生成 96x96 灰度图
-   当前比较 intensity baseline 和 saliency 方法
-
-4. sampling.py
-   用真实 renderer 生成 transition_dataset.npz
-   用训练好的 decoder 跑 DWM closed-loop trajectory
-
-5. rollout 对比
-   real_trajectories.npz vs dwm_trajectories_<variant>.npz
-   逐步算 full-state L2 偏差
-
-6. verify.py / compare.py
-   StarV 在 grid cell 上做可达性验证
-   compare.py 再把真实/DWM 轨迹和 reachable tube 对上
-```
-
-常用命令：
-
-```bash
-python make_decoder_dataset.py config/make_decoder_dataset/cartpole.json
-python saliency_map/scripts/precompute_saliency_maps.py
-python train_decoder.py config/train_decoder/cartpole/saliency.json
-python sampling.py config/sampling/cartpole.json --decoder-variant saliency
-mpirun -n 4 python verify.py config/starv_verification/cartpole.json
-```
+- `make_decoder_dataset.py` 生成 decoder 训练用的 `(state, image)`，同时保存真实 renderer 闭环下的 `real_trajectories.npz`。
+- 再用 `saliency_map/scripts/precompute_saliency_maps.py` 对真实图片算 controller saliency，产物是 `saliency_occlusion.npz`。
+- `train_decoder.py` 训练 decoder，当前主线比较 intensity baseline 和 saliency 方法。
+- `sampling.py` 生成真实 renderer 下的 `transition_dataset.npz`，也用训练好的 decoder 生成 `dwm_trajectories_<variant>.npz`。
+- 轨迹偏差比较的是 `real_trajectories.npz` 和 `dwm_trajectories_<variant>.npz`，同一个初始 state、同一个时间步上算 full-state L2。
+- 最后才是 `verify.py` / `compare.py`：StarV 先在 grid cell 上做 reachability，`compare.py` 再检查真实/DWM 轨迹和 reachable tube 的关系。
 
 ## 当前 CartPole 主线状态
 
@@ -94,38 +56,9 @@ dwm_weight/now_weight/cartpole/intensity/
 
 `hybrid` 现在只当诊断组，不是后续主线比较对象。
 
-## 目录结构
-
-```text
-verifiable_wm/
-├── config/                     # 各脚本的 json 配置
-├── datasets/                   # 生成的数据集和轨迹
-├── dwm_weight/                 # decoder / controller 权重和训练指标
-├── report/                     # 每日实验记录
-├── saliency_map/               # saliency 预计算和诊断图脚本
-├── starv_verification/         # StarV/pybdr 版本的 model + dynamics + verifier
-├── tools/                      # 验证结果可视化
-├── compare.py                  # 轨迹 vs reachable tube 对比
-├── dynamic.py                  # PyTorch tensor 版本环境动力学 + renderer wrapper
-├── env.py                      # CartPole 连续动作 renderer 环境
-├── make_decoder_dataset.py     # 生成 decoder 数据和真实闭环轨迹
-├── model.py                    # Controller / Decoder 网络结构
-├── sampling.py                 # 生成 transition 数据和 DWM 闭环轨迹
-├── train_decoder.py            # 训练 decoder
-├── utils.py                    # 公共工具
-└── verify.py                   # MPI 并行 StarV 验证入口
-```
-
 ## 配置文件
 
-`config/` 按入口脚本分目录：
-
-```text
-config/make_decoder_dataset/<env>.json
-config/sampling/<env>.json
-config/starv_verification/<env>.json
-config/train_decoder/cartpole/{intensity,saliency,hybrid}.json
-```
+`config/` 按实验环节分目录：`make_decoder_dataset` 管 decoder 数据和真实闭环轨迹，`sampling` 管 transition 数据和 DWM rollout，`train_decoder` 管 decoder 训练，`starv_verification` 管 StarV grid 和步数。
 
 几个容易混的字段：
 
@@ -204,16 +137,33 @@ saliency  : 按 controller saliency heatmap 加权
 hybrid    : intensity + saliency
 ```
 
-也就是 saliency 分支用：
+也就是 saliency 分支先把 heatmap 变成像素权重：
 
 $$
-w = 1 + \alpha H
+w_{i,p}=1+\alpha H_{i,p}
 $$
 
-训练目标是：
+每张图的权重再做一次均值归一化：
 
 $$
-L_{total} = L_{rec}^{w} + \lambda_{ctrl}\,\mathrm{ctrl\_mse}
+\bar w_{i,p} =
+\frac{w_{i,p}}
+{\frac{1}{P}\sum_{q=1}^{P} w_{i,q}}
+$$
+
+当前 total loss 实际按下面这个式子算：
+
+$$
+L_{total}(\theta)=
+\frac{1}{BP}
+\sum_{i=1}^{B}\sum_{p=1}^{P}
+\bar w_{i,p}
+\left(D_{\theta}(s_i)_p-y_{i,p}\right)^2
++
+\lambda_{ctrl}
+\frac{1}{BA}
+\sum_{i=1}^{B}\sum_{a=1}^{A}
+\left(C(D_{\theta}(s_i))_a-C(y_i)_a\right)^2
 $$
 
 当前 best checkpoint 用 `training.selection_metric` 选，CartPole 主线是 `total_loss`，所以文件名是：
@@ -222,15 +172,9 @@ $$
 decoder_best_total.pth
 ```
 
-CLI override 主要给 sweep 用：
+这里的 $s_i$ 是 decoder 输入 state，CartPole 当前只取 `[position, angle]`；$y_i$ 是真实 renderer 图片；$D_\theta$ 是正在训练的 decoder；$C$ 是固定 controller；$H$ 是 saliency heatmap；$B$ 是 batch size；$P$ 是像素数；$A$ 是 action 维度；$\alpha$ 控制 saliency 权重强度；$\lambda_{ctrl}$ 控制 action 一致性项强度。
 
-```bash
-python train_decoder.py config/train_decoder/cartpole/saliency.json \
-  --alpha 8 \
-  --lambda-ctrl 0.1 \
-  --seed 2025 \
-  --output-dir dwm_weight/now_weight/cartpole/saliency
-```
+`train_decoder.ipynb` 里的 `run_train(...)` 会直接改 config 后调用 `train_decoder.train(...)`。脚本保留 alpha、lambda、seed、output directory 这些 override，主要给 sweep 和补实验用。
 
 消融实验目录：
 
@@ -320,12 +264,7 @@ CartPole verifier 有一个特殊点：模型 reachability 只把 `[position, an
 results/cartpole/safety_result.json
 ```
 
-画 safety map：
-
-```bash
-python tools/visualize.py results/cartpole/safety_result.json \
-  --save results/cartpole/safety_result.png
-```
+`tools/visualize.py` 可以把 `safety_result.json` 画成红绿 safety map；这一步只是看结果，不改变验证产物。
 
 ## 轨迹 vs reachable tube
 
@@ -344,25 +283,7 @@ real_vs_reachable_tube_examples.png
 dwm_vs_reachable_tube_examples.png
 ```
 
-常用参数：
-
-```bash
-python compare.py \
-  --env cartpole \
-  --safety results/cartpole/safety_result.json \
-  --real datasets/cartpole/data/dataset_v1/real_trajectories.npz \
-  --dwm datasets/cartpole/data/dataset_v1/dwm_trajectories_saliency.npz \
-  --states datasets/cartpole/data/dataset_v1/states.npz \
-  --max-steps 30 \
-  --outdir results/cartpole/compare_tube
-```
-
-CartPole 默认画/check 的维度是 position 和 velocity，也就是 `0 1`。如果要换维度，用：
-
-```bash
---plot-dims 0 2
---check-dims 0 2
-```
+CartPole 默认画/check 的维度是 position 和 velocity，也就是 `0 1`。如果要看 position-angle 这类平面，再改 `plot_dims` / `check_dims`。注意 `compare.py` 里 cartpole 有一套历史默认路径，和现在 `datasets/cartpole/data/dataset_v1/` 的主线布局不完全一致；正式对结果时最好显式指定 `safety`、`real`、`dwm` 和 `states` 路径。
 
 ## 文件说明
 
@@ -387,11 +308,11 @@ CartPole 默认画/check 的维度是 position 和 velocity，也就是 `0 1`。
 | `env.py` | CartPole 连续动作环境，主要供 renderer 使用 |
 | `utils.py` | config、seed、device、uniform state 采样、批量 render 等小工具 |
 
-### 记录和 notebook
+### notebook 和记录
 
+- `notebooks/generate_dataset.ipynb`：封了 `run_make_decoder_dataset(env_name)` 和 `run_sampling(env_name, decoder_variant)`，现在用于整理数据生成和 rollout 的几个 case。
+- `notebooks/train_decoder.ipynb`：封了 `run_train(env_name, weight_mode, alpha=None, seed=None, output_dir=None)`，也放了 CartPole rollout 和轨迹偏差统计。
 - `report/`：每日实验记录。当前 CartPole 的 $\alpha$、$\lambda_{ctrl}$、rollout 决策都在 2026-07-08 的记录里。
-- `notebooks/generate_dataset.ipynb`：数据生成 notebook。
-- `notebooks/train_decoder.ipynb`：训练、汇总、rollout 对比 notebook。
 - `explore.ipynb`：早期探索记录，主要逻辑已经迁到 `compare.py`。
 
 ## 目前还要注意的事
