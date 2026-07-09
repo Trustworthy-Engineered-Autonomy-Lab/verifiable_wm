@@ -1,209 +1,402 @@
+# Verifiable World Model
 
-## 环境启动
+这份仓库现在主要在做一件事：用一个可验证的 image decoder 替代真实 renderer，再把这个 decoder 接到 controller 和 dynamics 后面，比较闭环轨迹，最后接 StarV 做形式化验证。
+
+当前主线先放在 CartPole 上。MountainCar 和 Pendulum 的数据生成、动力学和验证入口都在，但主要实验还没有像 CartPole 一样完整收口。
+
+## 环境
+
+```bash
 conda activate /home/tealab_shared/starv/env/starv_shared
+```
+
+如果要跑 `verify.py`，还需要当前环境里有 `mpi4py`、StarV、pybdr、gurobi 相关依赖。渲染脚本默认设置了 headless：
+
+```python
+PYGLET_HEADLESS=True
+```
+
+所以在服务器上直接跑数据生成一般不需要开图形界面。
+
+## 主线流程
+
+一条完整 CartPole 实验大概是这样：
+
+```text
+1. make_decoder_dataset.py
+   采样 state -> 真实 renderer 出图 -> 保存 decoder 训练数据
+   同时用真实 renderer + controller + dynamics 跑 real trajectory
+
+2. saliency_map/scripts/precompute_saliency_maps.py
+   对 states.npz 里的真实图片算 controller saliency heatmap
+
+3. train_decoder.py
+   训练 Decoder，让它从 state 生成 96x96 灰度图
+   当前比较 intensity baseline 和 saliency 方法
+
+4. sampling.py
+   用真实 renderer 生成 transition_dataset.npz
+   用训练好的 decoder 跑 DWM closed-loop trajectory
+
+5. rollout 对比
+   real_trajectories.npz vs dwm_trajectories_<variant>.npz
+   逐步算 full-state L2 偏差
+
+6. verify.py / compare.py
+   StarV 在 grid cell 上做可达性验证
+   compare.py 再把真实/DWM 轨迹和 reachable tube 对上
+```
+
+常用命令：
+
+```bash
+python make_decoder_dataset.py config/make_decoder_dataset/cartpole.json
+python saliency_map/scripts/precompute_saliency_maps.py
+python train_decoder.py config/train_decoder/cartpole/saliency.json
+python sampling.py config/sampling/cartpole.json --decoder-variant saliency
+mpirun -n 4 python verify.py config/starv_verification/cartpole.json
+```
+
+## 当前 CartPole 主线状态
+
+CartPole decoder 现在主要看两组：
+
+- `intensity`：论文 baseline，按像素亮度阈值加权；
+- `saliency`：当前方法，用 occlusion heatmap 做空间权重。
+
+当前 saliency 主线配置在：
+
+```text
+config/train_decoder/cartpole/saliency.json
+```
+
+当前参数是 $\alpha=8.0$、$\lambda_{ctrl}=0.1$，best checkpoint 按 `total_loss` 选。
+
+对应权重目录：
+
+```text
+dwm_weight/now_weight/cartpole/saliency/
+```
+
+里面主要看：
+
+```text
+decoder_last.pth
+decoder_best_total.pth
+metrics.json
+```
+
+`intensity` 对照组在：
+
+```text
+dwm_weight/now_weight/cartpole/intensity/
+```
+
+`hybrid` 现在只当诊断组，不是后续主线比较对象。
 
 ## 目录结构
 
-
-```
+```text
 verifiable_wm/
-├── compare.py                 # 轨迹 vs 可达管道（reachable tube）对比脚本，读 verify.py 的输出画包含性图
-├── config/                    # 各脚本用的 json 配置
-├── datasets/                  # 生成的数据集（按环境/版本存放）
-├── dwm_weight/                # world model 权重（老权重 / 当前权重）
-├── dynamic.py                 # 可微分环境动力学（pytorch tensor 版本）
-├── env.py                     # 老版本连续动作 CartPole 环境（供渲染用）
-├── explore.ipynb              # 探索性 notebook：人工检查 safety_result.json 的 grid 和真实轨迹是否落在里面（compare.py 的前身）
-├── gurobi.env                 # [本地/gitignore] Gurobi 求解器参数文件，starv_verification 内部用 gurobipy 求解时会读取
-├── make_decoder_dataset.py    # real renderer pipeline：生成 decoder 训练数据和真实闭环轨迹
-├── model.py                   # Controller / Decoder 网络结构
-├── notebooks/                 # 实验用 ipynb（generate_dataset：造 6 组数据集；train_decoder：训三组 decoder + rollout 对比）
-├── readme.md
-├── saliency_map/              # saliency/heatmap 脚本与临时可视化输出
-├── sampling.py                 # sampling / DWM pipeline：生成 transition 数据和 DWM 闭环轨迹
-├── starv_verification/         # 基于 StarV（区间/星集）的安全验证部分
-├── tools/                      # 可视化工具（红绿安全图）
-├── utils.py                    # 公共小工具
-├── verify.py                   # 验证入口脚本（mpi4py 并行跑 grid）
-└── verify.sh                   # [本地/gitignore] 提交 verify.py 到 HiPerGator SLURM 的作业脚本
+├── config/                     # 各脚本的 json 配置
+├── datasets/                   # 生成的数据集和轨迹
+├── dwm_weight/                 # decoder / controller 权重和训练指标
+├── report/                     # 每日实验记录
+├── saliency_map/               # saliency 预计算和诊断图脚本
+├── starv_verification/         # StarV/pybdr 版本的 model + dynamics + verifier
+├── tools/                      # 验证结果可视化
+├── compare.py                  # 轨迹 vs reachable tube 对比
+├── dynamic.py                  # PyTorch tensor 版本环境动力学 + renderer wrapper
+├── env.py                      # CartPole 连续动作 renderer 环境
+├── make_decoder_dataset.py     # 生成 decoder 数据和真实闭环轨迹
+├── model.py                    # Controller / Decoder 网络结构
+├── sampling.py                 # 生成 transition 数据和 DWM 闭环轨迹
+├── train_decoder.py            # 训练 decoder
+├── utils.py                    # 公共工具
+└── verify.py                   # MPI 并行 StarV 验证入口
 ```
 
-> 标 `[本地/gitignore]` 的文件（`verify.sh`、`gurobi.env`、`*.env`）不进 git，因为里面是本机 / 本人集群账号相关的配置（SLURM 账号、邮箱，求解器参数），每个人跑的时候按自己的环境改就行，模板可以直接抄本节里的内容。
+## 配置文件
 
-## 各文件 / 目录详细说明
+`config/` 按入口脚本分目录：
 
-### `config/`
+```text
+config/make_decoder_dataset/<env>.json
+config/sampling/<env>.json
+config/starv_verification/<env>.json
+config/train_decoder/cartpole/{intensity,saliency,hybrid}.json
+```
 
-存放各脚本需要的 json 配置，按脚本名分子文件夹，每个子文件夹下按环境（cartpole / mountain_car / pendulum）分文件：
+几个容易混的字段：
 
-- `config/make_decoder_dataset/` — `make_decoder_dataset.py` 用的配置，控制 real renderer pipeline 怎么采样、怎么生成 decoder 训练数据和 real rollout ground truth
-- `config/sampling/` — `sampling.py` 用的配置，控制 transition 数据怎么采样，以及 DWM rollout 用哪个 decoder（主线只比较 intensity / saliency）
-- `config/train_decoder/<环境>/` — 训练 decoder 的配置，按环境分子文件夹，每个环境下三份文件对应三组 loss（`intensity.json` = 论文 baseline、`saliency.json` = 我们的方法、`hybrid.json` = 诊断组），三份只差 `weight_mode` 和 `output_dir` 两行；mountain_car / pendulum 是预留位
-- `config/starv_verification/` — 跑安全验证的配置（grid 划分、verifier 选择等）
+- `state_space`：只控制采样初始 state 的范围。它不会限制 rollout 后的 state。
+- `decoder_state_indices`：CartPole 当前是 `[0, 2]`，也就是 Decoder 只吃 position 和 angle。
+- `rollout_steps`：数据生成和 sampling 里当前是 30。
+- `num_steps`：StarV verifier 的验证步数，CartPole 当前也是 30。
+- `seed_pool` / `num_pool`：只在 `make_decoder_dataset.py` 里有意义，用来先采一个 pool 再切 train/val；`sampling.py` 不用这两个字段。
 
-### `datasets/`
+现在有一个还没最终定下来的问题：`make_decoder_dataset.py` / `sampling.py` 的 CartPole `state_space` 还是比较大的全局范围，而 StarV grid 关注的是更小的区域，比如：
 
-数据集生成结果，按 `环境/data/版本号/` 存放，比如 `datasets/cartpole/data/dataset_v1/`。每个版本目录下包含 `states.npz`、`real_trajectories.npz`、`metadata.json` 等文件（具体字段见下方「生成的数据集文件说明」）。
+```text
+pos   : 0.00 ~ 0.60
+vel   : 0.00
+angle : 0.060 ~ 0.120
+avel  : 0.00
+```
 
-### `dwm_weight/`
+这件事后面要单独处理。严格说，`sampling` 的初始范围应该贴近 StarV grid；decoder 训练范围则最好覆盖从这个初始 grid 出发 30 步内实际会访问到的 state 区域，而不只是初始小框。
 
-存放 world model 相关权重：
+## 数据文件
 
-- `raw_weight/` — 各环境（cartpole / mountain_car / pendulum）的老 controller + decoder 权重
-- `now_weight/` — 当前正在训练的新权重，按 `<环境>/<weight_mode>/` 存放（如 `now_weight/cartpole/saliency/`），每个目录下有 `decoder_last.pth`（最后一个 epoch）、`decoder_best_<selection_metric>.pth`（val 上按 `training.selection_metric` 选出的最优 epoch，目前默认 `total_loss` → `decoder_best_total.pth`）和 `metrics.json`（含完整 config、逐 epoch history、test 指标）。
-- `now_weight/cartpole/saliency_alpha_sweep/alpha_<value>/seed_<seed>/` — saliency 模式的 α 消融实验专用目录，按 `alpha_<value>/seed_<seed>/` 两层分（同一 α 下不同 `training.seed` 各占一个子文件夹），内部文件结构和上面的 `<weight_mode>/` 一致（`decoder_last.pth` / `decoder_best_total.pth` / `metrics.json`）。α 和 seed 都用 `train_decoder.py --alpha <value> --seed <seed> --output-dir <此路径>` 覆盖 `config/train_decoder/cartpole/saliency.json` 生成，不需要为每组组合单独建 config 文件。主线 α（当前是 4）仍然训练/存放在 `now_weight/cartpole/saliency/`（单一 canonical 权重，供 `sampling.py` / StarV 用）；这个 sweep 子目录只是消融实验的记录，包括 α=4 自身的多 seed 重跑，不作为下游 pipeline 的输入。
+数据默认在：
 
-### `dynamic.py`
+```text
+datasets/<env>/data/<dataset_name>/
+```
 
-`DynamicModel` 是抽象基类，规定了 `step`（状态转移）和 `render`（渲染图片）两个接口。下面 `CartPole` / `MountainCar` / `Pendulum` 三个类是具体实现：
+CartPole 当前主线是：
 
-- CartPole 的物理公式是手写的
-- MountainCar 和 Pendulum 是照抄 gym 环境里的公式改成 tensor 版本
-- `render` 用的是 gym 画图逻辑，不是 tensor 化的，只是用来生成训练图片
+```text
+datasets/cartpole/data/dataset_v1/
+```
 
-### `env.py`
+主要文件：
 
-连续动作 CartPole 环境（`ContinuousCartPoleEnv`），`dynamic.py` 里 `CartPole` 类的 `render` 靠这个来画图。MountainCar 和 Pendulum 不需要这个文件，直接用 gym 自带的 env 来 render。
-
-### `notebooks/`
-
-实验用 notebook，从 `verifiable_wm/` 或 `notebooks/` 目录启动 Jupyter 均可（首个 cell 自动定位仓库根目录）：
-
-- `generate_dataset.ipynb` — 一键跑三个环境的 `make_decoder_dataset` 和 `sampling`（共 6 个 case）；sampling 的 cell 里用 `decoder_variant` 选闭环用哪个 decoder。
-- `train_decoder.ipynb` — 训练三组 decoder（intensity / saliency / hybrid）、汇总 test 指标、α 扫描模板、生成 WM 闭环轨迹并计算 rollout 偏差对比。
-
-### `make_decoder_dataset.py`
-
-这个脚本负责 real renderer pipeline。运行一次会生成两类产物：
-
-- `states.npz` — decoder 训练数据，即真实 renderer 给出的 `(state, image)` 对。
-- `real_trajectories.npz` — 真实 renderer + controller + dynamics 跑出的闭环轨迹，后面算 DWM rollout 偏差时拿它当 ground truth。
-
-训练 decoder 时主要用 `states.npz`；后面做闭环对比时再用 `real_trajectories.npz`。这两份数据都来自同一条 real renderer pipeline，所以放在一个脚本里一起生成。
-
-**`env.py` / `model.py` 在这条 pipeline 里各自的角色**：`make_decoder_dataset.py` 采样一批初始 state 之后，先用 `dynamic.py::CartPole.render()`（内部借用 `env.py` 的 pygame 画图）把 state 渲成真实图像，配对存成 `states.npz`；然后跑闭环——把这张真实图喂给 `model.py::Controller` 选出 action，交给 `dynamic.py` 的 `step` 算下一步 state，重复 30 步，全程用真实 renderer（`env.py`）出图，跑出来的轨迹就是 `real_trajectories.npz`，也就是"世界模型要去逼近的标准答案"。简单说：`dynamic.py` 管状态怎么变，`env.py` 管状态怎么画成真图（仅 CartPole 需要），`model.py::Controller` 管每步选什么动作；这三者组合起来才能生成 ground truth，后面训 `model.py::Decoder`（可微分 world model）就是要让它单靠 state 生成的图像去替代 `env.py` 这个真实 renderer，同时闭环轨迹还能贴近 `real_trajectories.npz`。
-
-### `model.py`
-
-两个网络：
-
-- `Controller` — 卷积网络，输入图片输出一个动作
-- `Decoder` — 输入 state 输出图片，也就是 wm
-
-训练脚本和验证脚本用的都是这两个类的结构，`starv_verification` 里会继承过去改写 `forward`，换成用区间去算。
-
-### `saliency_map/`
-
-用来放置不同 study case 的 controller saliency / heatmap 相关脚本和临时输出。当前约定：
-
-- `saliency_map/scripts/` — 放主线 saliency map 计算脚本。
-- `saliency_map/scripts/diagnostics/` — 放临时 preview、方法可视化检查脚本。
-- `saliency_map/output/diagnostics/previews/` — 放临时图片，靠文件名区分 study case 和用途。
-- 训练用的 `.npz` 放回对应的 `datasets/<env>/data/<version>/`，不要放在 `saliency_map/output/`。
-
-主方法先按 study case 检查后再定，不强行要求所有环境都用同一个 saliency 算法。
-
-### `sampling.py`
-
-这个脚本负责 sampling / DWM rollout。运行一次会加载 controller、dynamic 和指定 decoder，然后生成两类产物：
-
-- `transition_dataset.npz` — 用真实 renderer 生成图像，让 controller 选 action，再由 dynamics 得到下一步 state，最后把 rollout 展平成 `(s, a, s')`。
-- `dwm_trajectories_<decoder>.npz` — 用 decoder 生成图像，让 controller 选 action，再由 dynamics 往前推，保留完整 DWM 闭环轨迹。
-
-可以理解成：`transition_dataset.npz` 是按单步转移摊平的数据，`dwm_trajectories_<decoder>.npz` 是保留时间顺序的闭环轨迹。后者就是拿来和 `real_trajectories.npz` 逐步比较 rollout 偏差的。
-
-### `starv_verification/`
-
-用于后续验证 ground truth 的安全验证模块。
-
-- **`dynamic.py` / `model.py`** — 文件名和根目录一样，但内容是基于 StarV（区间/星集）重写的版本，直接继承根目录 `dynamic.py` / `model.py` 的类，再重载 `step` / `forward`，把原来 batch tensor 的计算换成对一个区间（bound）做 reachability 分析，这样就能证明"某个范围内的所有 state 都安全"而不是只测单个点。
-- **`verifiers.py`** — `PendulumVerifier` / `MountainCarVerifier` / `CartpoleVerifier` 三个具体验证器，每一步把当前 state bound 喂给 model 算出 action bound，再喂给 dynamic 算下一步的 state bound，循环 `num_steps` 步，每步检查是否满足 safe 条件（比如 pendulum 要求角度在阈值内），满足就提前退出。
-
-### `tools/`
-
-- **`visualize.py`** — 读 `verify.py` 跑出来的结果 json，把 grid 里每个格子的 safe/unsafe 画成红绿两色的热力图（safety map），支持存图或者存成 npy 矩阵。
-
-### `utils.py`
-
-公共工具：
-
-- `load_config` — 读 json
-- `set_seed` — 随机种子
-- `resolve_device` — 选 cpu 还是 cuda
-- `sample_uniform_states` — 按 state_space 的上下界采样
-- `render_images` — 批量渲染 state 对应的图片
-- `to_numpy` — 转 numpy
-
-`make_decoder_dataset.py` 和 `sampling.py` 都是从这里导入用的。
-
-### `verify.py`
-
-真正跑验证用的入口，用 `mpi4py` 把整个 state 空间切成网格（grid），每个进程分到一部分格子，每个格子用 `starv_verification` 里的 `Verifier` 去验证安全还是不安全，最后把结果存成 json。跑这个之前得先有决策/动力学模型，还有一个 json 配置文件描述 grid 和用哪个 verifier。
-
-### `verify.sh`（本地文件，gitignore）
-
-提交 `verify.py` 到 HiPerGator 集群跑的 SLURM 作业脚本（`sbatch verify.sh <conda_env> <mpi进程数> <线程数> <verify.py的参数>`）。里面有 `--account`、`--mail-user` 这些集群账号信息，是个人相关的，所以不进 git；每个人按自己的账号抄一份放根目录就行。
-
-### `gurobi.env`（本地文件，gitignore）
-
-Gurobi 求解器的参数文件。`starv_verification/model.py` 和 `starv_verification/dynamic.py` 底层用 `gurobipy` 做区间/星集运算涉及的 LP 求解，gurobipy 在当前工作目录发现 `gurobi.env` 会自动读取里面的参数。当前内容是 `OutputFlag 0`（关掉 Gurobi 求解日志）和 `TimeLimit 300`（单次求解最多跑 300 秒），跑 `verify.py` 这种网格级别大量重复求解时用来避免刷屏和卡死。因为跟本机 Gurobi 授权/环境相关，所以也不进 git。
-
-### `explore.ipynb`
-
-早期的探索性 notebook，手工读 `verify.py` 产出的 `safety_result.json`（grid + 每个格子的安全 bounds）和 `datasets/<env>/data/<version>/` 下的 `initial_states.npz` / `trajectories.npz`，逐条检查真实轨迹是不是落在对应格子的可达区间（reachable tube）里，用来验证 `verify.py` 算出来的安全结果对不对。这里的逻辑后来被固化成了 `compare.py`，之后如果要改对比逻辑优先改 `compare.py`；这个 notebook 保留作探索记录，不是主线 pipeline 的一部分。
-
-### `compare.py`
-
-`explore.ipynb` 里探索逻辑的正式化版本，做「轨迹 vs 可达管道（reachable tube）包含性」对比的 CLI 脚本，支持 cartpole / mountain_car / pendulum 三个环境。输入是 `verify.py` 的 `safety_result.json`（grid + 每格 safe bounds）、`real_trajectories.npz`（真实闭环轨迹）、`dwm_trajectories_<decoder>.npz`（DWM 闭环轨迹），逐步检查每条轨迹的每一步 state 是否落在对应网格的可达区间内，只输出两张图：
-
-- `real_vs_reachable_tube_examples.png` — 真实轨迹 vs 可达管道
-- `dwm_vs_reachable_tube_examples.png` — DWM（decoder 驱动）轨迹 vs 可达管道
-
-图上会标出每条轨迹是否「完全被包住」（fully contained）以及逐步包含率，这是判断"StarV 算出来的安全区间，在真实/DWM 闭环轨迹上站不站得住"的验证信号，衔接在 `verify.py` 之后。常用参数：`--env` 选环境（自动找默认路径）、`--check-dims` 选用哪几维做包含性检查（cartpole 默认 `0 1`，即 cart position / cart velocity）、`--max-steps` 限制只检查前多少步、`--outdir` 输出目录。
-
----
-
-## 生成的数据集文件说明
-
-数据集生成完之后会得到几个 npz 文件（存放在 `datasets/<env>/data/<version>/` 下）：
-
-| 文件 | 生成脚本 | 内容 |
+| 文件 | 由谁生成 | 用途 |
 |---|---|---|
-| `states.npz` | `make_decoder_dataset.py` | decoder 的训练数据。`states` 是精简过的 2 维 state（cartpole 用 `decoder_state_indices=[0,2]` 从 4 维里挑的），`images` 是真实渲染器渲出来的图，一一对应，训练时直接拿 `decoder(states)` 去拟合 `images`。 |
-| `real_trajectories.npz` | `make_decoder_dataset.py` | 真实渲染器 + 训练好的 controller 跑 30 步闭环得到的完整轨迹，31 = 起点 + 30 步。这个算标准答案，留着后面跟 decoder 驱动出来的轨迹做对比用。 |
-| `transition_dataset.npz` | `sampling.py` | 单步转移 `(s, a, s')`，48000 = 1600 条初始状态 x 30 步展平的，不保留轨迹顺序，是训练转移/动力学模型用的数据，跟训练 decoder 没关系。 |
-| `dwm_trajectories_<decoder>.npz` | `sampling.py` / rollout 评估 | 形状跟 `real_trajectories` 对齐，但每一步的图是 decoder 生成的而不是真实渲染器，再喂给 controller 走出来的轨迹。存在的意义就是拿去跟 `real_trajectories` 逐条对比，差异越小说明 decoder 这个 wm 学得越像真实环境，这也是 verifiable_wm 的核心验证信号，后面应该会喂给 `starv_verification` 用。**主线命名按生成轨迹用的 decoder 区分**：`_intensity` = 论文 baseline，`_saliency` = 当前方法。`_old` 和 `_hybrid` 只作为历史/诊断记录，不再进入后续主线对比。 |
-| `metadata.json` | 两者都会写 | 两个脚本各自把收到的 config 原样 dump 进去，方便回头查这批数据是什么参数生成的。**注意**：现在两个脚本 `output_dir` 是同一个，`metadata.json` 会被后跑的那个覆盖掉，先不管，以后再改。 |
+| `states.npz` | `make_decoder_dataset.py` | decoder 训练数据，包含 `{split}_states` 和 `{split}_images` |
+| `real_trajectories.npz` | `make_decoder_dataset.py` | 真实 renderer 闭环轨迹，后面当 ground truth |
+| `saliency_occlusion.npz` | `precompute_saliency_maps.py` | saliency / hybrid 训练用 heatmap |
+| `transition_dataset.npz` | `sampling.py` | 真实 renderer 下的单步 `(s, a, s')` 数据 |
+| `dwm_trajectories_<variant>.npz` | `sampling.py` | decoder 替代 renderer 后跑出的闭环轨迹 |
+| `metadata.json` | 两个数据脚本都会写 | 保存生成数据时用的 config；当前会被后跑的脚本覆盖 |
 
-### npz 文件 key
+常见 shape：
 
-`{split}` 指 `train` / `val` / `test`，每个文件里三个 split 各存一份。
+```text
+states.npz:
+  train_states      (N, 2)          # CartPole: [position, angle]
+  train_images      (N, 1, 96, 96)
 
-**`states.npz`**（6 个 key）
+real_trajectories.npz:
+  train_traj        (N, 31, 4)      # 初始点 + 30 步
+  train_actions     (N, 30, 1)
 
-| key | shape | 说明 |
-|---|---|---|
-| `{split}_states` | `(N, 2)` | 精简过的 2 维 state（cartpole 用 `decoder_state_indices=[0,2]` 从 4 维里挑的） |
-| `{split}_images` | `(N, 1, 96, 96)` | 对应的渲染图 |
+dwm_trajectories_<variant>.npz:
+  train_traj        (N, 31, 4)
+  train_actions     (N, 30, 1)
+```
 
-**`real_trajectories.npz`**（6 个 key）
+## Decoder 训练
 
-| key | shape | 说明 |
-|---|---|---|
-| `{split}_traj` | `(N, 31, state_dim)` | 31 = 起点 + 30 步闭环轨迹（cartpole state_dim=4） |
-| `{split}_actions` | `(N, 30, action_dim)` | 对应每一步的动作 |
+`model.py` 里只有两个网络：
 
-**`transition_dataset.npz`**（6 个 key，`sampling.py` 生成）
+- `Controller`：输入图片，输出 action；
+- `Decoder`：输入 2 维 state，输出 96x96 灰度图。
 
-| key | shape | 说明 |
-|---|---|---|
-| `{split}_states` | `(N, state_dim)` | 单步转移起点 state |
-| `{split}_actions` | `(N, action_dim)` | 该步动作 |
-| `{split}_next_states` | `(N, state_dim)` | 单步转移后的 state |
+训练时 controller 固定，不重训。变的是 decoder。
 
-**`dwm_trajectories_<decoder>.npz`**（6 个 key；主线只继续生成 / 比较 `_intensity` 和 `_saliency`，已有 `_old` / `_hybrid` 仅保留作历史记录）
+`train_decoder.py` 支持三种加权方式：
 
-| key | shape | 说明 |
-|---|---|---|
-| `{split}_traj` | `(N, 31, state_dim)` | 跟 `real_trajectories` 里的 `traj` 对齐，但每步图片是 decoder 生成的而不是真实渲染器 |
-| `{split}_actions` | `(N, 30, action_dim)` | 对应每一步的动作 |
+```text
+intensity : 按目标图像亮度阈值加权
+saliency  : 按 controller saliency heatmap 加权
+hybrid    : intensity + saliency
+```
+
+也就是 saliency 分支用：
+
+$$
+w = 1 + \alpha H
+$$
+
+训练目标是：
+
+$$
+L_{total} = L_{rec}^{w} + \lambda_{ctrl}\,\mathrm{ctrl\_mse}
+$$
+
+当前 best checkpoint 用 `training.selection_metric` 选，CartPole 主线是 `total_loss`，所以文件名是：
+
+```text
+decoder_best_total.pth
+```
+
+CLI override 主要给 sweep 用：
+
+```bash
+python train_decoder.py config/train_decoder/cartpole/saliency.json \
+  --alpha 8 \
+  --lambda-ctrl 0.1 \
+  --seed 2025 \
+  --output-dir dwm_weight/now_weight/cartpole/saliency
+```
+
+消融实验目录：
+
+```text
+dwm_weight/now_weight/cartpole/saliency_alpha_sweep/alpha_<value>/seed_<seed>/
+dwm_weight/now_weight/cartpole/lambda_ablation/<intensity|saliency_alpha8>/lambda_<value>/seed_<seed>/
+```
+
+这些目录只是实验记录，不作为下游 pipeline 默认输入。
+
+## Rollout 偏差
+
+闭环偏差比较的是同一个初始 state 出发后的两条轨迹：
+
+```text
+real : 真实 renderer -> controller -> dynamics
+DWM  : decoder      -> controller -> dynamics
+```
+
+每个时间步算 full-state L2：
+
+$$
+d_t = \lVert s_t^{dwm} - s_t^{real} \rVert_2
+$$
+
+CartPole state 是：
+
+```text
+[position, velocity, angle, angular_velocity]
+```
+
+所以这个偏差不是“差了几步”，而是同一时间步上两个 4 维 state 的距离。常看的统计量是 mean-step、最后一步、每条轨迹最大偏差的均值，以及 max-p95。
+
+## Saliency
+
+主线脚本：
+
+```text
+saliency_map/scripts/precompute_saliency_maps.py
+```
+
+当前实现的方法是 occlusion：遮挡图片上的 patch，看 controller action 变化有多大。默认输出：
+
+```text
+datasets/cartpole/data/dataset_v1/saliency_occlusion.npz
+```
+
+诊断脚本先保留：
+
+```text
+saliency_map/scripts/diagnostics/preview_cartpole_render.py
+saliency_map/scripts/diagnostics/compare_heatmap_methods.py
+saliency_map/scripts/diagnostics/compare_alpha2_recon.py
+```
+
+诊断图片默认放在：
+
+```text
+saliency_map/output/diagnostics/previews/
+```
+
+这些图帮助确认 renderer、heatmap 和重建图有没有明显问题，不是主线 pipeline 必跑项。
+
+## StarV 验证
+
+`verify.py` 读取 `config/starv_verification/<env>.json`，把 grid 切成 cell，用 MPI 分发，每个 cell 做 reachability。
+
+CartPole 当前配置：
+
+```text
+config/starv_verification/cartpole.json
+```
+
+当前 `num_steps = 30`。grid 里的 `start/stop/num` 不是采样点，而是连续区间 cell。比如 `num=60` 表示把 `[start, stop]` 切成 60 个小区间。
+
+`starv_verification/` 下的文件和根目录同名，但作用不同：
+
+- `starv_verification/model.py`：把根目录的 `Decoder` / `Controller` 换成 StarV reachability 版本；
+- `starv_verification/dynamic.py`：把 tensor dynamics 换成 bound / reachable-set 版本；
+- `starv_verification/verifiers.py`：定义每个环境的安全条件和逐步验证逻辑。
+
+CartPole verifier 有一个特殊点：模型 reachability 只把 `[position, angle]` 喂给 decoder，因为根目录 `Decoder` 的输入就是这两维；完整 dynamics 仍然维护 4 维 CartPole state。
+
+验证结果默认写到：
+
+```text
+results/cartpole/safety_result.json
+```
+
+画 safety map：
+
+```bash
+python tools/visualize.py results/cartpole/safety_result.json \
+  --save results/cartpole/safety_result.png
+```
+
+## 轨迹 vs reachable tube
+
+`compare.py` 是 `verify.py` 之后用的脚本。它读取：
+
+```text
+safety_result.json
+real_trajectories.npz
+dwm_trajectories_<variant>.npz
+```
+
+然后检查真实轨迹和 DWM 轨迹是否落在对应 cell 的 reachable tube 里。它会输出两张图：
+
+```text
+real_vs_reachable_tube_examples.png
+dwm_vs_reachable_tube_examples.png
+```
+
+常用参数：
+
+```bash
+python compare.py \
+  --env cartpole \
+  --safety results/cartpole/safety_result.json \
+  --real datasets/cartpole/data/dataset_v1/real_trajectories.npz \
+  --dwm datasets/cartpole/data/dataset_v1/dwm_trajectories_saliency.npz \
+  --states datasets/cartpole/data/dataset_v1/states.npz \
+  --max-steps 30 \
+  --outdir results/cartpole/compare_tube
+```
+
+CartPole 默认画/check 的维度是 position 和 velocity，也就是 `0 1`。如果要换维度，用：
+
+```bash
+--plot-dims 0 2
+--check-dims 0 2
+```
+
+## 文件说明
+
+### 根目录脚本
+
+| 文件 | 说明 |
+|---|---|
+| `make_decoder_dataset.py` | 生成 `states.npz` 和 `real_trajectories.npz` |
+| `saliency_map/scripts/precompute_saliency_maps.py` | 生成 `saliency_occlusion.npz` |
+| `train_decoder.py` | 训练 decoder，写入 `decoder_last.pth` / `decoder_best_*.pth` / `metrics.json` |
+| `sampling.py` | 生成 `transition_dataset.npz` 和 `dwm_trajectories_<variant>.npz` |
+| `verify.py` | StarV/MPI 验证入口 |
+| `compare.py` | 轨迹和 reachable tube 的包含性对比 |
+| `tools/visualize.py` | 把验证结果画成红绿 safety map |
+
+### 核心模块
+
+| 文件 | 说明 |
+|---|---|
+| `model.py` | PyTorch 版 `Controller` / `Decoder` |
+| `dynamic.py` | PyTorch 版 CartPole / MountainCar / Pendulum dynamics 和 renderer wrapper |
+| `env.py` | CartPole 连续动作环境，主要供 renderer 使用 |
+| `utils.py` | config、seed、device、uniform state 采样、批量 render 等小工具 |
+
+### 记录和 notebook
+
+- `report/`：每日实验记录。当前 CartPole 的 $\alpha$、$\lambda_{ctrl}$、rollout 决策都在 2026-07-08 的记录里。
+- `notebooks/generate_dataset.ipynb`：数据生成 notebook。
+- `notebooks/train_decoder.ipynb`：训练、汇总、rollout 对比 notebook。
+- `explore.ipynb`：早期探索记录，主要逻辑已经迁到 `compare.py`。
+
+## 目前还要注意的事
+
+- CartPole 的 `state_space` 还没和 StarV grid 完全理顺。后面如果正式进入 StarV 对比，最好先重新确认 sampling 初始范围和 decoder 训练覆盖范围。
+- `metadata.json` 会被 `make_decoder_dataset.py` 和 `sampling.py` 后跑的一方覆盖，追实验时最好同时看 config 和文件时间。
+- `sampling.py` 里的 `transition_dataset.npz` 和 DWM rollout 是同一个入口生成的，但如果只是更新 decoder 权重，很多时候只需要重新生成 `dwm_trajectories_<variant>.npz`，不一定要重算 transition 数据。
+- StarV 配置里的 decoder 权重路径要和你想验证的 decoder 对上。现在配置里如果还指向共享目录的老权重，就不是在验证 `dwm_weight/now_weight/cartpole/saliency/` 里的新 decoder。
