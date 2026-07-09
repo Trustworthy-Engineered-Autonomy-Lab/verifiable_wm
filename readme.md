@@ -63,9 +63,7 @@ verifiable_wm/
 
 ### `env.py`
 
-老版本连续动作 CartPole 环境（`ContinuousCartPoleEnv`），`dynamic.py` 里 `CartPole` 类的 `render` 靠这个来画图。MountainCar 和 Pendulum 不需要这个文件，直接用 gym 自带的 env 来 render。
-
-**为什么叫"老版本"**：这个文件本身就是照抄 Sutton 经典 CartPole (`pole.c`) 改的连续动作版本（文件头注释写了出处），是项目早期直接用 gym env 跑的那一套，早于后来为了求梯度/写 StarV 而重写的 tensor 版 `dynamic.py::CartPole`。`dynamic.py` 把状态转移（`step`）重新手写成了 tensor 形式，但没人把 `render`（pygame 画图那部分）也重写一遍，所以现在 `dynamic.py::CartPole.render()` 干脆直接实例化这个老 env、把 tensor state 塞进去借用它的 pygame 画图逻辑，纯粹是为了出图，不参与任何状态转移或梯度计算。
+连续动作 CartPole 环境（`ContinuousCartPoleEnv`），`dynamic.py` 里 `CartPole` 类的 `render` 靠这个来画图。MountainCar 和 Pendulum 不需要这个文件，直接用 gym 自带的 env 来 render。
 
 ### `notebooks/`
 
