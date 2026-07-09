@@ -257,6 +257,7 @@ def main():
     parser.add_argument("config", type=Path)
     parser.add_argument("--alpha", type=float, default=None, help="Override weight.alpha (sweeps).")
     parser.add_argument("--seed", type=int, default=None, help="Override training.seed (sweeps).")
+    parser.add_argument("--lambda-ctrl", type=float, default=None, help="Override lambda_ctrl (sweeps).")
     parser.add_argument("--output-dir", type=Path, default=None, help="Override output_dir.")
     args = parser.parse_args()
 
@@ -265,6 +266,8 @@ def main():
         config["weight"]["alpha"] = args.alpha
     if args.seed is not None:
         config["training"]["seed"] = args.seed
+    if args.lambda_ctrl is not None:
+        config["lambda_ctrl"] = args.lambda_ctrl
     if args.output_dir is not None:
         config["output_dir"] = str(args.output_dir)
 

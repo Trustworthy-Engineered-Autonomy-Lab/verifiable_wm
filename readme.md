@@ -7,22 +7,28 @@ conda activate /home/tealab_shared/starv/env/starv_shared
 
 ```
 verifiable_wm/
-├── config/                  # 各脚本用的 json 配置
-├── datasets/                # 生成的数据集（按环境/版本存放）
-├── dwm_weight/               # world model 权重（老权重 / 当前权重）
-├── dynamic.py                # 可微分环境动力学（pytorch tensor 版本）
-├── env.py                    # 老版本连续动作 CartPole 环境（供渲染用）
-├── make_decoder_dataset.py   # real renderer pipeline：生成 decoder 训练数据和真实闭环轨迹
-├── model.py                  # Controller / Decoder 网络结构
-├── notebooks/                # 实验用 ipynb（generate_dataset：造 6 组数据集；train_decoder：训三组 decoder + rollout 对比）
+├── compare.py                 # 轨迹 vs 可达管道（reachable tube）对比脚本，读 verify.py 的输出画包含性图
+├── config/                    # 各脚本用的 json 配置
+├── datasets/                  # 生成的数据集（按环境/版本存放）
+├── dwm_weight/                # world model 权重（老权重 / 当前权重）
+├── dynamic.py                 # 可微分环境动力学（pytorch tensor 版本）
+├── env.py                     # 老版本连续动作 CartPole 环境（供渲染用）
+├── explore.ipynb              # 探索性 notebook：人工检查 safety_result.json 的 grid 和真实轨迹是否落在里面（compare.py 的前身）
+├── gurobi.env                 # [本地/gitignore] Gurobi 求解器参数文件，starv_verification 内部用 gurobipy 求解时会读取
+├── make_decoder_dataset.py    # real renderer pipeline：生成 decoder 训练数据和真实闭环轨迹
+├── model.py                   # Controller / Decoder 网络结构
+├── notebooks/                 # 实验用 ipynb（generate_dataset：造 6 组数据集；train_decoder：训三组 decoder + rollout 对比）
 ├── readme.md
-├── saliency_map/             # saliency/heatmap 脚本与临时可视化输出
-├── sampling.py                # sampling / DWM pipeline：生成 transition 数据和 DWM 闭环轨迹
-├── starv_verification/        # 基于 StarV（区间/星集）的安全验证部分
-├── tools/                     # 可视化工具（红绿安全图）
-├── utils.py                   # 公共小工具
-└── verify.py                  # 验证入口脚本（mpi4py 并行跑 grid）
+├── saliency_map/              # saliency/heatmap 脚本与临时可视化输出
+├── sampling.py                 # sampling / DWM pipeline：生成 transition 数据和 DWM 闭环轨迹
+├── starv_verification/         # 基于 StarV（区间/星集）的安全验证部分
+├── tools/                      # 可视化工具（红绿安全图）
+├── utils.py                    # 公共小工具
+├── verify.py                   # 验证入口脚本（mpi4py 并行跑 grid）
+└── verify.sh                   # [本地/gitignore] 提交 verify.py 到 HiPerGator SLURM 的作业脚本
 ```
+
+> 标 `[本地/gitignore]` 的文件（`verify.sh`、`gurobi.env`、`*.env`）不进 git，因为里面是本机 / 本人集群账号相关的配置（SLURM 账号、邮箱，求解器参数），每个人跑的时候按自己的环境改就行，模板可以直接抄本节里的内容。
 
 ## 各文件 / 目录详细说明
 
@@ -44,7 +50,8 @@ verifiable_wm/
 存放 world model 相关权重：
 
 - `raw_weight/` — 各环境（cartpole / mountain_car / pendulum）的老 controller + decoder 权重
-- `now_weight/` — 当前正在训练的新权重
+- `now_weight/` — 当前正在训练的新权重，按 `<环境>/<weight_mode>/` 存放（如 `now_weight/cartpole/saliency/`），每个目录下有 `decoder_last.pth`（最后一个 epoch）、`decoder_best_<selection_metric>.pth`（val 上按 `training.selection_metric` 选出的最优 epoch，目前默认 `total_loss` → `decoder_best_total.pth`）和 `metrics.json`（含完整 config、逐 epoch history、test 指标）。
+- `now_weight/cartpole/saliency_alpha_sweep/alpha_<value>/seed_<seed>/` — saliency 模式的 α 消融实验专用目录，按 `alpha_<value>/seed_<seed>/` 两层分（同一 α 下不同 `training.seed` 各占一个子文件夹），内部文件结构和上面的 `<weight_mode>/` 一致（`decoder_last.pth` / `decoder_best_total.pth` / `metrics.json`）。α 和 seed 都用 `train_decoder.py --alpha <value> --seed <seed> --output-dir <此路径>` 覆盖 `config/train_decoder/cartpole/saliency.json` 生成，不需要为每组组合单独建 config 文件。主线 α（当前是 4）仍然训练/存放在 `now_weight/cartpole/saliency/`（单一 canonical 权重，供 `sampling.py` / StarV 用）；这个 sweep 子目录只是消融实验的记录，包括 α=4 自身的多 seed 重跑，不作为下游 pipeline 的输入。
 
 ### `dynamic.py`
 
@@ -57,6 +64,8 @@ verifiable_wm/
 ### `env.py`
 
 老版本连续动作 CartPole 环境（`ContinuousCartPoleEnv`），`dynamic.py` 里 `CartPole` 类的 `render` 靠这个来画图。MountainCar 和 Pendulum 不需要这个文件，直接用 gym 自带的 env 来 render。
+
+**为什么叫"老版本"**：这个文件本身就是照抄 Sutton 经典 CartPole (`pole.c`) 改的连续动作版本（文件头注释写了出处），是项目早期直接用 gym env 跑的那一套，早于后来为了求梯度/写 StarV 而重写的 tensor 版 `dynamic.py::CartPole`。`dynamic.py` 把状态转移（`step`）重新手写成了 tensor 形式，但没人把 `render`（pygame 画图那部分）也重写一遍，所以现在 `dynamic.py::CartPole.render()` 干脆直接实例化这个老 env、把 tensor state 塞进去借用它的 pygame 画图逻辑，纯粹是为了出图，不参与任何状态转移或梯度计算。
 
 ### `notebooks/`
 
@@ -73,6 +82,8 @@ verifiable_wm/
 - `real_trajectories.npz` — 真实 renderer + controller + dynamics 跑出的闭环轨迹，后面算 DWM rollout 偏差时拿它当 ground truth。
 
 训练 decoder 时主要用 `states.npz`；后面做闭环对比时再用 `real_trajectories.npz`。这两份数据都来自同一条 real renderer pipeline，所以放在一个脚本里一起生成。
+
+**`env.py` / `model.py` 在这条 pipeline 里各自的角色**：`make_decoder_dataset.py` 采样一批初始 state 之后，先用 `dynamic.py::CartPole.render()`（内部借用 `env.py` 的 pygame 画图）把 state 渲成真实图像，配对存成 `states.npz`；然后跑闭环——把这张真实图喂给 `model.py::Controller` 选出 action，交给 `dynamic.py` 的 `step` 算下一步 state，重复 30 步，全程用真实 renderer（`env.py`）出图，跑出来的轨迹就是 `real_trajectories.npz`，也就是"世界模型要去逼近的标准答案"。简单说：`dynamic.py` 管状态怎么变，`env.py` 管状态怎么画成真图（仅 CartPole 需要），`model.py::Controller` 管每步选什么动作；这三者组合起来才能生成 ground truth，后面训 `model.py::Decoder`（可微分 world model）就是要让它单靠 state 生成的图像去替代 `env.py` 这个真实 renderer，同时闭环轨迹还能贴近 `real_trajectories.npz`。
 
 ### `model.py`
 
@@ -130,6 +141,27 @@ verifiable_wm/
 ### `verify.py`
 
 真正跑验证用的入口，用 `mpi4py` 把整个 state 空间切成网格（grid），每个进程分到一部分格子，每个格子用 `starv_verification` 里的 `Verifier` 去验证安全还是不安全，最后把结果存成 json。跑这个之前得先有决策/动力学模型，还有一个 json 配置文件描述 grid 和用哪个 verifier。
+
+### `verify.sh`（本地文件，gitignore）
+
+提交 `verify.py` 到 HiPerGator 集群跑的 SLURM 作业脚本（`sbatch verify.sh <conda_env> <mpi进程数> <线程数> <verify.py的参数>`）。里面有 `--account`、`--mail-user` 这些集群账号信息，是个人相关的，所以不进 git；每个人按自己的账号抄一份放根目录就行。
+
+### `gurobi.env`（本地文件，gitignore）
+
+Gurobi 求解器的参数文件。`starv_verification/model.py` 和 `starv_verification/dynamic.py` 底层用 `gurobipy` 做区间/星集运算涉及的 LP 求解，gurobipy 在当前工作目录发现 `gurobi.env` 会自动读取里面的参数。当前内容是 `OutputFlag 0`（关掉 Gurobi 求解日志）和 `TimeLimit 300`（单次求解最多跑 300 秒），跑 `verify.py` 这种网格级别大量重复求解时用来避免刷屏和卡死。因为跟本机 Gurobi 授权/环境相关，所以也不进 git。
+
+### `explore.ipynb`
+
+早期的探索性 notebook，手工读 `verify.py` 产出的 `safety_result.json`（grid + 每个格子的安全 bounds）和 `datasets/<env>/data/<version>/` 下的 `initial_states.npz` / `trajectories.npz`，逐条检查真实轨迹是不是落在对应格子的可达区间（reachable tube）里，用来验证 `verify.py` 算出来的安全结果对不对。这里的逻辑后来被固化成了 `compare.py`，之后如果要改对比逻辑优先改 `compare.py`；这个 notebook 保留作探索记录，不是主线 pipeline 的一部分。
+
+### `compare.py`
+
+`explore.ipynb` 里探索逻辑的正式化版本，做「轨迹 vs 可达管道（reachable tube）包含性」对比的 CLI 脚本，支持 cartpole / mountain_car / pendulum 三个环境。输入是 `verify.py` 的 `safety_result.json`（grid + 每格 safe bounds）、`real_trajectories.npz`（真实闭环轨迹）、`dwm_trajectories_<decoder>.npz`（DWM 闭环轨迹），逐步检查每条轨迹的每一步 state 是否落在对应网格的可达区间内，只输出两张图：
+
+- `real_vs_reachable_tube_examples.png` — 真实轨迹 vs 可达管道
+- `dwm_vs_reachable_tube_examples.png` — DWM（decoder 驱动）轨迹 vs 可达管道
+
+图上会标出每条轨迹是否「完全被包住」（fully contained）以及逐步包含率，这是判断"StarV 算出来的安全区间，在真实/DWM 闭环轨迹上站不站得住"的验证信号，衔接在 `verify.py` 之后。常用参数：`--env` 选环境（自动找默认路径）、`--check-dims` 选用哪几维做包含性检查（cartpole 默认 `0 1`，即 cart position / cart velocity）、`--max-steps` 限制只检查前多少步、`--outdir` 输出目录。
 
 ---
 
