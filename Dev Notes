@@ -1,4 +1,0 @@
-2026/7/6
-compare.py仍然没法应用在mountain_car之外的模型；
-cartpole的safety_result需要重新验证；
-cartpole的trajectories维度与states的维度不一致。
