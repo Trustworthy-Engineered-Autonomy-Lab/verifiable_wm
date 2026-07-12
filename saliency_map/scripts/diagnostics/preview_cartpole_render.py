@@ -77,9 +77,9 @@ def save_preview(saved_images, rerendered_images, output_path):
     plt.close(fig)
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--states-npz", type=Path, default=Path("datasets/cartpole/data/dataset_v1/states.npz"))
+    parser.add_argument("--decoder-states-npz", type=Path, default=Path("datasets/cartpole/data/dataset_v1/decoder_states.npz"))
     parser.add_argument(
         "--traj-npz",
         type=Path,
@@ -93,16 +93,15 @@ def parse_args():
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("saliency_map/output/diagnostics/previews"),
+        default=Path("saliency_map/output/previews"),
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main():
-    args = parse_args()
+def run(args):
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    states_data = np.load(args.states_npz)
+    states_data = np.load(args.decoder_states_npz)
     traj_data = np.load(args.traj_npz) if args.traj_npz.exists() else None
 
     image_key = infer_image_key(states_data, args.split, args.image_key)
@@ -123,6 +122,10 @@ def main():
     output_path = args.output_dir / f"cartpole_render_{args.split}_{suffix}.png"
     save_preview(saved_images, rerendered, output_path)
     print(f"[saved] {output_path}")
+
+
+def main():
+    run(parse_args())
 
 
 if __name__ == "__main__":

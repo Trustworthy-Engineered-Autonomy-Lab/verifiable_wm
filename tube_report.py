@@ -37,11 +37,14 @@ ENV_DEFAULTS = {
         "description": "theta vs omega",
     },
     "cartpole": {
-        # Final comparison choice: cart position vs cart velocity.
-        "plot_dims": (0, 1),
-        "check_dims": (0, 1),
-        "description": "cart position vs cart velocity",
-        # If states.npz is 2-D while trajectory is 4-D, this is usually [x, theta].
+        # Grid only varies position (dim0) and angle (dim2); velocity/angular_velocity
+        # are pinned to a single point (num=1). The safety criterion (CartpoleVerifier)
+        # and decoder_state_indices both key off angle, not velocity, so position vs
+        # angle is the pair that's actually gridded and checked.
+        "plot_dims": (0, 2),
+        "check_dims": (0, 2),
+        "description": "cart position vs pole angle",
+        # If the states file is 2-D while trajectory is 4-D, this is usually [x, theta].
         "decoder_state_indices": (0, 2),
     },
 }
@@ -94,13 +97,13 @@ def choose_init_states(
 
     if states is None:
         if mode == "states":
-            raise ValueError("--init-source states requested, but states.npz was not provided")
+            raise ValueError("--init-source states requested, but the states file was not provided")
         return traj_init, "traj[:,0,:]"
 
     states_arr = np.asarray(states, dtype=float)
 
     if states_arr.shape == traj_init.shape:
-        return states_arr, "states.npz"
+        return states_arr, "states file"
 
     indices = decode_state_indices(
         metadata=metadata,
@@ -118,7 +121,7 @@ def choose_init_states(
     ):
         aligned = traj_init.copy()
         aligned[:, indices] = states_arr
-        return aligned, f"traj[:,0,:] with states.npz inserted at dims {indices.tolist()}"
+        return aligned, f"traj[:,0,:] with states file inserted at dims {indices.tolist()}"
 
     if mode == "states":
         raise ValueError(

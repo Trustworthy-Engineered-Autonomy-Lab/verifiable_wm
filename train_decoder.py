@@ -28,7 +28,7 @@ def load_controller(config, device):
 
 
 def load_split(dataset_dir, saliency_file, split, weight_mode):
-    data = np.load(dataset_dir / "states.npz")
+    data = np.load(dataset_dir / "decoder_states.npz")
     states = torch.from_numpy(data[f"{split}_states"]).float()
     images = torch.from_numpy(data[f"{split}_images"]).float()
 

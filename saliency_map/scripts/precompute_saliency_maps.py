@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 import sys
 from pathlib import Path
@@ -13,56 +12,13 @@ if str(REPO_ROOT) not in sys.path:
 import numpy as np
 import torch
 
-from model import Controller
 from utils import resolve_device, set_seed
-
-
-def load_json(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def load_state_dict(path, device):
-    try:
-        return torch.load(path, map_location=device, weights_only=True)
-    except TypeError:
-        return torch.load(path, map_location=device)
-
-
-def build_controller(config, device):
-    controller_cfg = config["controller"]
-    name = controller_cfg.get("name", "Controller")
-    if name != "Controller":
-        raise ValueError(f"Unsupported controller class: {name}")
-
-    controller = Controller(**controller_cfg.get("args", {})).to(device).eval()
-    controller.load_state_dict(load_state_dict(controller_cfg["weights"], device))
-    return controller
-
-
-def normalize_per_image(heat):
-    flat = heat.flatten(1)
-    lo = flat.min(dim=1).values.view(-1, 1, 1, 1)
-    hi = flat.max(dim=1).values.view(-1, 1, 1, 1)
-    return ((heat - lo) / (hi - lo).clamp_min(1e-12)).clamp(0.0, 1.0)
-
-
-@torch.no_grad()
-def occlusion_batch(controller, images, patch, stride, fill):
-    base_actions = controller(images)
-    heat = torch.zeros_like(images)
-    counts = torch.zeros_like(images)
-    _, _, height, width = images.shape
-
-    for y in range(0, height - patch + 1, stride):
-        for x0 in range(0, width - patch + 1, stride):
-            occluded = images.clone()
-            occluded[:, :, y : y + patch, x0 : x0 + patch] = fill
-            delta = (controller(occluded) - base_actions).abs().view(-1, 1, 1, 1)
-            heat[:, :, y : y + patch, x0 : x0 + patch] += delta
-            counts[:, :, y : y + patch, x0 : x0 + patch] += 1.0
-
-    return heat / counts.clamp_min(1.0), base_actions
+from saliency_map.methods import (
+    build_controller,
+    load_json,
+    normalize_per_image,
+    occlusion,
+)
 
 
 def compute_split(controller, images_np, device, args):
@@ -74,7 +30,7 @@ def compute_split(controller, images_np, device, args):
         images = torch.from_numpy(images_np[start:end]).float().to(device)
 
         if args.method == "occlusion":
-            heat, actions = occlusion_batch(
+            heat, actions = occlusion(
                 controller,
                 images,
                 patch=args.occlusion_patch,
@@ -98,7 +54,7 @@ def default_output_path(dataset_path, method):
     return dataset_path.parent / f"saliency_{method}.npz"
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
@@ -110,7 +66,7 @@ def parse_args():
         "--dataset",
         type=Path,
         default=None,
-        help="Defaults to <config output_dir>/states.npz.",
+        help="Defaults to <config output_dir>/decoder_states.npz.",
     )
     parser.add_argument("--method", choices=["occlusion"], default="occlusion")
     parser.add_argument("--splits", nargs="+", default=["train", "val", "test"])
@@ -127,16 +83,15 @@ def parse_args():
         default=None,
         help="Defaults to <dataset-dir>/saliency_<method>.npz.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main():
-    args = parse_args()
+def run(args):
     set_seed(args.seed)
     device = resolve_device(args.device)
 
     config = load_json(args.config)
-    dataset_path = args.dataset or (Path(config["output_dir"]) / "states.npz")
+    dataset_path = args.dataset or (Path(config["output_dir"]) / "decoder_states.npz")
     output_path = args.output or default_output_path(dataset_path, args.method)
 
     data = np.load(dataset_path)
@@ -160,6 +115,10 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(output_path, **arrays)
     print(f"[saved] {output_path}")
+
+
+def main():
+    run(parse_args())
 
 
 if __name__ == "__main__":

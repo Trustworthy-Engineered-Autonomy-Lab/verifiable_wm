@@ -11,6 +11,7 @@
   "rollout_steps": 30,
   "device": "auto",
   "render_batch_size": 64,
+  "starv_config": "config/starv_verification/cartpole.json",
   "decoder_state_indices": [0, 2],
   "state_space": [
     {"name": "position", "low": -2.4, "high": 2.4},

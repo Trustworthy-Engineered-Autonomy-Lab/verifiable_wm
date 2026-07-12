@@ -1,21 +1,10 @@
 {
   "dataset_name": "dataset_v1",
-  "seed_train": 2025,
-  "seed_val": 2026,
-  "seed_test": 2027,
-  "num_train": 1600,
-  "num_val": 400,
-  "num_test": 400,
   "rollout_steps": 30,
   "device": "auto",
   "render_batch_size": 64,
+  "starv_config": "config/starv_verification/cartpole.json",
   "decoder_state_indices": [0, 2],
-  "state_space": [
-    {"name": "position", "low": -2.4, "high": 2.4},
-    {"name": "velocity", "low": -1.0, "high": 1.0},
-    {"name": "angle", "low": -0.2095, "high": 0.2095},
-    {"name": "angular_velocity", "low": -1.0, "high": 1.0}
-  ],
   "controller": {
     "name": "Controller",
     "weights": "/home/tealab_shared/starv/weights/cartpole/controller_cp.pth",
@@ -27,8 +16,8 @@
     "name": "Decoder",
     "variant": "intensity",
     "weights": {
-      "intensity": "dwm_weight/now_weight/cartpole/intensity/decoder_last.pth",
-      "saliency": "dwm_weight/now_weight/cartpole/saliency/decoder_last.pth"
+      "intensity": "dwm_weight/now_weight/cartpole/intensity/decoder_best_total.pth",
+      "saliency": "dwm_weight/now_weight/cartpole/saliency/decoder_best_total.pth"
     }
   },
   "dynamic": {

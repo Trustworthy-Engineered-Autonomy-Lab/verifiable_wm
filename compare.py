@@ -17,7 +17,7 @@ A trajectory is fully contained if every checked state is inside the correspondi
 reachable tube bound for the chosen verification horizon and chosen check dimensions.
 
 --check-dims controls which state dimensions are used for containment checking.
-For CartPole, the default is position/velocity only: --plot-dims 0 1 --check-dims 0 1
+For CartPole, the default is position/angle: --plot-dims 0 2 --check-dims 0 2
 
 The containment math lives in tube_geometry.py, per-trajectory comparison and
 summary stats in tube_report.py, and the matplotlib rendering in tube_plot.py.
@@ -29,42 +29,26 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import numpy as np
 
-from tube_geometry import load_json, load_safety_result, normalize_check_dims
+from tube_geometry import load_safety_result, normalize_check_dims
 from tube_report import (
     ENV_DEFAULTS,
     build_summary_row,
-    choose_init_states,
     compare_set,
     print_summary,
 )
 from tube_plot import plot_examples
 
-# sampling.py falls back to decoder variant "old" when a config has no
-# decoder.variant (mountain_car / pendulum today). CartPole has several
-# real variants (intensity / saliency / hybrid) so there is no safe guess:
-# --variant must be passed explicitly when auto-resolving --dwm for it.
+# Pendulum's configured mainline is saliency. MountainCar still uses the old
+# shared decoder, while CartPole has multiple active variants and therefore
+# requires an explicit --variant when auto-resolving its DWM trajectory.
 DEFAULT_VARIANT = {
     "mountain_car": "old",
-    "pendulum": "old",
+    "pendulum": "saliency",
 }
-
-
-def load_metadata(*npz_paths: Optional[Path]) -> Optional[Dict[str, Any]]:
-    """
-    Both data scripts always write metadata.json next to the npz files they
-    produce (see readme), so it lives at a single fixed location per npz path.
-    """
-    for path in npz_paths:
-        if path is None:
-            continue
-        metadata_path = Path(path).parent / "metadata.json"
-        if metadata_path.exists():
-            return load_json(metadata_path)
-    return None
 
 
 def npz_keys(path: Path) -> List[str]:
@@ -107,7 +91,49 @@ def ensure_state_shape(arr: np.ndarray, name: str) -> np.ndarray:
     return arr.astype(float, copy=False)
 
 
-def parse_args() -> argparse.Namespace:
+def validate_trajectory_initial_states(
+    states: np.ndarray,
+    real_traj: np.ndarray,
+    dwm_traj: np.ndarray,
+) -> np.ndarray:
+    states = ensure_state_shape(states, "trajectory states")
+    real_init = np.asarray(real_traj[:, 0, :], dtype=float)
+    dwm_init = np.asarray(dwm_traj[:, 0, :], dtype=float)
+
+    if states.shape != real_init.shape:
+        raise ValueError(
+            "trajectory states must contain the full trajectory state and match "
+            f"real trajectory t=0; got states={states.shape}, real={real_init.shape}"
+        )
+    if dwm_init.shape != real_init.shape:
+        raise ValueError(
+            f"DWM trajectory t=0 shape {dwm_init.shape} != real trajectory t=0 shape {real_init.shape}"
+        )
+    if not np.allclose(states, real_init, rtol=0.0, atol=1e-7):
+        raise ValueError("trajectory states do not match real trajectory t=0")
+    if not np.allclose(states, dwm_init, rtol=0.0, atol=1e-7):
+        raise ValueError("trajectory states do not match DWM trajectory t=0")
+    return states
+
+
+def validate_states_in_grid(states: np.ndarray, grid) -> None:
+    outside = [
+        index
+        for index, state in enumerate(np.asarray(states, dtype=float))
+        if grid.point_to_linear_index(state) is None
+    ]
+    if outside:
+        preview = outside[:10]
+        raise ValueError(
+            f"{len(outside)} trajectory initial states are outside the StarV grid; "
+            f"first indices: {preview}"
+        )
+
+
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    """argv=None reads sys.argv (normal CLI use); pass an explicit list to
+    call this programmatically, e.g. from a notebook: parse_args(["--env",
+    "cartpole", "--variant", "saliency"])."""
     p = argparse.ArgumentParser(description="Generate two trajectory-vs-reachable-tube figures for multiple environments.")
 
     p.add_argument("--env", choices=["cartpole", "mountain_car", "pendulum"], default=None)
@@ -136,21 +162,21 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--init-source", choices=["auto", "states", "traj"], default="auto")
     p.add_argument("--only-in-grid", action="store_true")
     p.add_argument("--plot-dims", type=int, nargs=2, default=None,
-                   help="Two state dimensions to plot. Defaults by env: mountain_car/pendulum=0 1, cartpole=2 3.")
+                   help="Two state dimensions to plot. Defaults by env: mountain_car/pendulum=0 1, cartpole=0 2.")
     p.add_argument("--check-dims", type=int, nargs="+", default=None,
-                   help="State dimensions used for containment checking. Default by env; for cartpole default is 0 1. Example: --check-dims 0 1")
+                   help="State dimensions used for containment checking. Default by env; for cartpole default is 0 2. Example: --check-dims 0 2")
     p.add_argument("--max-steps", type=int, default=None,
                    help="Maximum transition steps to compare. Example: --max-steps 20 checks states t=0..20.")
     p.add_argument("--print-keys", action="store_true")
 
-    return p.parse_args()
+    return p.parse_args(argv)
 
 
 def resolve_paths_and_defaults(args: argparse.Namespace) -> None:
     """
     Fixed layout (see readme "数据文件" / "StarV 验证"):
       results/<env>/safety_result.json
-      datasets/<env>/data/<dataset_name>/{states,real_trajectories,dwm_trajectories_<variant>}.npz
+      datasets/<env>/data/<dataset_name>/{starv_states,real_trajectories,dwm_trajectories_<variant>}.npz
     --safety/--real/--dwm/--states always win when passed explicitly.
     """
     root = Path.cwd()
@@ -163,7 +189,7 @@ def resolve_paths_and_defaults(args: argparse.Namespace) -> None:
         if args.real is None:
             args.real = data_dir / "real_trajectories.npz"
         if args.states is None:
-            default_states = data_dir / "states.npz"
+            default_states = data_dir / "starv_states.npz"
             if default_states.exists():
                 args.states = default_states
         if args.dwm is None:
@@ -209,9 +235,10 @@ def default_check_dims(env_name: Optional[str], grid) -> Optional[tuple]:
     return None
 
 
-def main() -> None:
-    args = parse_args()
-
+def run(args: argparse.Namespace) -> None:
+    """The actual work, taking an already-parsed/built Namespace. Call this
+    directly (e.g. from a notebook) with args built via parse_args([...]) to
+    avoid going through sys.argv."""
     if args.delta is not None:
         args.real_delta = args.delta
         args.dwm_delta = args.delta
@@ -240,8 +267,6 @@ def main() -> None:
         requested_check_dims = default_check_dims(args.env, grid)
     active_check_dims = normalize_check_dims(requested_check_dims, grid)
 
-    metadata = load_metadata(args.real, args.dwm, args.states)
-
     real_key = args.real_key or default_key(args.split, "traj")
     dwm_key = args.dwm_key or default_key(args.split, "traj")
 
@@ -258,12 +283,21 @@ def main() -> None:
     if dwm_traj.shape[2] < grid.ndim:
         raise ValueError(f"dwm trajectory dim {dwm_traj.shape[2]} < grid dim {grid.ndim}")
 
-    real_init, real_init_source = choose_init_states(
-        real_traj, states_arr, args.init_source, metadata=metadata, env_name=args.env
-    )
-    dwm_init, dwm_init_source = choose_init_states(
-        dwm_traj, states_arr, args.init_source, metadata=metadata, env_name=args.env
-    )
+    if args.init_source == "states" and states_arr is None:
+        raise ValueError("--init-source states requested, but starv_states.npz was not provided")
+
+    if args.init_source == "traj" or states_arr is None:
+        shared_init = validate_trajectory_initial_states(real_traj[:, 0, :], real_traj, dwm_traj)
+        init_source = "real_traj[:,0,:]"
+    else:
+        shared_init = validate_trajectory_initial_states(states_arr, real_traj, dwm_traj)
+        init_source = "starv_states.npz"
+
+    real_init = shared_init
+    dwm_init = shared_init
+    real_init_source = init_source
+    dwm_init_source = init_source
+    validate_states_in_grid(shared_init, grid)
 
     print("========== Loaded ==========")
     print(f"env        : {args.env}")
@@ -348,6 +382,10 @@ def main() -> None:
 
     print(f"[Saved] {args.outdir / 'real_vs_reachable_tube_examples.png'}")
     print(f"[Saved] {args.outdir / 'dwm_vs_reachable_tube_examples.png'}")
+
+
+def main(argv: Optional[List[str]] = None) -> None:
+    run(parse_args(argv))
 
 
 if __name__ == "__main__":

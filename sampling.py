@@ -12,9 +12,9 @@ from model import *
 from dynamic import *
 from utils import (
     load_config,
-    set_seed,
     resolve_device,
-    sample_uniform_states,
+    load_state_splits,
+    starv_states_path,
     render_images,
     to_numpy,
 )
@@ -62,19 +62,16 @@ def load_decoder(config, device):
 
 
 def build_initial_state_splits(config, device):
-    set_seed(int(config["seed_train"]))
-    train_states = sample_uniform_states(int(config["num_train"]), config["state_space"], device)
-
-    set_seed(int(config["seed_val"]))
-    val_states = sample_uniform_states(int(config["num_val"]), config["state_space"], device)
-
-    set_seed(int(config["seed_test"]))
-    test_states = sample_uniform_states(int(config["num_test"]), config["state_space"], device)
-
+    starv_config_path = config.get("starv_config")
+    if not starv_config_path:
+        raise KeyError("sampling config must define 'starv_config'")
+    starv_config = load_config(starv_config_path)
+    path = starv_states_path(starv_config)
+    saved = load_state_splits(path, device)
+    print(f"[Load] starv states={path}")
     return {
-        "train": train_states,
-        "val": val_states,
-        "test": test_states,
+        split: saved[f"{split}_states"]
+        for split in ("train", "val", "test")
     }
 
 

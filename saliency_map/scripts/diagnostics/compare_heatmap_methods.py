@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 import sys
 from pathlib import Path
@@ -16,108 +15,17 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch.nn.functional as F
 
-from model import Controller
-
-
-def load_json(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def load_state_dict(path, device):
-    try:
-        return torch.load(path, map_location=device, weights_only=True)
-    except TypeError:
-        return torch.load(path, map_location=device)
-
-
-def build_controller(config, device):
-    controller_cfg = config["controller"]
-    name = controller_cfg.get("name", "Controller")
-    if name != "Controller":
-        raise ValueError(f"Unsupported controller class: {name}")
-
-    controller = Controller(**controller_cfg.get("args", {})).to(device).eval()
-    controller.load_state_dict(load_state_dict(controller_cfg["weights"], device))
-    return controller
-
-
-def normalize_per_image(heatmaps):
-    flat = heatmaps.flatten(1)
-    lo = flat.min(dim=1).values.view(-1, 1, 1, 1)
-    hi = flat.max(dim=1).values.view(-1, 1, 1, 1)
-    return ((heatmaps - lo) / (hi - lo).clamp_min(1e-12)).clamp(0.0, 1.0)
-
-
-def vanilla_gradient(controller, images):
-    x = images.detach().clone().requires_grad_(True)
-    actions = controller(x)
-    grads = torch.autograd.grad(actions.sum(), x)[0]
-    return grads.abs().detach(), actions.detach()
-
-
-def smoothgrad(controller, images, samples=16, noise_std=0.12, square=True):
-    x0 = images.detach()
-    heat = torch.zeros_like(x0)
-    for _ in range(samples):
-        x = (x0 + noise_std * torch.randn_like(x0)).clamp(0.0, 1.0).requires_grad_(True)
-        score = controller(x).sum()
-        grads = torch.autograd.grad(score, x)[0]
-        heat = heat + (grads.square() if square else grads.abs())
-    return (heat / samples).detach(), controller(images).detach()
-
-
-def integrated_gradients(controller, images, steps=32, baseline_value=1.0, square=True):
-    x0 = images.detach()
-    baseline = torch.full_like(x0, baseline_value)
-    diff = x0 - baseline
-    total = torch.zeros_like(x0)
-    for alpha in torch.linspace(1.0 / steps, 1.0, steps, device=images.device):
-        x = (baseline + alpha * diff).requires_grad_(True)
-        score = controller(x).sum()
-        grads = torch.autograd.grad(score, x)[0]
-        total = total + grads
-    attr = diff * total / steps
-    return (attr.square() if square else attr.abs()).detach(), controller(images).detach()
-
-
-def gradcam(controller, images, layer_name="conv2"):
-    features = {}
-    layer = getattr(controller, layer_name)
-
-    def hook(_module, _inputs, output):
-        features["activation"] = output
-
-    handle = layer.register_forward_hook(hook)
-    try:
-        x = images.detach().clone().requires_grad_(True)
-        actions = controller(x)
-        activation = features["activation"]
-        grads = torch.autograd.grad(actions.sum(), activation)[0]
-        weights = grads.mean(dim=(2, 3), keepdim=True)
-        cam = F.relu((weights * activation).sum(dim=1, keepdim=True))
-        cam = F.interpolate(cam, size=images.shape[-2:], mode="bilinear", align_corners=False)
-        return cam.detach(), actions.detach()
-    finally:
-        handle.remove()
-
-
-@torch.no_grad()
-def occlusion(controller, images, patch=8, stride=4, fill=1.0):
-    base_actions = controller(images)
-    heat = torch.zeros_like(images)
-    counts = torch.zeros_like(images)
-    _, _, height, width = images.shape
-    for y in range(0, height - patch + 1, stride):
-        for x0 in range(0, width - patch + 1, stride):
-            occluded = images.clone()
-            occluded[:, :, y : y + patch, x0 : x0 + patch] = fill
-            delta = (controller(occluded) - base_actions).abs().view(-1, 1, 1, 1)
-            heat[:, :, y : y + patch, x0 : x0 + patch] += delta
-            counts[:, :, y : y + patch, x0 : x0 + patch] += 1.0
-    return (heat / counts.clamp_min(1.0)).detach(), base_actions.detach()
+from saliency_map.methods import (
+    build_controller,
+    gradcam,
+    integrated_gradients,
+    load_json,
+    normalize_per_image,
+    occlusion,
+    smoothgrad,
+    vanilla_gradient,
+)
 
 
 def compute_methods(controller, images, args):
@@ -181,7 +89,7 @@ def save_overlay_grid(images, actions, outputs, output_path, alpha, title):
     plt.close(fig)
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
@@ -193,7 +101,7 @@ def parse_args():
         "--dataset",
         type=Path,
         default=None,
-        help="Defaults to <config output_dir>/states.npz.",
+        help="Defaults to <config output_dir>/decoder_states.npz.",
     )
     parser.add_argument("--image-key", default="train_images")
     parser.add_argument("--num-images", type=int, default=10)
@@ -206,7 +114,7 @@ def parse_args():
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("saliency_map/output/diagnostics/previews"),
+        default=Path("saliency_map/output/previews"),
     )
     parser.add_argument(
         "--output-name",
@@ -214,17 +122,16 @@ def parse_args():
         help="Defaults to <config-stem>_saliency_methods.png.",
     )
     parser.add_argument("--seed", type=int, default=0)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main():
-    args = parse_args()
+def run(args):
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     device = torch.device("cpu")
 
     config = load_json(args.config)
-    dataset_path = args.dataset or (Path(config["output_dir"]) / "states.npz")
+    dataset_path = args.dataset or (Path(config["output_dir"]) / "decoder_states.npz")
     data = np.load(dataset_path)
     images = torch.from_numpy(data[args.image_key][: args.num_images]).float().to(device)
 
@@ -247,6 +154,10 @@ def main():
 
     print(f"[saved] {output_path}")
     print("[actions]", actions.detach().cpu().numpy().reshape(-1).round(6).tolist())
+
+
+def main():
+    run(parse_args())
 
 
 if __name__ == "__main__":

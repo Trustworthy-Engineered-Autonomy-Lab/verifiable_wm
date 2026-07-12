@@ -1,18 +1,9 @@
 {
   "dataset_name": "dataset_v1",
-  "seed_train": 2025,
-  "seed_val": 2026,
-  "seed_test": 2027,
-  "num_train": 1600,
-  "num_val": 400,
-  "num_test": 400,
   "rollout_steps": 30,
   "device": "auto",
   "render_batch_size": 64,
-  "state_space": [
-    {"name": "position", "low": -1.2, "high": 0.6},
-    {"name": "velocity", "low": -0.07, "high": 0.07}
-  ],
+  "starv_config": "config/starv_verification/mountain_car.json",
   "decoder": {
     "name": "Decoder",
     "weights": "/home/tealab_shared/starv/weights/mountain_car/decoder_mc.pth"

@@ -15,6 +15,9 @@ from utils import (
     set_seed,
     resolve_device,
     sample_uniform_states,
+    sample_starv_state_splits,
+    save_state_splits,
+    starv_states_path,
     render_images,
     to_numpy,
 )
@@ -84,7 +87,7 @@ def save_dataset(config, splits):
     for split_name, states in splits.items():
         arrays[split_name] = to_numpy(states)
 
-    np.savez_compressed(output_dir / "states.npz", **arrays)
+    np.savez_compressed(output_dir / "decoder_states.npz", **arrays)
 
     with (output_dir / "metadata.json").open("w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
@@ -102,6 +105,13 @@ def save_real_trajectories(config, trajectory_splits):
         arrays[f"{split_name}_actions"] = to_numpy(split_data["actions"])
 
     np.savez_compressed(output_dir / "real_trajectories.npz", **arrays)
+
+
+def load_starv_config(config):
+    starv_config_path = config.get("starv_config")
+    if not starv_config_path:
+        raise KeyError("make_decoder_dataset config must define 'starv_config'")
+    return load_config(starv_config_path)
 
 
 def select_decoder_states(states, config):
@@ -132,7 +142,7 @@ def rollout_real_trajectory(states0, steps, controller, dynamic, device, render_
     return trajectories, actions
 
 
-def generate_dataset(config):
+def generate_dataset(config, starv_only=False):
     device = resolve_device(config.get("device", "auto"))
     controller = load_controller(config, device)
     steps = int(config["rollout_steps"])
@@ -141,22 +151,27 @@ def generate_dataset(config):
     dynamic = globals()[config["dynamic"]["name"]](**config["dynamic"].get("args", {}))
     print(f"[Dynamic] {config['dynamic']['name']}")
 
-    state_splits = build_initial_state_splits(config, device)
+    if not starv_only:
+        state_splits = build_initial_state_splits(config, device)
+        dataset = {}
+        for split_name in ("train_states", "val_states", "test_states"):
+            states = state_splits[split_name]
+            images = render_images(dynamic, states, device, render_batch_size)
+            prefix = split_name.replace("_states", "")
+            dataset[f"{prefix}_states"] = select_decoder_states(states, config)
+            dataset[f"{prefix}_images"] = images
+            print(f"[Render] {prefix}: states={tuple(states.shape)}, images={tuple(images.shape)}")
+        save_dataset(config, dataset)
 
-    dataset = {}
+    starv_config = load_starv_config(config)
+    starv_state_splits = sample_starv_state_splits(starv_config, device)
+    starv_path = starv_states_path(starv_config)
+    save_state_splits(starv_path, starv_state_splits)
+    print(f"[Saved] starv states={starv_path}")
+
     trajectory_splits = {}
-    for split_name in ("train_states", "val_states", "test_states"):
-        states = state_splits[split_name]
-        images = render_images(dynamic, states, device, render_batch_size)
-
+    for split_name, states in starv_state_splits.items():
         prefix = split_name.replace("_states", "")
-        decoder_states = select_decoder_states(states, config)
-
-        dataset[f"{prefix}_states"] = decoder_states
-        dataset[f"{prefix}_images"] = images
-
-        print(f"[Render] {prefix}: states={tuple(states.shape)}, images={tuple(images.shape)}")
-
         traj, actions = rollout_real_trajectory(
             states,
             steps,
@@ -176,18 +191,22 @@ def generate_dataset(config):
             f"actions={tuple(actions.shape)}"
         )
 
-    output_dir = save_dataset(config, dataset)
     save_real_trajectories(config, trajectory_splits)
-    return output_dir
+    return Path(config["output_dir"])
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("config", type=Path)
+    parser.add_argument(
+        "--starv-only",
+        action="store_true",
+        help="Only regenerate the StarV-aligned outputs (starv_states.npz + real_trajectories.npz) without rewriting decoder training data.",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
-    output_dir = generate_dataset(config)
+    output_dir = generate_dataset(config, starv_only=args.starv_only)
     print(f"[Done] decoder dataset saved to {output_dir}")
 
 

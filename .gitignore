@@ -14,15 +14,8 @@ report/
 *.pth
 *.pdf
 chat_history_exports
-saliency_map/output/**
-!saliency_map/output/
-!saliency_map/output/**/
-!saliency_map/output/**/.gitkeep
+saliency_map/output/
 *.png
-.gitkeep
-!saliency_map/output/**/.gitkeep
-!saliency_map/scripts/.gitkeep
-!saliency_map/scripts/diagnostics/.gitkeep
 settings.json
 metrics.json
 dwm_weight/now_weight/cartpole/intensity/metrics.json
