@@ -16,6 +16,7 @@
     "name": "Decoder",
     "variant": "intensity",
     "weights": {
+      "old": "/home/tealab_shared/starv/weights/cartpole/decoder_cp.pth",
       "intensity": "dwm_weight/now_weight/cartpole/intensity/decoder_best_total.pth",
       "saliency": "dwm_weight/now_weight/cartpole/saliency/decoder_best_total.pth"
     }

@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 from pathlib import Path
 
@@ -88,10 +87,6 @@ def save_dataset(config, splits):
         arrays[split_name] = to_numpy(states)
 
     np.savez_compressed(output_dir / "decoder_states.npz", **arrays)
-
-    with (output_dir / "metadata.json").open("w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2)
-
     return output_dir
 
 
