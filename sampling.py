@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 from pathlib import Path
 
@@ -12,10 +11,10 @@ from model import *
 from dynamic import *
 from utils import (
     load_config,
-    set_seed,
     resolve_device,
-    sample_uniform_states,
-    render_images,  
+    load_state_splits,
+    starv_states_path,
+    render_images,
     to_numpy,
 )
 
@@ -47,33 +46,43 @@ def load_controller(config, device):
     return controller
 
 
+def decoder_variant(config):
+    return config["decoder"].get("variant", "old")
+
+
+def resolve_decoder_weights(config):
+    weights = config["decoder"]["weights"]
+    if isinstance(weights, dict):
+        weights = weights[decoder_variant(config)]
+    return str(weights)
+
+
 def load_decoder(config, device):
     decoder_config = config["decoder"]
     decoder_name = decoder_config["name"]
     decoder_cls = globals()[decoder_name]
     decoder_args = decoder_config.get("args", {})
 
-    decoder = decoder_cls(**decoder_args).to(device).eval()
-    decoder.load_state_dict(load_state_dict(decoder_config["weights"], device))
+    weights = resolve_decoder_weights(config)
 
-    print(f"[Load] {decoder_name}={decoder_config['weights']}")
+    decoder = decoder_cls(**decoder_args).to(device).eval()
+    decoder.load_state_dict(load_state_dict(weights, device))
+
+    print(f"[Load] {decoder_name}[{decoder_variant(config)}]={weights}")
     return decoder
 
 
 def build_initial_state_splits(config, device):
-    set_seed(int(config["seed_train"]))
-    train_states = sample_uniform_states(int(config["num_train"]), config["state_space"], device)
-
-    set_seed(int(config["seed_val"]))
-    val_states = sample_uniform_states(int(config["num_val"]), config["state_space"], device)
-
-    set_seed(int(config["seed_test"]))
-    test_states = sample_uniform_states(int(config["num_test"]), config["state_space"], device)
-
+    starv_config_path = config.get("starv_config")
+    if not starv_config_path:
+        raise KeyError("sampling config must define 'starv_config'")
+    starv_config = load_config(starv_config_path)
+    path = starv_states_path(starv_config)
+    saved = load_state_splits(path, device)
+    print(f"[Load] starv states={path}")
     return {
-        "train": train_states,
-        "val": val_states,
-        "test": test_states,
+        split: saved[f"{split}_states"]
+        for split in ("train", "val", "test")
     }
 
 
@@ -114,18 +123,59 @@ def save_dataset(config, dataset):
         arrays[f"{split_name}_next_states"] = to_numpy(split_data["next_states"])
 
     np.savez_compressed(output_dir / "transition_dataset.npz", **arrays)
-
     return output_dir
 
 
-def save_metadata(config):
+def save_dwm_trajectories(config, trajectory_splits):
     output_dir = Path(config["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    with (output_dir / "metadata.json").open("w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2)
+    arrays = {}
+    for split_name, split_data in trajectory_splits.items():
+        arrays[f"{split_name}_traj"] = to_numpy(split_data["traj"])
+        arrays[f"{split_name}_actions"] = to_numpy(split_data["actions"])
 
-    return output_dir
+    # 溯源信息直接存进 npz（同 saliency_occlusion.npz 的做法）：消融会反复覆盖
+    # 同名文件，只有文件内部记录才说得清当前这份是哪个 checkpoint 跑出来的
+    arrays["variant"] = np.array(decoder_variant(config))
+    arrays["decoder_weights"] = np.array(resolve_decoder_weights(config))
+
+    output_path = output_dir / f"dwm_trajectories_{decoder_variant(config)}.npz"
+    np.savez_compressed(output_path, **arrays)
+    print(f"[Saved] {output_path} (decoder={arrays['decoder_weights']})")
+
+
+@torch.no_grad()
+def rollout_dwm_trajectory(
+    states0,
+    steps,
+    decoder,
+    controller,
+    dynamic,
+    device,
+    decoder_state_indices=None,
+):
+    num_samples, state_dim = states0.shape
+    trajectories = torch.empty(num_samples, steps + 1, state_dim, device=device)
+    action_steps = []
+
+    states = states0.clone()
+    trajectories[:, 0, :] = states
+
+    for step in range(steps):
+        decoder_states = states
+        if decoder_state_indices is not None:
+            decoder_states = states[:, decoder_state_indices]
+
+        images = decoder(decoder_states)
+        actions = controller(images)
+        states = dynamic.step(states, actions)
+
+        action_steps.append(actions)
+        trajectories[:, step + 1, :] = states
+
+    actions = torch.stack(action_steps, dim=1)
+    return trajectories, actions
 
 
 def save_dwm_trajectories(config, trajectory_splits):
@@ -180,8 +230,6 @@ def generate_dataset(config):
 
     steps = int(config["rollout_steps"])
     render_batch_size = int(config.get("render_batch_size", 64))
-    generate_transition_dataset = bool(config.get("generate_transition_dataset", False))
-    should_save_metadata = bool(config.get("save_metadata", False))
     decoder_state_indices = config.get(
         "decoder_state_indices",
         config["decoder"].get("state_indices"),
@@ -192,34 +240,32 @@ def generate_dataset(config):
 
     initial_splits = build_initial_state_splits(config, device)
 
-    dataset = {}
+    # transition_dataset.npz 生成已停用：(s,a,s') 单步转移对是给 learned dynamics 用的，
+    # 当前 pipeline 的 dynamics 是解析已知的（dynamic.py），全仓库没有下游消费者，
+    # 而它的真实渲染是 sampling 里最慢的部分。以后要做 learned dynamics 实验时，
+    # 取消本函数里相关注释即可恢复（rollout_transition / save_dataset 都还保留着）。
+    # dataset = {}
     trajectory_splits = {}
-    if not generate_transition_dataset:
-        print("[Skip] transition dataset generation is disabled")
-
     for split_name, states0 in initial_splits.items():
-        if generate_transition_dataset:
-            states, actions, next_states = rollout_transition(
-                states0,
-                steps,
-                controller,
-                dynamic,
-                device,
-                render_batch_size,
-            )
-
-            dataset[split_name] = {
-                "states": states,
-                "actions": actions,
-                "next_states": next_states,
-            }
-
-            print(
-                f"[Rollout] {split_name}: "
-                f"states={tuple(states.shape)}, "
-                f"actions={tuple(actions.shape)}, "
-                f"next_states={tuple(next_states.shape)}"
-            )
+        # states, actions, next_states = rollout_transition(
+        #     states0,
+        #     steps,
+        #     controller,
+        #     dynamic,
+        #     device,
+        #     render_batch_size,
+        # )
+        # dataset[split_name] = {
+        #     "states": states,
+        #     "actions": actions,
+        #     "next_states": next_states,
+        # }
+        # print(
+        #     f"[Rollout] {split_name}: "
+        #     f"states={tuple(states.shape)}, "
+        #     f"actions={tuple(actions.shape)}, "
+        #     f"next_states={tuple(next_states.shape)}"
+        # )
 
         traj, dwm_actions = rollout_dwm_trajectory(
             states0,
@@ -241,17 +287,9 @@ def generate_dataset(config):
             f"actions={tuple(dwm_actions.shape)}"
         )
 
+    # output_dir = save_dataset(config, dataset)
     output_dir = Path(config["output_dir"])
-    if generate_transition_dataset:
-        output_dir = save_dataset(config, dataset)
-
     save_dwm_trajectories(config, trajectory_splits)
-
-    if should_save_metadata:
-        save_metadata(config)
-    else:
-        print("[Skip] metadata generation is disabled")
-
     return output_dir
 
 
@@ -259,29 +297,29 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "configs",
-        nargs="*",
+        nargs="+",
         type=Path,
-        help="Config JSON files. If omitted, all local make_dataset configs are used.",
+        help="Config JSON files.",
+    )
+    parser.add_argument(
+        "--decoder-variant",
+        default=None,
+        help="Which decoder weights to roll out with (old / intensity / saliency). "
+        "Overrides the config's decoder.variant.",
     )
     return parser.parse_args()
 
 
-def resolve_config_path(path):
-    if path.is_absolute() or path.exists():
-        return path
-    return PROJECT_ROOT / path
-
-
 def main():
     args = parse_args()
-    config_paths = args.configs or DEFAULT_CONFIGS
 
-    for config_path in config_paths:
-        config_path = resolve_config_path(config_path)
+    for config_path in args.configs:
         print(f"[Config] {config_path}")
         config = load_config(config_path)
+        if args.decoder_variant is not None:
+            config["decoder"]["variant"] = args.decoder_variant
         output_dir = generate_dataset(config)
-        print(f"[Done] sampling outputs saved to {output_dir}")
+        print(f"[Done] dwm trajectories saved to {output_dir}")
 
 
 if __name__ == "__main__":

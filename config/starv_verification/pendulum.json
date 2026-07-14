@@ -3,7 +3,7 @@
         "Decoder" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "/home/tealab_shared/starv/weights/pendulum/decoder_pen.pth"
+                "weights" : "dwm_weight/now_weight/pendulum/saliency/decoder_best_total.pth"
             }
         },
         "Controller" : {
@@ -20,8 +20,7 @@
         "kwargs": {
             "goal_angle_threshold": 0.15,
             "num_steps": 30,
-            "early_stop": false,
-            "save_history": true
+            "early_stop": true
         }
     },
     "grid": {
@@ -40,5 +39,14 @@
             }
         ]
     },
-    "output_prefix": "/home/UFAD/yanru.li/projects/verifiable_wm/results/pendulum/safety_result_cell_100"
+    "starv_states": {
+        "num_train": 1600,
+        "num_val": 400,
+        "num_test": 400,
+        "seed_train": 2025,
+        "seed_val": 2026,
+        "seed_test": 2027,
+        "output_file": "datasets/pendulum/data/dataset_v1/starv_states.npz"
+    },
+    "output_prefix": "results/pendulum/safety_result"
 }

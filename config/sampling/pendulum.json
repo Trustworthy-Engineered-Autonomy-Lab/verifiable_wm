@@ -1,23 +1,10 @@
 {
   "env": "pendulum",
   "dataset_name": "dataset_v1",
-  "seed_pool": 2024,
-  "seed_train": 2025,
-  "seed_val": 2026,
-  "seed_test": 2027,
-  "num_pool": 2000,
-  "num_train": 1600,
-  "num_val": 400,
-  "num_test": 400,
   "rollout_steps": 30,
   "device": "auto",
   "render_batch_size": 64,
-  "generate_transition_dataset": false,
-  "save_metadata": false,
-  "state_space": [
-    {"name": "theta", "low": 1.0, "high": 1.1},
-    {"name": "omega", "low": 4.5, "high": 4.6}
-  ],
+  "starv_config": "config/starv_verification/pendulum.json",
   "controller": {
     "name": "Controller",
     "weights": "/home/tealab_shared/starv/weights/pendulum/controller_pen.pth",
@@ -27,7 +14,12 @@
   },
   "decoder": {
     "name": "Decoder",
-    "weights": "/home/tealab_shared/starv/weights/pendulum/decoder_pen.pth"
+    "variant": "saliency",
+    "weights": {
+      "old": "/home/tealab_shared/starv/weights/pendulum/decoder_pen.pth",
+      "intensity": "dwm_weight/now_weight/pendulum/intensity/decoder_best_total.pth",
+      "saliency": "dwm_weight/now_weight/pendulum/saliency/decoder_best_total.pth"
+    }
   },
   "dynamic": {
     "name": "Pendulum"

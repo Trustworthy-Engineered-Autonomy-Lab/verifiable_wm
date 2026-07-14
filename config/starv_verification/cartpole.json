@@ -3,7 +3,7 @@
         "Decoder" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "/home/UFAD/yanru.li/projects/verifiable_wm/weight_decoder/cartpole/cartpole_a8_lamda01.pth"
+                "weights" : "dwm_weight/now_weight/cartpole/saliency/decoder_best_total.pth"
             }
         },
         "Controller" : {
@@ -21,8 +21,7 @@
         "kwargs": {
             "goal_angle_threshold" : 0.209,
             "num_steps": 30,
-            "early_stop": false,
-            "save_history": true
+            "early_stop": false
         }
     },
     "grid": {
@@ -53,5 +52,14 @@
             }
         ]
     },
-    "output_prefix": "/home/UFAD/yanru.li/projects/verifiable_wm/results/cartpole/safety_result_cell_100"
+    "starv_states": {
+        "num_train": 1600,
+        "num_val": 400,
+        "num_test": 400,
+        "seed_train": 2025,
+        "seed_val": 2026,
+        "seed_test": 2027,
+        "output_file": "datasets/cartpole/data/dataset_v1/starv_states.npz"
+    },
+    "output_prefix": "results/cartpole/safety_result"
 }

@@ -12,6 +12,7 @@
   "rollout_steps": 30,
   "device": "auto",
   "render_batch_size": 64,
+  "starv_config": "config/starv_verification/pendulum.json",
   "state_space": [
     {"name": "theta", "low": 1.0, "high": 1.1},
     {"name": "omega", "low": 4.5, "high": 4.6}
@@ -22,10 +23,6 @@
     "args": {
       "activation": "tanh"
     }
-  },
-  "decoder": {
-    "name": "Decoder",
-    "weights": "/home/tealab_shared/starv/weights/pendulum/decoder_pen.pth"
   },
   "dynamic": {
     "name": "Pendulum"
