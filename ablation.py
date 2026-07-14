@@ -563,3 +563,158 @@ def pivot_metric(
         .sort_index()
         .sort_index(axis=1)
     )
+
+
+def _rooted(repo_root: Path, path: str | Path) -> Path:
+    path = Path(path)
+    return path if path.is_absolute() else repo_root / path
+
+
+def compare_with_mainline(
+    experiment: Experiment,
+    *,
+    repo_root: Path = Path("."),
+    real_path: Path | None = None,
+) -> pd.DataFrame:
+    repo_root = Path(repo_root)
+    if real_path is None:
+        real_path = repo_root / (
+            f"datasets/{experiment.env}/data/dataset_v1/real_trajectories.npz"
+        )
+    selected = build_combined_metrics(
+        experiment.env,
+        experiments=[experiment],
+        real_path=real_path,
+    ).assign(source="selected")
+
+    train_config = load_config(
+        repo_root
+        / "config/train_decoder"
+        / experiment.env
+        / "saliency.json"
+    )
+    metrics_path = _rooted(repo_root, train_config["output_dir"]) / "metrics.json"
+    if not metrics_path.exists():
+        raise FileNotFoundError(f"missing mainline metrics: {metrics_path}")
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    best_epoch = int(metrics["best_epoch"])
+    try:
+        validation = next(
+            record
+            for record in metrics["history"]
+            if int(record["epoch"]) == best_epoch
+        )
+    except StopIteration as exc:
+        raise ValueError(f"best epoch {best_epoch} is absent from {metrics_path}") from exc
+
+    sampling_config = load_config(
+        repo_root / "config/sampling" / f"{experiment.env}.json"
+    )
+    trajectory_path = (
+        _rooted(repo_root, sampling_config["output_dir"])
+        / "dwm_trajectories_saliency.npz"
+    )
+    if not trajectory_path.exists():
+        raise FileNotFoundError(f"missing mainline trajectory: {trajectory_path}")
+
+    base = {
+        "env": experiment.env,
+        "alpha": float(train_config["weight"]["alpha"]),
+        "lambda_ctrl": float(train_config["lambda_ctrl"]),
+        "seed": int(train_config["training"]["seed"]),
+        "best_epoch": best_epoch,
+        "source": "mainline",
+    }
+    mainline_rows = []
+    circular_dims = (0,) if experiment.env == "pendulum" else ()
+    with np.load(real_path, allow_pickle=False) as real_data, np.load(
+        trajectory_path,
+        allow_pickle=False,
+    ) as dwm_data:
+        for split in ("val", "test"):
+            single_frame = (
+                {
+                    "ctrl_mse": float(validation["val_ctrl_mse"]),
+                    "pixel_mse": float(validation["val_pixel_mse"]),
+                }
+                if split == "val"
+                else {
+                    "ctrl_mse": float(metrics["test"]["ctrl_mse"]),
+                    "pixel_mse": float(metrics["test"]["pixel_mse"]),
+                }
+            )
+            mainline_rows.append(
+                {
+                    **base,
+                    "split": split,
+                    **single_frame,
+                    **compute_l2_metrics(
+                        real_data[f"{split}_traj"],
+                        dwm_data[f"{split}_traj"],
+                        circular_dims=circular_dims,
+                    ),
+                }
+            )
+
+    mainline = pd.DataFrame(mainline_rows)
+    columns = ["source", *(column for column in selected.columns if column != "source")]
+    return pd.concat([selected, mainline], ignore_index=True).loc[:, columns]
+
+
+def promote_mainline(
+    experiment: Experiment,
+    *,
+    force: bool = False,
+    repo_root: Path = Path("."),
+    trainer=None,
+    mainline_runner=None,
+) -> dict:
+    if not force:
+        raise ValueError("Mainline promotion requires force=True")
+
+    trained, training_reason = validate_training_artifacts(experiment)
+    rolled, rollout_reason = validate_rollout_artifact(experiment)
+    if not trained or not rolled:
+        raise RuntimeError(
+            "incomplete source: "
+            f"training={training_reason}, rollout={rollout_reason}"
+        )
+
+    repo_root = Path(repo_root)
+    train_json = (
+        repo_root
+        / "config/train_decoder"
+        / experiment.env
+        / "saliency.json"
+    )
+    config = load_config(train_json)
+    changed = (
+        float(config["weight"]["alpha"]) != experiment.alpha
+        or float(config["lambda_ctrl"]) != experiment.lambda_ctrl
+    )
+    if changed:
+        config["weight"]["alpha"] = experiment.alpha
+        config["lambda_ctrl"] = experiment.lambda_ctrl
+        train_json.write_text(
+            json.dumps(config, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+    canonical_config = copy.deepcopy(config)
+    canonical_config["training"]["seed"] = experiment.seed
+    canonical_config["output_dir"] = (
+        Path("dwm_weight/now_weight") / experiment.env / "saliency"
+    ).as_posix()
+    set_seed(experiment.seed)
+    train_fn = trainer or td.train
+    train_fn(
+        canonical_config,
+        resolve_device(canonical_config.get("device", "auto")),
+    )
+    rollout_fn = mainline_runner or run_mainline_rollouts
+    rollout_frame = rollout_fn(
+        experiment.env,
+        variants=("saliency",),
+        skip_existing=False,
+    )
+    return {"config_changed": changed, "rollout": rollout_frame}

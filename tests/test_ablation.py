@@ -22,6 +22,7 @@ from ablation import (
     run_rollout_grid,
     run_training_grid,
     pivot_metric,
+    promote_mainline,
     validate_rollout_artifact,
     validate_training_artifacts,
     write_summary_tables,
@@ -424,6 +425,153 @@ class L2MetricTests(unittest.TestCase):
 
         self.assertEqual(pivot.index.tolist(), [1.0, 2.0])
         self.assertEqual(pivot.columns.tolist(), [0.1])
+
+
+class PromotionTests(unittest.TestCase):
+    def _write_repo_configs(self, root, alpha, lambda_ctrl):
+        train_path = root / "config/train_decoder/pendulum/saliency.json"
+        sampling_path = root / "config/sampling/pendulum.json"
+        starv_path = root / "config/starv_verification/pendulum.json"
+        train_path.parent.mkdir(parents=True)
+        sampling_path.parent.mkdir(parents=True)
+        starv_path.parent.mkdir(parents=True)
+        train_path.write_text(
+            json.dumps(
+                {
+                    "weight_mode": "saliency",
+                    "weight": {"alpha": alpha},
+                    "lambda_ctrl": lambda_ctrl,
+                    "training": {"seed": 2025},
+                    "device": "cpu",
+                    "output_dir": "dwm_weight/now_weight/pendulum/saliency",
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        sampling_path.write_text(
+            json.dumps(
+                {
+                    "decoder": {
+                        "weights": {
+                            "saliency": (
+                                "dwm_weight/now_weight/pendulum/saliency/"
+                                "decoder_best_total.pth"
+                            )
+                        }
+                    }
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        starv_path.write_text(
+            json.dumps(
+                {
+                    "layers": {
+                        "Decoder": {
+                            "kwargs": {
+                                "weights": (
+                                    "dwm_weight/now_weight/pendulum/saliency/"
+                                    "decoder_best_total.pth"
+                                )
+                            }
+                        }
+                    }
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return train_path, sampling_path, starv_path
+
+    def test_promotion_requires_force(self):
+        experiment = Experiment("pendulum", 4.0, 0.05, 2025)
+
+        with self.assertRaisesRegex(ValueError, "force=True"):
+            promote_mainline(experiment, force=False)
+
+    def test_same_hyperparameters_do_not_rewrite_training_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            train_path, _, _ = self._write_repo_configs(root, 8.0, 0.1)
+            before = train_path.read_bytes()
+            experiment = Experiment(
+                "pendulum",
+                8.0,
+                0.1,
+                2025,
+                root / "weights",
+            )
+            trainer = mock.Mock()
+            mainline_runner = mock.Mock(
+                return_value=pd.DataFrame([{"status": "generated"}])
+            )
+            with mock.patch(
+                "ablation.validate_training_artifacts",
+                return_value=(True, "complete"),
+            ), mock.patch(
+                "ablation.validate_rollout_artifact",
+                return_value=(True, "complete"),
+            ):
+                result = promote_mainline(
+                    experiment,
+                    force=True,
+                    repo_root=root,
+                    trainer=trainer,
+                    mainline_runner=mainline_runner,
+                )
+
+            self.assertFalse(result["config_changed"])
+            self.assertEqual(train_path.read_bytes(), before)
+            trainer.assert_called_once()
+            mainline_runner.assert_called_once()
+
+    def test_changed_hyperparameters_update_only_train_json_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            train_path, sampling_path, starv_path = self._write_repo_configs(
+                root,
+                8.0,
+                0.1,
+            )
+            sampling_before = sampling_path.read_bytes()
+            starv_before = starv_path.read_bytes()
+            experiment = Experiment(
+                "pendulum",
+                4.0,
+                0.05,
+                2025,
+                root / "weights",
+            )
+            with mock.patch(
+                "ablation.validate_training_artifacts",
+                return_value=(True, "complete"),
+            ), mock.patch(
+                "ablation.validate_rollout_artifact",
+                return_value=(True, "complete"),
+            ):
+                result = promote_mainline(
+                    experiment,
+                    force=True,
+                    repo_root=root,
+                    trainer=mock.Mock(),
+                    mainline_runner=mock.Mock(return_value=pd.DataFrame()),
+                )
+
+            updated = json.loads(train_path.read_text(encoding="utf-8"))
+            self.assertTrue(result["config_changed"])
+            self.assertEqual(updated["weight"]["alpha"], 4.0)
+            self.assertEqual(updated["lambda_ctrl"], 0.05)
+            self.assertEqual(
+                updated["output_dir"],
+                "dwm_weight/now_weight/pendulum/saliency",
+            )
+            self.assertEqual(sampling_path.read_bytes(), sampling_before)
+            self.assertEqual(starv_path.read_bytes(), starv_before)
 
 
 if __name__ == "__main__":
