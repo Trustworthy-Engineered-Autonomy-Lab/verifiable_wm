@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import copy
+import json
 from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from utils import load_config
+import pandas as pd
+
+import train_decoder as td
+from utils import load_config, resolve_device, set_seed
 
 
 DEFAULT_ALPHAS = (0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0)
@@ -96,3 +100,71 @@ def build_train_config(
     config["training"]["seed"] = experiment.seed
     config["output_dir"] = experiment.output_dir.as_posix()
     return config
+
+
+def _same_path(left: str | Path, right: str | Path) -> bool:
+    return Path(left).resolve() == Path(right).resolve()
+
+
+def validate_training_artifacts(experiment: Experiment) -> tuple[bool, str]:
+    required = [
+        experiment.metrics_path,
+        experiment.best_checkpoint,
+        experiment.last_checkpoint,
+    ]
+    missing = [path.name for path in required if not path.exists()]
+    if missing:
+        return False, f"missing: {', '.join(missing)}"
+
+    try:
+        metrics = json.loads(experiment.metrics_path.read_text(encoding="utf-8"))
+        config = metrics["config"]
+        matches = (
+            config["weight_mode"] == "saliency"
+            and float(config["weight"]["alpha"]) == experiment.alpha
+            and float(config["lambda_ctrl"]) == experiment.lambda_ctrl
+            and int(config["training"]["seed"]) == experiment.seed
+            and _same_path(config["output_dir"], experiment.output_dir)
+            and metrics["best_checkpoint"] == experiment.best_checkpoint.name
+        )
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        return False, f"invalid metrics: {exc}"
+
+    return (True, "complete") if matches else (False, "config mismatch")
+
+
+def run_training_grid(
+    env: str,
+    *,
+    experiments: Sequence[Experiment] | None = None,
+    skip_existing: bool = True,
+    continue_on_error: bool = True,
+    trainer=None,
+) -> pd.DataFrame:
+    selected = list(build_experiments(env) if experiments is None else experiments)
+    train_fn = trainer or td.train
+    rows = []
+
+    for experiment in selected:
+        valid, _ = validate_training_artifacts(experiment)
+        if skip_existing and valid:
+            rows.append({**experiment.as_row(), "status": "skipped", "error": ""})
+            continue
+
+        try:
+            config = build_train_config(experiment)
+            set_seed(experiment.seed)
+            device = resolve_device(config.get("device", "auto"))
+            train_fn(config, device)
+            valid, reason = validate_training_artifacts(experiment)
+            if not valid:
+                raise RuntimeError(f"training artifact validation failed: {reason}")
+            rows.append({**experiment.as_row(), "status": "trained", "error": ""})
+        except Exception as exc:
+            rows.append(
+                {**experiment.as_row(), "status": "failed", "error": str(exc)}
+            )
+            if not continue_on_error:
+                raise
+
+    return pd.DataFrame(rows)
