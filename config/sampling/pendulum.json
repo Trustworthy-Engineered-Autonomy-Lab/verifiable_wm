@@ -24,5 +24,5 @@
   "dynamic": {
     "name": "Pendulum"
   },
-  "output_dir": "/home/UFAD/yanru.li/projects/verifiable_wm/datasets/pendulum/data_cell_100/dataset_v1"
+  "output_dir": "datasets/pendulum/data/dataset_v1"
 }

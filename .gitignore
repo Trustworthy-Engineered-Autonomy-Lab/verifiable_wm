@@ -11,6 +11,7 @@ datasets/**/*.pth
 .ipynb_checkpoints/
 logs/
 report/
+/docs/
 *.pth
 *.pdf
 chat_history_exports
@@ -22,3 +23,4 @@ metrics.json
 dwm_weight/now_weight/cartpole/intensity/metrics.json
 dwm_weight/now_weight/cartpole/saliency/metrics.json
 explore.ipynb
+/notebooks/
