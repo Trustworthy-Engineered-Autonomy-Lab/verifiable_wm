@@ -343,3 +343,223 @@ def run_mainline_rollouts(
                 raise
 
     return pd.DataFrame(rows)
+
+
+def compute_l2_metrics(
+    real: np.ndarray,
+    dwm: np.ndarray,
+    *,
+    circular_dims: Sequence[int] = (),
+    period: float = 2 * np.pi,
+) -> dict[str, float]:
+    real = np.asarray(real, dtype=float)
+    dwm = np.asarray(dwm, dtype=float)
+    if real.shape != dwm.shape or real.ndim != 3:
+        raise ValueError(
+            f"trajectory shape mismatch: real={real.shape}, dwm={dwm.shape}"
+        )
+    if not np.array_equal(real[:, 0, :], dwm[:, 0, :]):
+        raise ValueError("real and DWM initial states do not match")
+
+    diff = dwm - real
+    if circular_dims:
+        diff = diff.copy()
+        for dim in circular_dims:
+            values = diff[..., dim]
+            diff[..., dim] = (values + period / 2) % period - period / 2
+
+    distance = np.linalg.norm(diff, ord=2, axis=-1)
+    maximum = distance.max(axis=1)
+    return {
+        "mean_step_l2": float(distance.mean()),
+        "final_l2": float(distance[:, -1].mean()),
+        "max_l2_mean": float(maximum.mean()),
+        "max_l2_p95": float(np.percentile(maximum, 95)),
+    }
+
+
+def _artifact_missing(experiment: Experiment, path: Path) -> FileNotFoundError:
+    return FileNotFoundError(
+        f"alpha={format_value(experiment.alpha)}, "
+        f"lambda_ctrl={format_value(experiment.lambda_ctrl)}: missing {path}"
+    )
+
+
+def collect_training_metrics(
+    experiments: Sequence[Experiment],
+) -> pd.DataFrame:
+    rows = []
+    for experiment in experiments:
+        for path in (
+            experiment.metrics_path,
+            experiment.best_checkpoint,
+            experiment.last_checkpoint,
+        ):
+            if not path.exists():
+                raise _artifact_missing(experiment, path)
+
+        valid, reason = validate_training_artifacts(experiment)
+        if not valid:
+            raise ValueError(
+                f"alpha={format_value(experiment.alpha)}, "
+                f"lambda_ctrl={format_value(experiment.lambda_ctrl)}: {reason}"
+            )
+
+        metrics = json.loads(experiment.metrics_path.read_text(encoding="utf-8"))
+        best_epoch = int(metrics["best_epoch"])
+        try:
+            validation = next(
+                record
+                for record in metrics["history"]
+                if int(record["epoch"]) == best_epoch
+            )
+        except StopIteration as exc:
+            raise ValueError(
+                f"best epoch {best_epoch} is absent from {experiment.metrics_path}"
+            ) from exc
+
+        base = {
+            "env": experiment.env,
+            "alpha": experiment.alpha,
+            "lambda_ctrl": experiment.lambda_ctrl,
+            "seed": experiment.seed,
+            "best_epoch": best_epoch,
+        }
+        rows.append(
+            {
+                **base,
+                "split": "val",
+                "ctrl_mse": float(validation["val_ctrl_mse"]),
+                "pixel_mse": float(validation["val_pixel_mse"]),
+            }
+        )
+        rows.append(
+            {
+                **base,
+                "split": "test",
+                "ctrl_mse": float(metrics["test"]["ctrl_mse"]),
+                "pixel_mse": float(metrics["test"]["pixel_mse"]),
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
+def collect_rollout_metrics(
+    env: str,
+    experiments: Sequence[Experiment],
+    *,
+    real_path: Path | None = None,
+) -> pd.DataFrame:
+    real_path = real_path or Path(
+        f"datasets/{env}/data/dataset_v1/real_trajectories.npz"
+    )
+    if not real_path.exists():
+        raise FileNotFoundError(f"missing real trajectories: {real_path}")
+
+    circular_dims = (0,) if env == "pendulum" else ()
+    rows = []
+    with np.load(real_path, allow_pickle=False) as real_data:
+        for experiment in experiments:
+            if not experiment.trajectory_path.exists():
+                raise _artifact_missing(experiment, experiment.trajectory_path)
+            with np.load(experiment.trajectory_path, allow_pickle=False) as dwm_data:
+                for split in ("val", "test"):
+                    metrics = compute_l2_metrics(
+                        real_data[f"{split}_traj"],
+                        dwm_data[f"{split}_traj"],
+                        circular_dims=circular_dims,
+                    )
+                    rows.append(
+                        {
+                            "env": experiment.env,
+                            "alpha": experiment.alpha,
+                            "lambda_ctrl": experiment.lambda_ctrl,
+                            "seed": experiment.seed,
+                            "split": split,
+                            **metrics,
+                        }
+                    )
+
+    return pd.DataFrame(rows)
+
+
+def build_combined_metrics(
+    env: str,
+    *,
+    experiments: Sequence[Experiment] | None = None,
+    real_path: Path | None = None,
+) -> pd.DataFrame:
+    selected = list(build_experiments(env) if experiments is None else experiments)
+    training = collect_training_metrics(selected)
+    rollout = collect_rollout_metrics(env, selected, real_path=real_path)
+    keys = ["env", "alpha", "lambda_ctrl", "seed", "split"]
+    combined = training.merge(rollout, on=keys, how="inner", validate="one_to_one")
+    if len(combined) != 2 * len(selected):
+        raise ValueError(
+            f"incomplete combined table: expected {2 * len(selected)} rows, "
+            f"got {len(combined)}"
+        )
+    columns = [
+        "env",
+        "alpha",
+        "lambda_ctrl",
+        "seed",
+        "split",
+        "best_epoch",
+        "ctrl_mse",
+        "pixel_mse",
+        "mean_step_l2",
+        "final_l2",
+        "max_l2_mean",
+        "max_l2_p95",
+    ]
+    return combined.loc[:, columns].sort_values(
+        ["alpha", "lambda_ctrl", "split"]
+    ).reset_index(drop=True)
+
+
+def write_summary_tables(
+    env: str,
+    *,
+    experiments: Sequence[Experiment] | None = None,
+    real_path: Path | None = None,
+) -> dict[str, pd.DataFrame | dict[str, Path]]:
+    selected = list(build_experiments(env) if experiments is None else experiments)
+    training = collect_training_metrics(selected)
+    rollout = collect_rollout_metrics(env, selected, real_path=real_path)
+    combined = build_combined_metrics(
+        env,
+        experiments=selected,
+        real_path=real_path,
+    )
+    output_dir = GRID_ROOT / env / "alpha_lambda_grid"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    paths = {
+        "training": output_dir / "training_metrics.csv",
+        "rollout": output_dir / "rollout_l2.csv",
+        "combined": output_dir / "combined_metrics.csv",
+    }
+    training.to_csv(paths["training"], index=False)
+    rollout.to_csv(paths["rollout"], index=False)
+    combined.to_csv(paths["combined"], index=False)
+    return {
+        "training": training,
+        "rollout": rollout,
+        "combined": combined,
+        "paths": paths,
+    }
+
+
+def pivot_metric(
+    frame: pd.DataFrame,
+    metric: str,
+    *,
+    split: str = "val",
+) -> pd.DataFrame:
+    return (
+        frame.loc[frame["split"] == split]
+        .pivot(index="alpha", columns="lambda_ctrl", values=metric)
+        .sort_index()
+        .sort_index(axis=1)
+    )

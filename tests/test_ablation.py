@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 import numpy as np
+import pandas as pd
 
 from ablation import (
     DEFAULT_ALPHAS,
@@ -13,13 +14,17 @@ from ablation import (
     Experiment,
     build_experiments,
     build_sampling_config,
+    build_combined_metrics,
     build_train_config,
+    compute_l2_metrics,
     format_value,
     run_mainline_rollouts,
     run_rollout_grid,
     run_training_grid,
+    pivot_metric,
     validate_rollout_artifact,
     validate_training_artifacts,
+    write_summary_tables,
 )
 
 
@@ -286,6 +291,139 @@ class RolloutResumeTests(unittest.TestCase):
         self.assertEqual(called_config["decoder"]["variant"], "saliency")
         self.assertEqual(base["decoder"]["variant"], "old")
         self.assertEqual(frame.loc[0, "status"], "generated")
+
+
+class L2MetricTests(unittest.TestCase):
+    def test_cartpole_full_state_l2(self):
+        real = np.zeros((1, 3, 4), dtype=float)
+        dwm = real.copy()
+        dwm[0, 1, :] = np.array([1.0, 2.0, 2.0, 0.0])
+
+        actual = compute_l2_metrics(real, dwm)
+
+        self.assertAlmostEqual(actual["mean_step_l2"], 1.0)
+        self.assertAlmostEqual(actual["final_l2"], 0.0)
+        self.assertAlmostEqual(actual["max_l2_mean"], 3.0)
+        self.assertAlmostEqual(actual["max_l2_p95"], 3.0)
+
+    def test_pendulum_theta_uses_short_circular_difference(self):
+        real = np.array([[[0.0, 0.0], [np.pi - 0.001, 0.0]]])
+        dwm = np.array([[[0.0, 0.0], [-np.pi + 0.001, 0.0]]])
+
+        actual = compute_l2_metrics(real, dwm, circular_dims=(0,))
+
+        self.assertAlmostEqual(actual["max_l2_mean"], 0.002, places=6)
+
+    def test_l2_rejects_different_initial_states(self):
+        real = np.zeros((1, 2, 2))
+        dwm = real.copy()
+        dwm[0, 0, 0] = 1.0
+
+        with self.assertRaisesRegex(ValueError, "initial states"):
+            compute_l2_metrics(real, dwm)
+
+    def test_combined_table_joins_training_and_rollout_metrics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            experiment = Experiment(
+                "pendulum",
+                2.0,
+                0.05,
+                2025,
+                root / "weights",
+            )
+            experiment.output_dir.mkdir(parents=True)
+            metrics = {
+                "config": {
+                    "weight_mode": "saliency",
+                    "weight": {"alpha": 2.0},
+                    "lambda_ctrl": 0.05,
+                    "training": {"seed": 2025},
+                    "output_dir": experiment.output_dir.as_posix(),
+                },
+                "best_epoch": 1,
+                "best_checkpoint": "decoder_best_total.pth",
+                "history": [
+                    {"epoch": 0, "val_ctrl_mse": 0.3, "val_pixel_mse": 0.4},
+                    {"epoch": 1, "val_ctrl_mse": 0.1, "val_pixel_mse": 0.2},
+                ],
+                "test": {"ctrl_mse": 0.11, "pixel_mse": 0.21},
+            }
+            experiment.metrics_path.write_text(json.dumps(metrics), encoding="utf-8")
+            experiment.best_checkpoint.touch()
+            experiment.last_checkpoint.touch()
+
+            initial = np.array([[1.0, 4.5]], dtype=np.float32)
+            real_val = np.stack(
+                [initial, initial + np.array([[0.1, 0.2]])],
+                axis=1,
+            )
+            real_test = np.stack(
+                [initial, initial + np.array([[0.2, 0.3]])],
+                axis=1,
+            )
+            real_path = root / "real_trajectories.npz"
+            np.savez_compressed(
+                real_path,
+                val_traj=real_val,
+                test_traj=real_test,
+            )
+            np.savez_compressed(
+                experiment.trajectory_path,
+                val_traj=real_val.copy(),
+                test_traj=real_test.copy(),
+                variant=np.array("saliency"),
+                decoder_weights=np.array(experiment.best_checkpoint.as_posix()),
+            )
+
+            combined = build_combined_metrics(
+                "pendulum",
+                experiments=[experiment],
+                real_path=real_path,
+            )
+
+            self.assertEqual(len(combined), 2)
+            self.assertEqual(set(combined["split"]), {"val", "test"})
+            self.assertEqual(
+                set(combined.columns),
+                {
+                    "env",
+                    "alpha",
+                    "lambda_ctrl",
+                    "seed",
+                    "split",
+                    "best_epoch",
+                    "ctrl_mse",
+                    "pixel_mse",
+                    "mean_step_l2",
+                    "final_l2",
+                    "max_l2_mean",
+                    "max_l2_p95",
+                },
+            )
+
+            with mock.patch("ablation.GRID_ROOT", root / "summaries"):
+                result = write_summary_tables(
+                    "pendulum",
+                    experiments=[experiment],
+                    real_path=real_path,
+                )
+            round_trip = pd.read_csv(result["paths"]["combined"])
+            self.assertEqual(round_trip.columns.tolist(), combined.columns.tolist())
+            self.assertEqual(len(round_trip), len(combined))
+
+    def test_pivot_uses_alpha_rows_and_lambda_columns(self):
+        frame = pd.DataFrame(
+            [
+                {"split": "val", "alpha": 2.0, "lambda_ctrl": 0.1, "score": 3.0},
+                {"split": "val", "alpha": 1.0, "lambda_ctrl": 0.1, "score": 2.0},
+            ]
+        )
+
+        pivot = pivot_metric(frame, "score")
+
+        self.assertEqual(pivot.index.tolist(), [1.0, 2.0])
+        self.assertEqual(pivot.columns.tolist(), [0.1])
 
 
 if __name__ == "__main__":
