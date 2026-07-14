@@ -13,8 +13,8 @@
   "render_batch_size": 64,
   "starv_config": "config/starv_verification/mountain_car.json",
   "state_space": [
-    {"name": "position", "low": -1.2, "high": 0.6},
-    {"name": "velocity", "low": -0.07, "high": 0.07}
+    {"name": "position", "low": 0.0, "high": 0.1},
+    {"name": "velocity", "low": 0.0, "high": 0.01}
   ],
   "controller": {
     "name": "Controller",
@@ -26,5 +26,5 @@
   "dynamic": {
     "name": "MountainCar"
   },
-  "output_dir": "datasets/mountain_car/data/dataset_v1"
+  "output_dir": "/home/UFAD/yanru.li/projects/verifiable_wm/datasets/mountain_car/data_cell_100/dataset_v1"
 }

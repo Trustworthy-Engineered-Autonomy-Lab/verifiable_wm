@@ -14,8 +14,8 @@
   "render_batch_size": 64,
   "starv_config": "config/starv_verification/pendulum.json",
   "state_space": [
-    {"name": "theta", "low": -3.141592653589793, "high": 3.141592653589793},
-    {"name": "omega", "low": -8.0, "high": 8.0}
+    {"name": "theta", "low": 1.0, "high": 1.1},
+    {"name": "omega", "low": 4.5, "high": 4.6}
   ],
   "controller": {
     "name": "Controller",
@@ -27,5 +27,5 @@
   "dynamic": {
     "name": "Pendulum"
   },
-  "output_dir": "datasets/pendulum/data/dataset_v1"
+  "output_dir": "/home/UFAD/yanru.li/projects/verifiable_wm/datasets/pendulum/data_cell_100/dataset_v1"
 }

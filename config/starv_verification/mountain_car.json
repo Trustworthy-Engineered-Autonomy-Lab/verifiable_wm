@@ -20,22 +20,23 @@
         "kwargs": {
             "goal_position_threshold": 0.6,
             "num_steps": 30,
-            "early_stop": true
+            "early_stop": false,
+            "save_history": true
         }
     },
     "grid": {
         "dims": [
             {
                 "name": "pos",
-                "start": -0.20,
-                "stop": 0.60,
-                "num": 80
+                "start": 0.00,
+                "stop": 0.10,
+                "num": 10
             },
             {
                 "name": "vel",
                 "start": 0.000,
-                "stop": 0.080,
-                "num": 80
+                "stop": 0.010,
+                "num": 10
             }
         ]
     },

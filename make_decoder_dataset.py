@@ -109,6 +109,19 @@ def load_starv_config(config):
     return load_config(starv_config_path)
 
 
+
+def save_real_trajectories(config, trajectory_splits):
+    output_dir = Path(config["output_dir"])
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    arrays = {}
+    for split_name, split_data in trajectory_splits.items():
+        arrays[f"{split_name}_traj"] = to_numpy(split_data["traj"])
+        arrays[f"{split_name}_actions"] = to_numpy(split_data["actions"])
+
+    np.savez_compressed(output_dir / "real_trajectories.npz", **arrays)
+
+
 def select_decoder_states(states, config):
     indices = config.get("decoder_state_indices", None)
     if indices is None:

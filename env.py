@@ -57,7 +57,7 @@ class ContinuousCartPoleEnv(gym.Env):
 
         self.steps_beyond_done = None
         self.screen = None
-        self.screen_width = 600
+        self.screen_width = 600 
         self.screen_height = 400
 
         self.clock = None

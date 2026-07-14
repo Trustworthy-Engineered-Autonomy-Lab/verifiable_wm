@@ -67,7 +67,7 @@ class MountainCar(DynmaicModel):
 class Pendulum(DynmaicModel):
     def __init__(self, 
             max_speed=8.0, 
-            max_torgue=2.0, 
+            max_torque=2.0, 
             dt=0.05, 
             g=10.0, 
             m=1.0, 
@@ -77,7 +77,7 @@ class Pendulum(DynmaicModel):
         from gym.utils import seeding
 
         self.max_speed = max_speed
-        self.max_torque = max_torgue
+        self.max_torque = max_torque
         self.dt = dt
         self.g = g
         self.m = m

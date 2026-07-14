@@ -14,10 +14,10 @@
   "starv_config": "config/starv_verification/cartpole.json",
   "decoder_state_indices": [0, 2],
   "state_space": [
-    {"name": "position", "low": -2.4, "high": 2.4},
-    {"name": "velocity", "low": -1.0, "high": 1.0},
-    {"name": "angle", "low": -0.2095, "high": 0.2095},
-    {"name": "angular_velocity", "low": -1.0, "high": 1.0}
+    {"name": "position", "low": 0.0, "high": 0.1},
+    {"name": "velocity", "low": 0.0, "high": 0.0},
+    {"name": "angle", "low": 0.6, "high": 0.7},
+    {"name": "angular_velocity", "low": 0.0, "high": 0.0}
   ],
   "controller": {
     "name": "Controller",
@@ -29,5 +29,5 @@
   "dynamic": {
     "name": "CartPole"
   },
-  "output_dir": "datasets/cartpole/data/dataset_v1"
+  "output_dir": "/home/UFAD/yanru.li/projects/verifiable_wm/datasets/cartpole/data_cell_100/dataset_v1"
 }
