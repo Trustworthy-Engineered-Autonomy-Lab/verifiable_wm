@@ -160,6 +160,29 @@ python train_decoder.py config/train_decoder/cartpole/intensity.json
 
 Pendulum 的运行方式相同，只需换成对应配置。
 
+`notebooks/train_decoder.ipynb` 也提供完整的 saliency `alpha × lambda_ctrl` 消融入口：
+
+```text
+alpha       = [0.5, 1, 2, 4, 8, 16, 32]
+lambda_ctrl = [0, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5]
+seed        = 2025
+```
+
+CartPole 和 Pendulum 各有 49 个训练点，不筛选 seed。网格实现位于 `ablation.py`，notebook
+只负责调用和显示表格。每个点使用独立目录：
+
+```text
+dwm_weight/now_weight/<env>/alpha_lambda_grid/
+  alpha_<alpha>/lambda_<lambda>/seed_2025/
+    decoder_best_total.pth
+    decoder_last.pth
+    metrics.json
+    dwm_trajectories_saliency.npz
+```
+
+再次执行时，只有 checkpoint、metrics 和配置严格匹配的完整点才会跳过；部分产物、错误参数或
+错误 rollout 溯源都会重跑。旧的 CartPole 一维消融目录保留为历史结果。
+
 ### 4. 生成 DWM trajectory
 
 在 `notebooks/generate_dataset.ipynb` 中运行
@@ -171,6 +194,14 @@ python sampling.py config/sampling/pendulum.json --decoder-variant saliency
 ```
 
 sampling 直接读取 `starv_states.npz`，所以此前必须至少完成一次完整生成或 `starv-only` 生成。
+
+当前 sampling 是 DWM-only：只运行 `decoder -> controller -> analytic dynamics` 的闭环，不再生成
+没有下游消费者的 `transition_dataset.npz`。旧 transition 流程每次需要执行 72,000 次真实 renderer
+调用；在 98 个消融点中跳过这部分可以消除大量重复渲染和磁盘写入。真实 trajectory 只生成一次，
+随后由所有 decoder checkpoint 共用。
+
+`dwm_trajectories_<variant>.npz` 内部保存 `variant` 和 `decoder_weights`，因此不再依赖容易被后一次
+运行覆盖的 `metadata.json` 来判断来源。
 
 ### 5. 运行 StarV
 
@@ -256,6 +287,22 @@ $$
 d_t=\lVert s_t^{dwm}-s_t^{real}\rVert_2
 $$
 
+CartPole 直接对四维完整 state 计算 L2。Pendulum 的 theta 差先映射为最短圆周差，再与 omega
+一起计算 full-state L2，避免跨越 `-π/π` 时产生接近 `2π` 的伪误差。完整消融表对 validation 和
+test 分别报告：
+
+```text
+mean_step_l2   所有 trajectory、所有 t=0..30 的均值
+final_l2       t=30 的均值
+max_l2_mean    每条 trajectory 最大偏差的均值
+max_l2_p95     每条 trajectory 最大偏差的 95% 分位数
+```
+
+`ablation.py` 将单帧 controller/pixel MSE 与闭环 L2 合并，并在网格根目录写出
+`training_metrics.csv`、`rollout_l2.csv` 和 `combined_metrics.csv`。validation 用于选择
+`alpha/lambda_ctrl`；test 只用于最终候选报告。主线晋升必须在 notebook 中显式调用
+`promote_mainline(..., force=True)`，不会由排序结果自动覆盖。
+
 StarV 为每个初始 grid cell 计算 decoder world model 的 reachable tube。`compare.py` 根据轨迹的
 初始 state 找到对应 cell，然后逐时间步检查真实轨迹和 DWM 轨迹是否位于 bounds 内。
 
@@ -298,11 +345,13 @@ verifiable_wm/
 │   ├── model.py
 │   └── verifiers.py
 ├── tests/
+│   ├── test_ablation.py
 │   ├── test_compare_trajectory_states.py
 │   └── test_starv_states.py
 ├── tools/
 │   └── visualize.py
 ├── make_decoder_dataset.py     # 训练数据、StarV states 与真实轨迹生成
+├── ablation.py                 # alpha-lambda 网格、DWM rollout、L2 表与显式晋升
 ├── sampling.py                 # DWM 闭环 rollout
 ├── train_decoder.py            # decoder 训练
 ├── verify.py                   # StarV/MPI 验证入口
