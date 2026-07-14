@@ -29,16 +29,16 @@
             {
                 "name": "theta",
                 "start": 1.00,
-                "stop": 2.00,
-                "num": 100
+                "stop": 1.10,
+                "num": 10
             },
             {
                 "name": "omega",
                 "start": 4.50,
-                "stop": 5.00,
-                "num": 50
+                "stop": 4.60,
+                "num": 10
             }
         ]
     },
-    "output_prefix": "results/pendulum/safety_result"
+    "output_prefix": "/home/UFAD/yanru.li/projects/verifiable_wm/results/pendulum/safety_result_cell_100"
 }

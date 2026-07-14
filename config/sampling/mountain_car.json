@@ -11,9 +11,11 @@
   "rollout_steps": 30,
   "device": "auto",
   "render_batch_size": 64,
+  "generate_transition_dataset": false,
+  "save_metadata": false,
   "state_space": [
-    {"name": "position", "low": -0.2, "high": 0.6},
-    {"name": "velocity", "low": 0.0, "high": 0.08}
+    {"name": "position", "low": 0.0, "high": 0.1},
+    {"name": "velocity", "low": 0.0, "high": 0.01}
   ],
   "decoder": {
     "name": "Decoder",
@@ -29,5 +31,5 @@
   "dynamic": {
     "name": "MountainCar"
   },
-  "output_dir": "datasets/mountain_car/data/dataset_v1"
+  "output_dir": "/home/UFAD/yanru.li/projects/verifiable_wm/datasets/mountain_car/data_cell_100/dataset_v1"
 }

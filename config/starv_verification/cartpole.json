@@ -3,7 +3,7 @@
         "Decoder" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "/home/tealab_shared/starv/weights/cartpole/decoder_cp.pth"
+                "weights" : "/home/UFAD/yanru.li/projects/verifiable_wm/weight_decoder/cartpole/cartpole_a8_lamda01.pth"
             }
         },
         "Controller" : {
@@ -30,8 +30,8 @@
             {
                 "name": "pos",
                 "start": 0.00,
-                "stop": 0.60,
-                "num": 60
+                "stop": 0.10,
+                "num": 10
             },
             {
                 "name": "vel",
@@ -41,9 +41,9 @@
             },
             {
                 "name": "angle",
-                "start": 0.060,
-                "stop": 0.120,
-                "num": 60
+                "start": 0.60,
+                "stop": 0.70,
+                "num": 10
             },
             {
                 "name": "avel",
@@ -53,5 +53,5 @@
             }
         ]
     },
-    "output_prefix": "results/cartpole/safety_result"
+    "output_prefix": "/home/UFAD/yanru.li/projects/verifiable_wm/results/cartpole/safety_result_cell_100"
 }

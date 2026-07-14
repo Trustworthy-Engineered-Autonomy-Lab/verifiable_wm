@@ -20,6 +20,13 @@ from utils import (
 )
 
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+DEFAULT_CONFIGS = tuple(
+    PROJECT_ROOT / "config" / "sampling" / f"{environment}.json"
+    for environment in ("cartpole", "mountain_car", "pendulum")
+)
+
+
 def load_state_dict(path, device):
     try:
         return torch.load(path, map_location=device, weights_only=True)
@@ -108,6 +115,13 @@ def save_dataset(config, dataset):
 
     np.savez_compressed(output_dir / "transition_dataset.npz", **arrays)
 
+    return output_dir
+
+
+def save_metadata(config):
+    output_dir = Path(config["output_dir"])
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     with (output_dir / "metadata.json").open("w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
 
@@ -166,6 +180,8 @@ def generate_dataset(config):
 
     steps = int(config["rollout_steps"])
     render_batch_size = int(config.get("render_batch_size", 64))
+    generate_transition_dataset = bool(config.get("generate_transition_dataset", False))
+    should_save_metadata = bool(config.get("save_metadata", False))
     decoder_state_indices = config.get(
         "decoder_state_indices",
         config["decoder"].get("state_indices"),
@@ -178,21 +194,32 @@ def generate_dataset(config):
 
     dataset = {}
     trajectory_splits = {}
-    for split_name, states0 in initial_splits.items():
-        states, actions, next_states = rollout_transition(
-            states0,
-            steps,
-            controller,
-            dynamic,
-            device,
-            render_batch_size,
-        )
+    if not generate_transition_dataset:
+        print("[Skip] transition dataset generation is disabled")
 
-        dataset[split_name] = {
-            "states": states,
-            "actions": actions,
-            "next_states": next_states,
-        }
+    for split_name, states0 in initial_splits.items():
+        if generate_transition_dataset:
+            states, actions, next_states = rollout_transition(
+                states0,
+                steps,
+                controller,
+                dynamic,
+                device,
+                render_batch_size,
+            )
+
+            dataset[split_name] = {
+                "states": states,
+                "actions": actions,
+                "next_states": next_states,
+            }
+
+            print(
+                f"[Rollout] {split_name}: "
+                f"states={tuple(states.shape)}, "
+                f"actions={tuple(actions.shape)}, "
+                f"next_states={tuple(next_states.shape)}"
+            )
 
         traj, dwm_actions = rollout_dwm_trajectory(
             states0,
@@ -209,19 +236,22 @@ def generate_dataset(config):
         }
 
         print(
-            f"[Rollout] {split_name}: "
-            f"states={tuple(states.shape)}, "
-            f"actions={tuple(actions.shape)}, "
-            f"next_states={tuple(next_states.shape)}"
-        )
-        print(
             f"[DWM Trajectory] {split_name}: "
             f"traj={tuple(traj.shape)}, "
             f"actions={tuple(dwm_actions.shape)}"
         )
 
-    output_dir = save_dataset(config, dataset)
+    output_dir = Path(config["output_dir"])
+    if generate_transition_dataset:
+        output_dir = save_dataset(config, dataset)
+
     save_dwm_trajectories(config, trajectory_splits)
+
+    if should_save_metadata:
+        save_metadata(config)
+    else:
+        print("[Skip] metadata generation is disabled")
+
     return output_dir
 
 
@@ -251,7 +281,7 @@ def main():
         print(f"[Config] {config_path}")
         config = load_config(config_path)
         output_dir = generate_dataset(config)
-        print(f"[Done] transition dataset saved to {output_dir}")
+        print(f"[Done] sampling outputs saved to {output_dir}")
 
 
 if __name__ == "__main__":
