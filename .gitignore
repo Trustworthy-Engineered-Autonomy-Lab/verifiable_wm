@@ -15,6 +15,7 @@ report/
 *.pdf
 chat_history_exports
 saliency_map/output/
+dwm_weight/now_weight/*/alpha_lambda_grid/
 *.png
 settings.json
 metrics.json
