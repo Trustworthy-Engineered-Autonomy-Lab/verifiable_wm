@@ -7,6 +7,7 @@ from itertools import product
 from pathlib import Path
 from typing import Mapping, Sequence
 
+import numpy as np
 import pandas as pd
 
 import train_decoder as td
@@ -164,6 +165,180 @@ def run_training_grid(
             rows.append(
                 {**experiment.as_row(), "status": "failed", "error": str(exc)}
             )
+            if not continue_on_error:
+                raise
+
+    return pd.DataFrame(rows)
+
+
+def build_sampling_config(
+    experiment: Experiment,
+    base_config: Mapping | None = None,
+) -> dict:
+    source = base_config
+    if source is None:
+        source = load_config(Path("config/sampling") / f"{experiment.env}.json")
+    config = copy.deepcopy(dict(source))
+    config["decoder"]["variant"] = "saliency"
+    config["decoder"]["weights"] = experiment.best_checkpoint.as_posix()
+    config["output_dir"] = experiment.output_dir.as_posix()
+    return config
+
+
+def _starv_states_path_for_env(env: str) -> Path:
+    sampling_config = load_config(Path("config/sampling") / f"{env}.json")
+    starv_config = load_config(sampling_config["starv_config"])
+    return Path(starv_config["starv_states"]["output_file"])
+
+
+def _validate_trajectory_file(
+    trajectory_path: Path,
+    *,
+    variant: str,
+    decoder_weights: str | Path,
+    states_path: Path,
+) -> tuple[bool, str]:
+    if not trajectory_path.exists():
+        return False, "missing trajectory"
+
+    try:
+        with np.load(states_path, allow_pickle=False) as states, np.load(
+            trajectory_path,
+            allow_pickle=False,
+        ) as trajectory:
+            if trajectory["variant"].item() != variant:
+                return False, "variant mismatch"
+            if not _same_path(
+                trajectory["decoder_weights"].item(),
+                decoder_weights,
+            ):
+                return False, "checkpoint mismatch"
+            for split in ("train", "val", "test"):
+                expected = states[f"{split}_states"]
+                actual = trajectory[f"{split}_traj"][:, 0, :]
+                if not np.array_equal(expected, actual):
+                    return False, f"{split} initial state mismatch"
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return False, f"invalid trajectory: {exc}"
+
+    return True, "complete"
+
+
+def validate_rollout_artifact(
+    experiment: Experiment,
+    *,
+    states_path: Path | None = None,
+) -> tuple[bool, str]:
+    return _validate_trajectory_file(
+        experiment.trajectory_path,
+        variant="saliency",
+        decoder_weights=experiment.best_checkpoint,
+        states_path=states_path or _starv_states_path_for_env(experiment.env),
+    )
+
+
+def run_rollout_grid(
+    env: str,
+    *,
+    experiments: Sequence[Experiment] | None = None,
+    skip_existing: bool = True,
+    continue_on_error: bool = True,
+    generator=None,
+) -> pd.DataFrame:
+    selected = list(build_experiments(env) if experiments is None else experiments)
+    if generator is None:
+        from sampling import generate_dataset
+
+        generate_fn = generate_dataset
+    else:
+        generate_fn = generator
+    rows = []
+
+    for experiment in selected:
+        trained, reason = validate_training_artifacts(experiment)
+        if not trained:
+            rows.append(
+                {**experiment.as_row(), "status": "failed", "error": reason}
+            )
+            if not continue_on_error:
+                raise RuntimeError(reason)
+            continue
+
+        valid, _ = validate_rollout_artifact(experiment)
+        if skip_existing and valid:
+            rows.append({**experiment.as_row(), "status": "skipped", "error": ""})
+            continue
+
+        try:
+            generate_fn(build_sampling_config(experiment))
+            valid, reason = validate_rollout_artifact(experiment)
+            if not valid:
+                raise RuntimeError(f"rollout artifact validation failed: {reason}")
+            rows.append(
+                {**experiment.as_row(), "status": "generated", "error": ""}
+            )
+        except Exception as exc:
+            rows.append(
+                {**experiment.as_row(), "status": "failed", "error": str(exc)}
+            )
+            if not continue_on_error:
+                raise
+
+    return pd.DataFrame(rows)
+
+
+def run_mainline_rollouts(
+    env: str,
+    *,
+    variants: Sequence[str] = ("intensity", "saliency"),
+    skip_existing: bool = True,
+    continue_on_error: bool = True,
+    generator=None,
+) -> pd.DataFrame:
+    base_config = load_config(Path("config/sampling") / f"{env}.json")
+    states_path = _starv_states_path_for_env(env)
+    if generator is None:
+        from sampling import generate_dataset
+
+        generate_fn = generate_dataset
+    else:
+        generate_fn = generator
+    rows = []
+
+    for variant in variants:
+        config = copy.deepcopy(base_config)
+        weights = config["decoder"]["weights"]
+        if not isinstance(weights, Mapping) or variant not in weights:
+            raise KeyError(f"sampling config has no decoder weights for {variant!r}")
+        checkpoint = weights[variant]
+        config["decoder"]["variant"] = variant
+        trajectory_path = (
+            Path(config["output_dir"]) / f"dwm_trajectories_{variant}.npz"
+        )
+        valid, _ = _validate_trajectory_file(
+            trajectory_path,
+            variant=variant,
+            decoder_weights=checkpoint,
+            states_path=states_path,
+        )
+        row = {"env": env, "variant": variant, "decoder_weights": checkpoint}
+        if skip_existing and valid:
+            rows.append({**row, "status": "skipped", "error": ""})
+            continue
+
+        try:
+            generate_fn(config)
+            valid, reason = _validate_trajectory_file(
+                trajectory_path,
+                variant=variant,
+                decoder_weights=checkpoint,
+                states_path=states_path,
+            )
+            if not valid:
+                raise RuntimeError(f"rollout artifact validation failed: {reason}")
+            rows.append({**row, "status": "generated", "error": ""})
+        except Exception as exc:
+            rows.append({**row, "status": "failed", "error": str(exc)})
             if not continue_on_error:
                 raise
 
