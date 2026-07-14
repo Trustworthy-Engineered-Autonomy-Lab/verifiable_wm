@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 import numpy as np
+import nbformat
 import pandas as pd
 
 from ablation import (
@@ -572,6 +573,36 @@ class PromotionTests(unittest.TestCase):
             )
             self.assertEqual(sampling_path.read_bytes(), sampling_before)
             self.assertEqual(starv_path.read_bytes(), starv_before)
+
+
+class TrainNotebookTests(unittest.TestCase):
+    def test_notebook_contains_ablation_workflow_cells(self):
+        notebook = nbformat.read("notebooks/train_decoder.ipynb", as_version=4)
+        ids = {cell.get("id") for cell in notebook.cells}
+        required = {
+            "nb-setup",
+            "nb-single-train",
+            "nb-grid-config",
+            "nb-grid-train",
+            "nb-training-summary",
+            "nb-mainline-rollout",
+            "nb-grid-rollout",
+            "nb-l2-summary",
+            "nb-pivots",
+            "nb-promotion",
+        }
+        self.assertTrue(required.issubset(ids))
+
+        expensive = {
+            "nb-grid-train",
+            "nb-mainline-rollout",
+            "nb-grid-rollout",
+            "nb-promotion",
+        }
+        for cell in notebook.cells:
+            if cell.get("id") in expensive:
+                self.assertIsNone(cell.get("execution_count"))
+                self.assertEqual(cell.get("outputs", []), [])
 
 
 if __name__ == "__main__":
