@@ -86,6 +86,9 @@ def build_initial_state_splits(config, device):
     }
 
 
+# 当前主流程不调用下面两个 transition helper。它们只为未来可能恢复的
+# learned-dynamics `(state, action, next_state)` 数据生成保留，请勿当作
+# 当前 sampling 的输出路径；当前输出只有 variant-aware DWM trajectory。
 @torch.no_grad()
 def rollout_transition(states0, steps, controller, dynamic, device, render_batch_size):
     states = states0.clone()
@@ -143,51 +146,6 @@ def save_dwm_trajectories(config, trajectory_splits):
     output_path = output_dir / f"dwm_trajectories_{decoder_variant(config)}.npz"
     np.savez_compressed(output_path, **arrays)
     print(f"[Saved] {output_path} (decoder={arrays['decoder_weights']})")
-
-
-@torch.no_grad()
-def rollout_dwm_trajectory(
-    states0,
-    steps,
-    decoder,
-    controller,
-    dynamic,
-    device,
-    decoder_state_indices=None,
-):
-    num_samples, state_dim = states0.shape
-    trajectories = torch.empty(num_samples, steps + 1, state_dim, device=device)
-    action_steps = []
-
-    states = states0.clone()
-    trajectories[:, 0, :] = states
-
-    for step in range(steps):
-        decoder_states = states
-        if decoder_state_indices is not None:
-            decoder_states = states[:, decoder_state_indices]
-
-        images = decoder(decoder_states)
-        actions = controller(images)
-        states = dynamic.step(states, actions)
-
-        action_steps.append(actions)
-        trajectories[:, step + 1, :] = states
-
-    actions = torch.stack(action_steps, dim=1)
-    return trajectories, actions
-
-
-def save_dwm_trajectories(config, trajectory_splits):
-    output_dir = Path(config["output_dir"])
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    arrays = {}
-    for split_name, split_data in trajectory_splits.items():
-        arrays[f"{split_name}_traj"] = to_numpy(split_data["traj"])
-        arrays[f"{split_name}_actions"] = to_numpy(split_data["actions"])
-
-    np.savez_compressed(output_dir / "dwm_trajectories.npz", **arrays)
 
 
 @torch.no_grad()

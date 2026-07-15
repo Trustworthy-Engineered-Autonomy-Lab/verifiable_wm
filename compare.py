@@ -48,14 +48,9 @@ from matplotlib.colors import Normalize
 # any path from the terminal with --safety / --real / --dwm / --outdir.
 # ============================================================
 
-# File paths on the server:
-# SAFETY_PATH:/home/tealab_shared/dwm_verification/results/pendulum or cartpole or mountain_car/safety_result.json
-# REAL_TRAJ_PATH:/home/tealab_shared/trajectories/pendulum or cartpole or mountain_car/real_trajectories.npz
-# DWM_TRAJ_PATH:/home/tealab_shared/trajectories/pendulum or cartpole or mountain_car/dwm_trajectories.npz
-
 DEFAULT_SAFETY_PATH = Path("results/cartpole/safety_result.json")
-DEFAULT_REAL_TRAJ_PATH = Path("/home/tealab_shared/trajectories/cartpole/starv_state/real_trajectories.npz")
-DEFAULT_DWM_TRAJ_PATH = Path("/home/tealab_shared/trajectories/cartpole/starv_state/dwm_trajectories.npz")
+DEFAULT_REAL_TRAJ_PATH = Path("datasets/cartpole/data/dataset_v1/real_trajectories.npz")
+DEFAULT_DWM_TRAJ_PATH = Path("datasets/cartpole/data/dataset_v1/dwm_trajectories_saliency.npz")
 DEFAULT_OUT_DIR = Path("results/cartpole/compare_plot")
 
 SAFETY_PATH: Path = DEFAULT_SAFETY_PATH
@@ -579,21 +574,21 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
-    # Optional paths. If omitted, the DEFAULT_* paths at the top of this file are used.
-    parser.add_argument("--safety", type=Path, default=DEFAULT_SAFETY_PATH,
-                        help=f"Path to safety_result.json. Default: {DEFAULT_SAFETY_PATH}")
-    parser.add_argument("--real", type=Path, default=DEFAULT_REAL_TRAJ_PATH,
-                        help=f"Path to real_trajectories.npz. Default: {DEFAULT_REAL_TRAJ_PATH}")
-    parser.add_argument("--dwm", type=Path, default=DEFAULT_DWM_TRAJ_PATH,
-                        help=f"Path to dwm_trajectories.npz. Default: {DEFAULT_DWM_TRAJ_PATH}")
-    parser.add_argument("--outdir", type=Path, default=DEFAULT_OUT_DIR,
-                        help=f"Output directory for figures. Default: {DEFAULT_OUT_DIR}")
+    # Optional paths. If omitted, paths are derived from --env inside this repository.
+    parser.add_argument("--safety", type=Path, default=None,
+                        help="Path to safety_result.json. Default: results/<env>/safety_result.json")
+    parser.add_argument("--real", type=Path, default=None,
+                        help="Path to real_trajectories.npz. Default: datasets/<env>/data/dataset_v1/real_trajectories.npz")
+    parser.add_argument("--dwm", type=Path, default=None,
+                        help="Path to DWM trajectories. Default: datasets/<env>/data/dataset_v1/dwm_trajectories_saliency.npz")
+    parser.add_argument("--outdir", type=Path, default=None,
+                        help="Output directory for figures. Default: results/<env>/compare_plot")
 
     # NPZ keys.
     parser.add_argument("--real-key", default="test_traj",
                         help="Array key in real_trajectories.npz. Default: test_traj")
     parser.add_argument("--dwm-key", default="test_traj",
-                        help="Array key in dwm_trajectories.npz. Default: test_traj")
+                        help="Array key in the DWM trajectory NPZ. Default: test_traj")
 
     # Plot and checking settings.
     parser.add_argument(
@@ -634,10 +629,11 @@ def apply_args(args: argparse.Namespace) -> None:
     global REAL_KEY, DWM_KEY, ENV_NAME, PLOT_DIMS, CHECK_DIMS, MAX_STEPS
     global DELTA, PRINT_KEYS_ONLY, DPI
 
-    SAFETY_PATH = args.safety
-    REAL_TRAJ_PATH = args.real
-    DWM_TRAJ_PATH = args.dwm
-    OUT_DIR = args.outdir
+    data_dir = Path("datasets") / args.env / "data" / "dataset_v1"
+    SAFETY_PATH = args.safety or Path("results") / args.env / "safety_result.json"
+    REAL_TRAJ_PATH = args.real or data_dir / "real_trajectories.npz"
+    DWM_TRAJ_PATH = args.dwm or data_dir / "dwm_trajectories_saliency.npz"
+    OUT_DIR = args.outdir or Path("results") / args.env / "compare_plot"
 
     REAL_KEY = args.real_key
     DWM_KEY = args.dwm_key

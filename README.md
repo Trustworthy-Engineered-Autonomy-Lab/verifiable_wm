@@ -14,6 +14,9 @@ decoder-controller-dynamics 闭环的 reachable set。
 当前实验以 CartPole 和 Pendulum 为主。MountainCar 的 controller 仍有问题，occlusion heatmap
 的关注区域不合理，因此暂时冻结实验内容，只维护代码和配置结构的一致性。
 
+当前 saliency 主线参数为：CartPole `(alpha=8, lambda_ctrl=0.1)`，Pendulum
+`(alpha=16, lambda_ctrl=0.5)`。
+
 ## 运行环境
 
 实验默认使用：
@@ -50,7 +53,7 @@ starv_verification.grid                小范围
 ```text
 decoder training range  ⊇  StarV grid
 sampling initial states =  StarV grid samples
-compare initial states  =  StarV grid samples
+compare 使用 trajectory t=0 state 定位 StarV cell
 ```
 
 decoder 使用较大的 state range 训练，以覆盖从 StarV 初始 grid rollout 后可能访问的区域。
@@ -90,9 +93,12 @@ datasets/<env>/data/dataset_v1/
 |---|---|
 | `decoder_states.npz` | decoder 训练数据，包含 `{split}_states` 与 `{split}_images`。CartPole state 是二维 decoder 输入。 |
 | `saliency_occlusion.npz` | controller occlusion heatmap。 |
-| `starv_states.npz` | 从 StarV grid 生成的完整初始 state；供 real/DWM trajectory 和 compare 共用。 |
+| `starv_states.npz` | 从 StarV grid 生成的完整初始 state；供 real/DWM trajectory 共用。 |
 | `real_trajectories.npz` | 从 `starv_states.npz` 出发，使用真实 renderer 的完整闭环轨迹。 |
 | `dwm_trajectories_<variant>.npz` | decoder 替代 renderer 后得到的完整闭环轨迹；`variant` 和 `decoder_weights` 字段记录所用 checkpoint。 |
+
+旧的无 variant 文件 `dwm_trajectories.npz` 已停用并删除。当前 variant 为 `old`、`intensity` 和
+`saliency`。
 
 常用 shape：
 
@@ -108,12 +114,6 @@ CartPole real/DWM trajectories:
   test_traj              (N, 31, 4)   # t=0 + 30 steps
   test_actions           (N, 30, 1)
 ```
-
-## 运行流程
-
-日常实验主要从 `notebooks/` 运行，便于查看中间结果。notebook 只负责组织流程和可视化，
-实际逻辑仍在 Python 脚本中，并保留 CLI 入口。每个 notebook 的第一个 cell 会自动定位仓库根目录；
-使用 `starv_shared` kernel（`/home/tealab_shared/starv/env/starv_shared`）打开即可。
 
 ### 1. 生成 decoder 训练数据
 
@@ -193,12 +193,12 @@ python sampling.py config/sampling/cartpole.json --decoder-variant saliency
 python sampling.py config/sampling/pendulum.json --decoder-variant saliency
 ```
 
-sampling 直接读取 `starv_states.npz`，所以此前必须至少完成一次完整生成或 `starv-only` 生成。
+sampling 直接读取本地 `datasets/<env>/data/dataset_v1/starv_states.npz`，所以此前必须至少完成一次
+完整生成或 `starv-only` 生成。
 
 当前 sampling 是 DWM-only：只运行 `decoder -> controller -> analytic dynamics` 的闭环，不再生成
-没有下游消费者的 `transition_dataset.npz`。旧 transition 流程每次需要执行 72,000 次真实 renderer
-调用；在 98 个消融点中跳过这部分可以消除大量重复渲染和磁盘写入。真实 trajectory 只生成一次，
-随后由所有 decoder checkpoint 共用。
+没有下游消费者的 `transition_dataset.npz`。旧 transition helper 暂时保留在 `sampling.py` 并标记
+为停用，后续如果恢复 learned dynamics 实验可以重新启用。
 
 `dwm_trajectories_<variant>.npz` 内部保存 `variant` 和 `decoder_weights`，因此不再依赖容易被后一次
 运行覆盖的 `metadata.json` 来判断来源。
@@ -221,20 +221,33 @@ results/<env>/safety_result.json
 
 ### 6. 比较 trajectory 与 reachable tube
 
-在 `notebooks/compare_tube.ipynb` 中运行
-`run_compare_tube("cartpole", variant="saliency")`。对应的命令行为：
+`compare.py` 按 `--env` 自动使用当前仓库中的本地 trajectory NPZ：
 
 ```bash
-python compare.py --env cartpole --variant saliency
-python compare.py --env pendulum --variant saliency
+python compare.py --env cartpole
+python compare.py --env pendulum
 ```
 
-`compare.py` 会强制检查：
+默认输入和输出为：
 
 ```text
-starv_states == real_traj[:,0,:] == dwm_traj[:,0,:]
-starv_states 全部位于 StarV grid 内
+results/<env>/safety_result.json
+datasets/<env>/data/dataset_v1/real_trajectories.npz
+datasets/<env>/data/dataset_v1/dwm_trajectories_saliency.npz
+results/<env>/compare_plot/
 ```
+
+`compare.py` 没有 `--variant` 参数。比较其他 variant 时使用 `--dwm` 显式指定文件，例如：
+
+```bash
+python compare.py \
+  --env cartpole \
+  --dwm datasets/cartpole/data/dataset_v1/dwm_trajectories_intensity.npz \
+  --outdir results/cartpole/compare_plot_intensity
+```
+
+脚本根据每条 trajectory 的 `t=0` state 定位 StarV cell，再逐时间步检查真实轨迹和 DWM 轨迹是否
+位于对应 bounds 内。它不直接读取 `starv_states.npz`。
 
 CartPole 默认绘制和检查 `(0, 2)` 两个维度，即 position-angle。velocity 和 angular velocity
 仍参与 dynamics，只是在当前初始 grid 中固定为 0。
@@ -310,9 +323,29 @@ StarV 为每个初始 grid cell 计算 decoder world model 的 reachable tube。
 StarV 初始分布一致的 trajectory 上计算 L1 non-conformity score，并按 Theorem 1 对 tube 做
 inflation。
 
-## 文件树
+## 测试
 
-下面只列出源码、配置和主要实验目录，不展开 checkpoint、数据文件与缓存。
+从仓库根目录运行当前全部测试：
+
+```bash
+MPLCONFIGDIR=/tmp/matplotlib-codex \
+  /home/tealab_shared/starv/env/starv_shared/bin/python \
+  -m unittest discover -s tests -v
+```
+
+当前共 26 项测试，正常结果为 `OK`。这些测试使用 mock 和 `/tmp` 中的临时文件，不会训练模型、
+运行完整 sampling/StarV、覆盖正式 NPZ 或修改 notebook；完整运行通常不到 1 秒。
+
+测试分别覆盖：
+
+- `test_sampling.py`：variant 文件名以及 `variant`、`decoder_weights` 溯源字段；
+- `test_starv_states.py`：StarV grid 范围、完整状态维度和本地 NPZ 加载；
+- `test_ablation.py`：消融网格、断点续跑、rollout 溯源、L2 指标和 mainline 晋升保护。
+
+运行时可能出现 Gym 维护状态或系统用户 ID 的环境警告；只要最终显示 `Ran 26 tests` 和 `OK`，就表示
+测试通过。真正的失败会显示 `FAIL` 或 `ERROR`，并返回非零退出码。
+
+## 文件树
 
 ```text
 verifiable_wm/
@@ -330,8 +363,7 @@ verifiable_wm/
 ├── notebooks/
 │   ├── generate_dataset.ipynb
 │   ├── train_decoder.ipynb
-│   ├── saliency_diagnostics.ipynb
-│   └── compare_tube.ipynb
+│   └── saliency_diagnostics.ipynb
 ├── report/                     # 每日工作记录
 ├── results/                    # StarV 验证和对比结果
 ├── saliency_map/
@@ -346,21 +378,18 @@ verifiable_wm/
 │   └── verifiers.py
 ├── tests/
 │   ├── test_ablation.py
-│   ├── test_compare_trajectory_states.py
+│   ├── test_sampling.py
 │   └── test_starv_states.py
 ├── tools/
 │   └── visualize.py
 ├── make_decoder_dataset.py     # 训练数据、StarV states 与真实轨迹生成
 ├── ablation.py                 # alpha-lambda 网格、DWM rollout、L2 表与显式晋升
-├── sampling.py                 # DWM 闭环 rollout
+├── sampling.py                 # variant-aware DWM 闭环 rollout
 ├── train_decoder.py            # decoder 训练
 ├── verify.py                   # StarV/MPI 验证入口
 ├── compare.py                  # trajectory 与 reachable tube 对比
 ├── dynamic.py                  # 真实环境 dynamics
 ├── env.py                      # renderer 与环境封装
 ├── model.py                    # controller 和 decoder
-├── tube_geometry.py            # reachable tube 几何计算
-├── tube_plot.py                # tube 绘图
-├── tube_report.py              # tube 统计报告
 └── utils.py                    # 数据采样与通用工具
 ```
