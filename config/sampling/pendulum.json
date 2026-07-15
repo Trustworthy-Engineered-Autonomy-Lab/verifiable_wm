@@ -18,7 +18,7 @@
     "weights": {
       "old": "/home/tealab_shared/starv/weights/pendulum/decoder_pen.pth",
       "intensity": "dwm_weight/now_weight/pendulum/intensity/decoder_best_total.pth",
-      "saliency": "dwm_weight/now_weight/pendulum/saliency/decoder_best_total.pth"
+      "saliency": "dwm_weight/now_weight/pendulum/alpha_lambda_grid/alpha_16/lambda_0.5/seed_2025/decoder_best_total.pth"
     }
   },
   "dynamic": {

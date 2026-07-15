@@ -14,11 +14,11 @@
   },
   "decoder": {
     "name": "Decoder",
-    "variant": "intensity",
+    "variant": "saliency",
     "weights": {
       "old": "/home/tealab_shared/starv/weights/cartpole/decoder_cp.pth",
       "intensity": "dwm_weight/now_weight/cartpole/intensity/decoder_best_total.pth",
-      "saliency": "dwm_weight/now_weight/cartpole/saliency/decoder_best_total.pth"
+      "saliency": "dwm_weight/now_weight/cartpole/alpha_lambda_grid/alpha_8/lambda_0.1/seed_2025/decoder_best_total.pth"
     }
   },
   "dynamic": {

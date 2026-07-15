@@ -3,7 +3,7 @@
         "Decoder" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "dwm_weight/now_weight/cartpole/saliency/decoder_best_total.pth"
+                "weights" : "dwm_weight/now_weight/cartpole/alpha_lambda_grid/alpha_8/lambda_0.1/seed_2025/decoder_best_total.pth"
             }
         },
         "Controller" : {
