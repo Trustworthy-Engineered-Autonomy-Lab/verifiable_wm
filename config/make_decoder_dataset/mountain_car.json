@@ -1,0 +1,30 @@
+{
+  "dataset_name": "dataset_v1",
+  "seed_pool": 2024,
+  "seed_train": 2025,
+  "seed_val": 2026,
+  "seed_test": 2027,
+  "num_pool": 2000,
+  "num_train": 1600,
+  "num_val": 400,
+  "num_test": 400,
+  "rollout_steps": 30,
+  "device": "auto",
+  "render_batch_size": 64,
+  "starv_config": "config/starv_verification/mountain_car.json",
+  "state_space": [
+    {"name": "position", "low": 0.0, "high": 0.1},
+    {"name": "velocity", "low": 0.0, "high": 0.01}
+  ],
+  "controller": {
+    "name": "Controller",
+    "weights": "/home/tealab_shared/starv/weights/mountain_car/controller_mc.pth",
+    "args": {
+      "activation": "tanh"
+    }
+  },
+  "dynamic": {
+    "name": "MountainCar"
+  },
+  "output_dir": "datasets/mountain_car/data/dataset_v1"
+}

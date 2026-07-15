@@ -4,7 +4,8 @@ from typing import Dict, List
 from abc import ABC, abstractmethod
 import random
 
-from models import Pendulum, MountainCar, Cartpole, FullModel
+from starv_verification.model import FullModel
+from starv_verification.dynamic import Pendulum, MountainCar, CartPole
 
 from colorama import Fore, Style
 
@@ -91,7 +92,7 @@ class PendulumVerifier(Verifier):
         return splited_bounds
     
     def dynamic_step(self, bound: np.ndarray):
-        return self.dynamic.reach(bound)
+        return self.dynamic.step(bound)
     
     def criteria(self, bounds: List[np.ndarray]) -> bool:
         # if BOTH |theta_min| and |theta_max| <= 0.15, treat as SAFE.
@@ -108,7 +109,7 @@ class MountainCarVerifier(Verifier):
         self.dynamic = MountainCar()
 
     def dynamic_step(self, bound: np.ndarray):
-        return self.dynamic.reach(bound)
+        return self.dynamic.step(bound)
 
     def criteria(self, bounds: List[np.ndarray]) -> bool:
         # Check safety condition: BOTH min and max position must be >= threshold
@@ -119,7 +120,7 @@ class CartpoleVerifier(Verifier):
     def __init__(self, goal_angle_threshold = 12, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.goal_angle_threshold = goal_angle_threshold
-        self.dynamic = Cartpole()
+        self.dynamic = CartPole()
 
     def verify_single_bound(self, model: FullModel, state_bound: np.ndarray) -> np.ndarray:
         action_bound = model.reach(state_bound[:,(0,2)])
@@ -127,7 +128,7 @@ class CartpoleVerifier(Verifier):
         return self.dynamic_step(combined_bound)
 
     def dynamic_step(self, bound: np.ndarray):
-        return self.dynamic.reach(bound)
+        return self.dynamic.step(bound)
 
     def criteria(self, bounds: List[np.ndarray]) -> bool:
         # Check safety condition
