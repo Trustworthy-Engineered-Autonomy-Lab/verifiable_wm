@@ -25,8 +25,10 @@ covering the whole range with larger cells.
 | MountainCar | position `[0.00, 0.10]`, velocity `[0.000, 0.010]` | `0.01`, `0.001` | position `[0.03, 0.07]`, velocity `[0.003, 0.007]` | 16 |
 
 CartPole velocity and angular velocity stay fixed at zero. Every case keeps
-its existing verifier class, safety threshold, early-stop setting, and full
-30-step horizon.
+its existing verifier class, safety threshold, and full 30-step horizon.
+All three smoke configurations set `save_history=true` and
+`early_stop=false` so every result contains the aligned sequence
+`t=0, ..., 30` required by `compare.py`.
 
 ## Files and isolation
 
@@ -54,11 +56,12 @@ approved unsandboxed command.
 For every case:
 
 1. The selected decoder and controller checkpoints load successfully.
-2. Exactly sixteen cells are generated and processed for 30 steps, subject to
-   the case's existing early-stop behavior.
+2. Exactly sixteen cells are generated and processed for all 30 steps.
 3. The result JSON is written only under `results/smoke/<case>/`.
 4. Every cell contains either a Boolean `result` or an `error_msg`.
-5. The final report gives cell counts, safe/unsafe/error counts, elapsed
+5. Every error-free cell contains exactly 31 ordered bounds entries, one for
+   each state time from `t=0` through `t=30`.
+6. The final report gives cell counts, safe/unsafe/error counts, elapsed
    time, and observed bound/history sizes. A smoke result is an integration
    signal only; it is not a formal conclusion over the full configured
    initial-state range.
@@ -67,5 +70,6 @@ For every case:
 
 Add a focused regression test that loads all three smoke configurations and
 checks checkpoint selection, sixteen-cell grid cardinality, 30-step horizon,
-and isolated output prefixes. Run it failing before adding the configs, then
-passing afterward. Run the full existing test suite before launching StarV.
+full-history settings, and isolated output prefixes. Run it failing before
+updating the configs, then passing afterward. Run the full existing test suite
+before launching StarV.

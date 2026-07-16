@@ -4,7 +4,7 @@
 
 **Goal:** Verify CartPole, Pendulum, and MountainCar end to end with their selected decoder checkpoints on isolated central 4-by-4 StarV grids.
 
-**Architecture:** Add three data-only smoke configurations that preserve formal cell widths and all 30 verification steps while selecting only the central sixteen cells. Keep formal configs and outputs untouched, then validate each generated result JSON with a read-only summary command.
+**Architecture:** Add three data-only smoke configurations that preserve formal cell widths and all 30 verification steps while selecting only the central sixteen cells. Save every intermediate bound with early stopping disabled so `compare.py` receives the aligned sequence `t=0, ..., 30`; keep formal configs and outputs untouched, then validate each generated result JSON with a read-only summary command.
 
 **Tech Stack:** JSON, Python 3, unittest/pytest, mpi4py, StarV, pybdr
 
@@ -14,6 +14,8 @@
 - Do not write to `results/<env>/safety_result.json`; use `results/smoke/<env>/safety_result.json`.
 - Preserve the formal grid's cell width along every dimension.
 - Run sixteen initial cells and the existing 30-step horizon for every case.
+- Set `save_history=true` and `early_stop=false` for every case so each
+  error-free cell contains exactly 31 bounds entries.
 - Treat smoke results as integration evidence, not full-range formal conclusions.
 
 ---
@@ -76,6 +78,8 @@ class StarVSmokeConfigTests(unittest.TestCase):
                     expected["ranges"],
                 )
                 self.assertEqual(config["verifier"]["kwargs"]["num_steps"], 30)
+                self.assertTrue(config["verifier"]["kwargs"]["save_history"])
+                self.assertFalse(config["verifier"]["kwargs"]["early_stop"])
                 self.assertEqual(
                     config["output_prefix"],
                     f"results/smoke/{env}/safety_result",
@@ -106,7 +110,7 @@ Create `config/starv_verification/smoke/cartpole.json`:
     "Decoder": {"args": [], "kwargs": {"weights": "dwm_weight/now_weight/cartpole/alpha_lambda_grid/alpha_8/lambda_0.1/seed_2025/decoder_best_total.pth"}},
     "Controller": {"args": [], "kwargs": {"weights": "/home/tealab_shared/starv/weights/cartpole/controller_cp.pth", "activation": "sigmoid"}}
   },
-  "verifier": {"name": "CartpoleVerifier", "args": [], "kwargs": {"goal_angle_threshold": 0.209, "num_steps": 30, "early_stop": false}},
+  "verifier": {"name": "CartpoleVerifier", "args": [], "kwargs": {"goal_angle_threshold": 0.209, "num_steps": 30, "early_stop": false, "save_history": true}},
   "grid": {"dims": [
     {"name": "pos", "start": 0.18, "stop": 0.42, "num": 4},
     {"name": "vel", "start": 0.0, "stop": 0.0, "num": 1},
@@ -125,7 +129,7 @@ Create `config/starv_verification/smoke/pendulum.json`:
     "Decoder": {"args": [], "kwargs": {"weights": "dwm_weight/now_weight/pendulum/alpha_lambda_grid/alpha_16/lambda_0.5/seed_2025/decoder_best_total.pth"}},
     "Controller": {"args": [], "kwargs": {"weights": "/home/tealab_shared/starv/weights/pendulum/controller_pen.pth"}}
   },
-  "verifier": {"name": "PendulumVerifier", "args": [], "kwargs": {"goal_angle_threshold": 0.15, "num_steps": 30, "early_stop": true}},
+  "verifier": {"name": "PendulumVerifier", "args": [], "kwargs": {"goal_angle_threshold": 0.15, "num_steps": 30, "early_stop": false, "save_history": true}},
   "grid": {"dims": [
     {"name": "theta", "start": 1.03, "stop": 1.07, "num": 4},
     {"name": "omega", "start": 4.53, "stop": 4.57, "num": 4}
@@ -195,6 +199,7 @@ for env in ("cartpole", "pendulum", "mountain_car"):
     cells = result["cells"]
     assert len(cells) == 16
     assert all(isinstance(cell.get("result"), bool) or "error_msg" in cell for cell in cells)
+    assert all("error_msg" in cell or len(cell["bounds"]) == 31 for cell in cells)
     print(
         env,
         "safe=", sum(cell.get("result") is True for cell in cells),
