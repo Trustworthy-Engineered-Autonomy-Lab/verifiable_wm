@@ -14,15 +14,15 @@ overwriting formal verification results or changing the formal grid.
 
 ## Smoke grid
 
-Each smoke configuration selects the two central formal cells along every
+Each smoke configuration selects the four central formal cells along every
 non-fixed grid dimension. It preserves the formal cell width instead of
 covering the whole range with larger cells.
 
 | Case | Formal varying ranges | Formal cell width | Smoke ranges | Smoke cells |
 |---|---|---|---|---:|
-| CartPole | position `[0.00, 0.60]`, angle `[0.06, 0.12]` | `0.06`, `0.006` | position `[0.24, 0.36]`, angle `[0.084, 0.096]` | 4 |
-| Pendulum | theta `[1.00, 1.10]`, omega `[4.50, 4.60]` | `0.01`, `0.01` | theta `[1.04, 1.06]`, omega `[4.54, 4.56]` | 4 |
-| MountainCar | position `[0.00, 0.10]`, velocity `[0.000, 0.010]` | `0.01`, `0.001` | position `[0.04, 0.06]`, velocity `[0.004, 0.006]` | 4 |
+| CartPole | position `[0.00, 0.60]`, angle `[0.06, 0.12]` | `0.06`, `0.006` | position `[0.18, 0.42]`, angle `[0.078, 0.102]` | 16 |
+| Pendulum | theta `[1.00, 1.10]`, omega `[4.50, 4.60]` | `0.01`, `0.01` | theta `[1.03, 1.07]`, omega `[4.53, 4.57]` | 16 |
+| MountainCar | position `[0.00, 0.10]`, velocity `[0.000, 0.010]` | `0.01`, `0.001` | position `[0.03, 0.07]`, velocity `[0.003, 0.007]` | 16 |
 
 CartPole velocity and angular velocity stay fixed at zero. Every case keeps
 its existing verifier class, safety threshold, early-stop setting, and full
@@ -44,7 +44,7 @@ only verifies cells and does not regenerate trajectory datasets.
 ## Execution
 
 Run `verify.py` once per smoke configuration in the shared StarV Python
-environment. A single MPI rank is sufficient for four cells; if a working
+environment. A single MPI rank is sufficient for sixteen cells; if a working
 MPI launcher is available, up to four ranks may be used. The sandboxed
 runtime currently prevents MPI initialization, so execution may require an
 approved unsandboxed command.
@@ -54,7 +54,7 @@ approved unsandboxed command.
 For every case:
 
 1. The selected decoder and controller checkpoints load successfully.
-2. Exactly four cells are generated and processed for 30 steps, subject to
+2. Exactly sixteen cells are generated and processed for 30 steps, subject to
    the case's existing early-stop behavior.
 3. The result JSON is written only under `results/smoke/<case>/`.
 4. Every cell contains either a Boolean `result` or an `error_msg`.
@@ -66,6 +66,6 @@ For every case:
 ## Testing
 
 Add a focused regression test that loads all three smoke configurations and
-checks checkpoint selection, four-cell grid cardinality, 30-step horizon,
+checks checkpoint selection, sixteen-cell grid cardinality, 30-step horizon,
 and isolated output prefixes. Run it failing before adding the configs, then
 passing afterward. Run the full existing test suite before launching StarV.
