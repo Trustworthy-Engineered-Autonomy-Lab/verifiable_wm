@@ -1,0 +1,55 @@
+{
+  "layers": {
+    "Decoder": {
+      "args": [],
+      "kwargs": {
+        "weights": "dwm_weight/now_weight/cartpole/alpha_lambda_grid/alpha_8/lambda_0.1/seed_2025/decoder_best_total.pth"
+      }
+    },
+    "Controller": {
+      "args": [],
+      "kwargs": {
+        "weights": "/home/tealab_shared/starv/weights/cartpole/controller_cp.pth",
+        "activation": "sigmoid"
+      }
+    }
+  },
+  "verifier": {
+    "name": "CartpoleVerifier",
+    "args": [],
+    "kwargs": {
+      "goal_angle_threshold": 0.209,
+      "num_steps": 30,
+      "early_stop": false
+    }
+  },
+  "grid": {
+    "dims": [
+      {
+        "name": "pos",
+        "start": 0.18,
+        "stop": 0.42,
+        "num": 4
+      },
+      {
+        "name": "vel",
+        "start": 0.0,
+        "stop": 0.0,
+        "num": 1
+      },
+      {
+        "name": "angle",
+        "start": 0.078,
+        "stop": 0.102,
+        "num": 4
+      },
+      {
+        "name": "avel",
+        "start": 0.0,
+        "stop": 0.0,
+        "num": 1
+      }
+    ]
+  },
+  "output_prefix": "results/smoke/cartpole/safety_result"
+}
