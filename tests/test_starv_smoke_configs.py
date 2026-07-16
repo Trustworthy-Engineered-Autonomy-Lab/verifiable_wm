@@ -58,6 +58,8 @@ class StarVSmokeConfigTests(unittest.TestCase):
                     expected["ranges"],
                 )
                 self.assertEqual(config["verifier"]["kwargs"]["num_steps"], 30)
+                self.assertTrue(config["verifier"]["kwargs"]["save_history"])
+                self.assertFalse(config["verifier"]["kwargs"]["early_stop"])
                 self.assertEqual(
                     config["output_prefix"],
                     f"results/smoke/{env}/safety_result",
