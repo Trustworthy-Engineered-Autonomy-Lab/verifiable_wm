@@ -48,10 +48,22 @@ from matplotlib.colors import Normalize
 # any path from the terminal with --safety / --real / --dwm / --outdir.
 # ============================================================
 
-DEFAULT_SAFETY_PATH = Path("results/cartpole/safety_result.json")
-DEFAULT_REAL_TRAJ_PATH = Path("datasets/cartpole/data/dataset_v1/real_trajectories.npz")
-DEFAULT_DWM_TRAJ_PATH = Path("datasets/cartpole/data/dataset_v1/dwm_trajectories_saliency.npz")
-DEFAULT_OUT_DIR = Path("results/cartpole/compare_plot")
+PROJECT_ROOT = Path(__file__).resolve().parent
+
+# DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/cartpole/safety_result_cell_100_a8_lamda01.json"
+# DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/data_cell_100/real_trajectories.npz"
+# DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/data_cell_100/dwm_trajectories_saliency.npz"
+# DEFAULT_OUT_DIR = PROJECT_ROOT / "results/cartpole/compare_plot"
+
+DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/mountain_car/safety_result_cell_100_a16_lambda05.json"
+DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/real_trajectories.npz"
+DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/dwm_trajectories_saliency.npz"
+DEFAULT_OUT_DIR = PROJECT_ROOT / "results/mountain_car/compare_plot"
+
+# DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/mountain_car/safety_result_cell_100_a16_lambda05.json"
+# DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/real_trajectories.npz"
+# DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/dwm_trajectories_saliency.npz"
+# DEFAULT_OUT_DIR = PROJECT_ROOT / "results/mountain_car/compare_plot"
 
 SAFETY_PATH: Path = DEFAULT_SAFETY_PATH
 REAL_TRAJ_PATH: Path = DEFAULT_REAL_TRAJ_PATH
@@ -64,7 +76,9 @@ DWM_KEY = "test_traj"
 # Environment-specific dimensions used by default.
 # CartPole compares cart position x (dim 0) and pole angle theta (dim 2).
 # MountainCar and Pendulum continue to compare dimensions (0, 1).
-DEFAULT_ENV = "cartpole"
+# DEFAULT_ENV = "cartpole"
+DEFAULT_ENV = "mountain_car"
+# DEFAULT_ENV = "pendulum"
 ENV_DEFAULT_DIMS = {
     "cartpole": {
         "plot_dims": (0, 2),
@@ -574,15 +588,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
-    # Optional paths. If omitted, paths are derived from --env inside this repository.
+    # Optional paths. If omitted, the editable defaults at the top are used.
     parser.add_argument("--safety", type=Path, default=None,
-                        help="Path to safety_result.json. Default: results/<env>/safety_result.json")
+                        help=f"Path to safety result. Default: {DEFAULT_SAFETY_PATH}")
     parser.add_argument("--real", type=Path, default=None,
-                        help="Path to real_trajectories.npz. Default: datasets/<env>/data/dataset_v1/real_trajectories.npz")
+                        help=f"Path to real trajectories. Default: {DEFAULT_REAL_TRAJ_PATH}")
     parser.add_argument("--dwm", type=Path, default=None,
-                        help="Path to DWM trajectories. Default: datasets/<env>/data/dataset_v1/dwm_trajectories_saliency.npz")
+                        help=f"Path to DWM trajectories. Default: {DEFAULT_DWM_TRAJ_PATH}")
     parser.add_argument("--outdir", type=Path, default=None,
-                        help="Output directory for figures. Default: results/<env>/compare_plot")
+                        help=f"Output directory for figures. Default: {DEFAULT_OUT_DIR}")
 
     # NPZ keys.
     parser.add_argument("--real-key", default="test_traj",
@@ -629,11 +643,10 @@ def apply_args(args: argparse.Namespace) -> None:
     global REAL_KEY, DWM_KEY, ENV_NAME, PLOT_DIMS, CHECK_DIMS, MAX_STEPS
     global DELTA, PRINT_KEYS_ONLY, DPI
 
-    data_dir = Path("datasets") / args.env / "data" / "dataset_v1"
-    SAFETY_PATH = args.safety or Path("results") / args.env / "safety_result.json"
-    REAL_TRAJ_PATH = args.real or data_dir / "real_trajectories.npz"
-    DWM_TRAJ_PATH = args.dwm or data_dir / "dwm_trajectories_saliency.npz"
-    OUT_DIR = args.outdir or Path("results") / args.env / "compare_plot"
+    SAFETY_PATH = args.safety or DEFAULT_SAFETY_PATH
+    REAL_TRAJ_PATH = args.real or DEFAULT_REAL_TRAJ_PATH
+    DWM_TRAJ_PATH = args.dwm or DEFAULT_DWM_TRAJ_PATH
+    OUT_DIR = args.outdir or DEFAULT_OUT_DIR
 
     REAL_KEY = args.real_key
     DWM_KEY = args.dwm_key

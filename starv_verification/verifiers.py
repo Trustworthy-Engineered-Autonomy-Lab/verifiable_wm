@@ -10,7 +10,7 @@ from starv_verification.dynamic import Pendulum, MountainCar, CartPole
 from colorama import Fore, Style
 
 class Verifier(ABC):
-    def __init__(self, save_history = False, num_steps = 20, early_stop = True):
+    def __init__(self, save_history = True, num_steps = 30, early_stop = False):
         self.save_history = save_history
         self.num_steps = num_steps
         self.early_stop = early_stop
