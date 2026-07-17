@@ -81,7 +81,7 @@ def run(env_name, dataset_dir, checkpoints, output_path=None, num_samples=6, see
             if r == 0:
                 ax.set_title(f"test idx {idx[c]}", fontsize=9)
 
-    fig.tight_layout()
+    fig.tight_layout(rect=(0.14, 0.0, 1.0, 1.0))
     output_path = Path(output_path) if output_path is not None else default_output_path(env_name)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=150)

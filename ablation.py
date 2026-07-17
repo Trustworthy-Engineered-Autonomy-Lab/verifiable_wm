@@ -31,17 +31,15 @@ class Experiment:
     lambda_ctrl: float
     seed: int = DEFAULT_SEED
     weight_root: Path = GRID_ROOT
+    condition: str = "default"
+    base_config_path: Path | None = None
 
     @property
     def output_dir(self) -> Path:
-        return (
-            self.weight_root
-            / self.env
-            / "alpha_lambda_grid"
-            / f"alpha_{format_value(self.alpha)}"
-            / f"lambda_{format_value(self.lambda_ctrl)}"
-            / f"seed_{self.seed}"
-        )
+        root = self.weight_root / self.env / "alpha_lambda_grid"
+        if self.condition != "default":
+            root = root / self.condition
+        return root / f"alpha_{format_value(self.alpha)}" / f"lambda_{format_value(self.lambda_ctrl)}" / f"seed_{self.seed}"
 
     @property
     def best_checkpoint(self) -> Path:
@@ -65,6 +63,7 @@ class Experiment:
             "alpha": self.alpha,
             "lambda_ctrl": self.lambda_ctrl,
             "seed": self.seed,
+            "condition": self.condition,
             "output_dir": self.output_dir.as_posix(),
         }
 
@@ -75,11 +74,21 @@ def build_experiments(
     lambdas: Sequence[float] = DEFAULT_LAMBDAS,
     seed: int = DEFAULT_SEED,
     weight_root: Path = GRID_ROOT,
+    condition: str = "default",
+    base_config_path: Path | None = None,
 ) -> list[Experiment]:
-    if env not in {"cartpole", "pendulum"}:
+    if env not in {"cartpole", "mountain_car", "pendulum"}:
         raise ValueError(f"Unsupported ablation environment: {env}")
     return [
-        Experiment(env, float(alpha), float(lambda_ctrl), int(seed), Path(weight_root))
+        Experiment(
+            env,
+            float(alpha),
+            float(lambda_ctrl),
+            int(seed),
+            Path(weight_root),
+            condition,
+            Path(base_config_path) if base_config_path is not None else None,
+        )
         for alpha, lambda_ctrl in product(alphas, lambdas)
     ]
 
@@ -91,7 +100,8 @@ def build_train_config(
     source = base_config
     if source is None:
         source = load_config(
-            Path("config/train_decoder") / experiment.env / "saliency.json"
+            experiment.base_config_path
+            or Path("config/train_decoder") / experiment.env / "saliency.json"
         )
     config = copy.deepcopy(dict(source))
     if config.get("weight_mode") != "saliency":
@@ -423,6 +433,7 @@ def collect_training_metrics(
             "alpha": experiment.alpha,
             "lambda_ctrl": experiment.lambda_ctrl,
             "seed": experiment.seed,
+            "condition": experiment.condition,
             "best_epoch": best_epoch,
         }
         rows.append(
@@ -470,13 +481,23 @@ def collect_rollout_metrics(
                         dwm_data[f"{split}_traj"],
                         circular_dims=circular_dims,
                     )
+                    action_key = f"{split}_actions"
+                    action_mse = float("nan")
+                    if action_key in real_data and action_key in dwm_data:
+                        action_mse = float(
+                            np.mean(
+                                (real_data[action_key] - dwm_data[action_key]) ** 2
+                            )
+                        )
                     rows.append(
                         {
                             "env": experiment.env,
                             "alpha": experiment.alpha,
                             "lambda_ctrl": experiment.lambda_ctrl,
                             "seed": experiment.seed,
+                            "condition": experiment.condition,
                             "split": split,
+                            "action_mse": action_mse,
                             **metrics,
                         }
                     )
@@ -493,7 +514,7 @@ def build_combined_metrics(
     selected = list(build_experiments(env) if experiments is None else experiments)
     training = collect_training_metrics(selected)
     rollout = collect_rollout_metrics(env, selected, real_path=real_path)
-    keys = ["env", "alpha", "lambda_ctrl", "seed", "split"]
+    keys = ["env", "condition", "alpha", "lambda_ctrl", "seed", "split"]
     combined = training.merge(rollout, on=keys, how="inner", validate="one_to_one")
     if len(combined) != 2 * len(selected):
         raise ValueError(
@@ -502,6 +523,7 @@ def build_combined_metrics(
         )
     columns = [
         "env",
+        "condition",
         "alpha",
         "lambda_ctrl",
         "seed",
@@ -509,6 +531,7 @@ def build_combined_metrics(
         "best_epoch",
         "ctrl_mse",
         "pixel_mse",
+        "action_mse",
         "mean_step_l2",
         "final_l2",
         "max_l2_mean",
@@ -619,6 +642,7 @@ def compare_with_mainline(
 
     base = {
         "env": experiment.env,
+        "condition": "mainline",
         "alpha": float(train_config["weight"]["alpha"]),
         "lambda_ctrl": float(train_config["lambda_ctrl"]),
         "seed": int(train_config["training"]["seed"]),

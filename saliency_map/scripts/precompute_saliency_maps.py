@@ -21,7 +21,14 @@ from saliency_map.methods import (
 )
 
 
-def compute_split(controller, images_np, device, args):
+def build_background_median(data):
+    if "train_images" not in data:
+        available = ", ".join(data.files)
+        raise KeyError(f"Missing key train_images; available keys: {available}")
+    return np.median(data["train_images"], axis=0, keepdims=True).astype(np.float32)
+
+
+def compute_split(controller, images_np, device, args, background=None):
     heat_chunks = []
     action_chunks = []
 
@@ -30,12 +37,13 @@ def compute_split(controller, images_np, device, args):
         images = torch.from_numpy(images_np[start:end]).float().to(device)
 
         if args.method == "occlusion":
+            fill = background if args.occlusion_baseline == "background_median" else args.occlusion_fill
             heat, actions = occlusion(
                 controller,
                 images,
                 patch=args.occlusion_patch,
                 stride=args.occlusion_stride,
-                fill=args.occlusion_fill,
+                fill=fill,
             )
         else:
             raise ValueError(f"Unsupported method: {args.method}")
@@ -50,8 +58,9 @@ def compute_split(controller, images_np, device, args):
     return np.concatenate(heat_chunks, axis=0), np.concatenate(action_chunks, axis=0)
 
 
-def default_output_path(dataset_path, method):
-    return dataset_path.parent / f"saliency_{method}.npz"
+def default_output_path(dataset_path, method, occlusion_baseline):
+    suffix = "" if occlusion_baseline == "white" else f"_{occlusion_baseline}"
+    return dataset_path.parent / f"saliency_{method}{suffix}.npz"
 
 
 def parse_args(argv=None):
@@ -74,6 +83,12 @@ def parse_args(argv=None):
     parser.add_argument("--occlusion-patch", type=int, default=8)
     parser.add_argument("--occlusion-stride", type=int, default=4)
     parser.add_argument("--occlusion-fill", type=float, default=1.0)
+    parser.add_argument(
+        "--occlusion-baseline",
+        choices=["white", "background_median"],
+        default="white",
+        help="Patch fill source. background_median is computed once from train_images.",
+    )
     parser.add_argument("--normalize", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--seed", type=int, default=0)
@@ -92,10 +107,15 @@ def run(args):
 
     config = load_json(args.config)
     dataset_path = args.dataset or (Path(config["output_dir"]) / "decoder_states.npz")
-    output_path = args.output or default_output_path(dataset_path, args.method)
+    output_path = args.output or default_output_path(
+        dataset_path, args.method, args.occlusion_baseline
+    )
 
     data = np.load(dataset_path)
     controller = build_controller(config, device)
+    background = None
+    if args.occlusion_baseline == "background_median":
+        background = torch.from_numpy(build_background_median(data)).to(device)
 
     arrays = {}
     for split in args.splits:
@@ -105,12 +125,17 @@ def run(args):
             raise KeyError(f"Missing key {key}; available keys: {available}")
 
         print(f"[split] {split}")
-        heatmaps, actions = compute_split(controller, data[key], device, args)
+        heatmaps, actions = compute_split(
+            controller, data[key], device, args, background=background
+        )
         arrays[f"{split}_heatmaps"] = heatmaps
         arrays[f"{split}_actions"] = actions
 
     arrays["method"] = np.array(args.method)
     arrays["config"] = np.array(str(args.config))
+    arrays["occlusion_baseline"] = np.array(args.occlusion_baseline)
+    if args.occlusion_baseline == "background_median":
+        arrays["background_source"] = np.array("train_images_median")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(output_path, **arrays)
@@ -123,4 +148,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

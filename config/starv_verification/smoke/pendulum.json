@@ -3,13 +3,15 @@
     "Decoder": {
       "args": [],
       "kwargs": {
-        "weights": "dwm_weight/now_weight/pendulum/alpha_lambda_grid/alpha_16/lambda_0.5/seed_2025/decoder_best_total.pth"
+        "weights": "dwm_weight/now_weight/pendulum/alpha_lambda_grid/alpha_16/lambda_0.5/seed_2025/decoder_best_total.pth",
+        "lp_solver": "linprog"
       }
     },
     "Controller": {
       "args": [],
       "kwargs": {
-        "weights": "/home/tealab_shared/starv/weights/pendulum/controller_pen.pth"
+        "weights": "/home/tealab_shared/starv/weights/pendulum/controller_pen.pth",
+        "lp_solver": "linprog"
       }
     }
   },
@@ -20,7 +22,8 @@
       "goal_angle_threshold": 0.15,
       "num_steps": 30,
       "early_stop": false,
-      "save_history": true
+      "save_history": true,
+      "lp_solver": "linprog"
     }
   },
   "grid": {

@@ -71,6 +71,46 @@ class AblationGridTests(unittest.TestCase):
         self.assertEqual(actual["training"]["seed"], 2025)
         self.assertEqual(actual["output_dir"], experiment.output_dir.as_posix())
 
+    def test_mountain_car_condition_has_an_isolated_grid_subtree(self):
+        experiment = build_experiments(
+            "mountain_car",
+            alphas=(2.0,),
+            lambdas=(0.1,),
+            condition="background",
+            base_config_path=Path("config/train_decoder/mountain_car/saliency_background.json"),
+        )[0]
+
+        self.assertEqual(experiment.condition, "background")
+        self.assertEqual(
+            experiment.output_dir,
+            Path("dwm_weight/now_weight/mountain_car/alpha_lambda_grid/background")
+            / "alpha_2"
+            / "lambda_0.1"
+            / "seed_2025",
+        )
+
+    def test_mountain_car_background_baseline_config(self):
+        sampling = json.loads(
+            Path("config/sampling/mountain_car.json").read_text(encoding="utf-8")
+        )
+        training = json.loads(
+            Path(
+                "config/train_decoder/mountain_car/saliency_background.json"
+            ).read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(
+            sampling["decoder"]["weights"]["saliency"],
+            "dwm_weight/now_weight/mountain_car/alpha_lambda_grid/background/"
+            "alpha_16/lambda_0.5/seed_2025/decoder_best_total.pth",
+        )
+        self.assertEqual(
+            training["saliency_file"],
+            "saliency_occlusion_background_median.npz",
+        )
+        self.assertEqual(training["weight"]["alpha"], 16.0)
+        self.assertEqual(training["lambda_ctrl"], 0.5)
+
 
 class TrainingResumeTests(unittest.TestCase):
     def _experiment(self, root):
@@ -369,11 +409,15 @@ class L2MetricTests(unittest.TestCase):
                 real_path,
                 val_traj=real_val,
                 test_traj=real_test,
+                val_actions=np.array([[[0.1]]], dtype=np.float32),
+                test_actions=np.array([[[0.2]]], dtype=np.float32),
             )
             np.savez_compressed(
                 experiment.trajectory_path,
                 val_traj=real_val.copy(),
                 test_traj=real_test.copy(),
+                val_actions=np.array([[[0.1]]], dtype=np.float32),
+                test_actions=np.array([[[0.3]]], dtype=np.float32),
                 variant=np.array("saliency"),
                 decoder_weights=np.array(experiment.best_checkpoint.as_posix()),
             )
@@ -390,6 +434,7 @@ class L2MetricTests(unittest.TestCase):
                 set(combined.columns),
                 {
                     "env",
+                    "condition",
                     "alpha",
                     "lambda_ctrl",
                     "seed",
@@ -397,11 +442,20 @@ class L2MetricTests(unittest.TestCase):
                     "best_epoch",
                     "ctrl_mse",
                     "pixel_mse",
+                    "action_mse",
                     "mean_step_l2",
                     "final_l2",
                     "max_l2_mean",
                     "max_l2_p95",
                 },
+            )
+            self.assertEqual(
+                combined.loc[combined["split"] == "val", "action_mse"].item(),
+                0.0,
+            )
+            self.assertAlmostEqual(
+                combined.loc[combined["split"] == "test", "action_mse"].item(),
+                0.01,
             )
 
             with mock.patch("ablation.GRID_ROOT", root / "summaries"):

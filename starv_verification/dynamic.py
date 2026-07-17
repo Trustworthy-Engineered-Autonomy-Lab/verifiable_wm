@@ -13,8 +13,9 @@ from sympy import Matrix, cos, sin
 import dynamic
 
 class Pendulum(dynamic.Pendulum):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, lp_solver='gurobi', *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.lp_solver = lp_solver
 
     def angle_normalize(self, x):
         """Normalize angle to [-π, π] range"""
@@ -31,9 +32,11 @@ class Pendulum(dynamic.Pendulum):
         ub_theta = np.array([theta_max], dtype=np.float32)
         S_theta = Star(lb_theta, ub_theta)
 
-        IM_sin = L_sin.reach(S_theta, method='approx', lp_solver='gurobi', RF=0.0)
+        IM_sin = L_sin.reach(
+            S_theta, method='approx', lp_solver=self.lp_solver, RF=0.0
+        )
         try:
-            z_bound = np.array(IM_sin.getRanges(lp_solver='gurobi'))
+            z_bound = np.array(IM_sin.getRanges(lp_solver=self.lp_solver))
         except Exception as e:
             z_bound = np.array(IM_sin.getRanges(lp_solver='estimate'))
 
@@ -47,7 +50,7 @@ class Pendulum(dynamic.Pendulum):
         S_next = S_full.affineMap(M, b_dyn)
 
         # Step 7: Get bounds BEFORE clipping
-        next_bound = np.array(S_next.getRanges('gurobi', RF=0.0))
+        next_bound = np.array(S_next.getRanges(self.lp_solver, RF=0.0))
 
         # Clip omega' to [-8, 8]
         next_bound[:,1] = np.clip(next_bound[:,1], -8.0, 8.0)
