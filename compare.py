@@ -55,15 +55,15 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 # DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/data_cell_100/dwm_trajectories_saliency.npz"
 # DEFAULT_OUT_DIR = PROJECT_ROOT / "results/cartpole/compare_plot"
 
-DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/mountain_car/safety_result_cell_100_a16_lambda05.json"
-DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/real_trajectories.npz"
-DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/dwm_trajectories_saliency.npz"
-DEFAULT_OUT_DIR = PROJECT_ROOT / "results/mountain_car/compare_plot"
-
 # DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/mountain_car/safety_result_cell_100_a16_lambda05.json"
 # DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/real_trajectories.npz"
 # DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/dwm_trajectories_saliency.npz"
 # DEFAULT_OUT_DIR = PROJECT_ROOT / "results/mountain_car/compare_plot"
+
+DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/pendulum/safety_result_cell_100_a16_lambda05.json"
+DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/data_cell_100/real_trajectories.npz"
+DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/data_cell_100/dwm_trajectories_saliency.npz"
+DEFAULT_OUT_DIR = PROJECT_ROOT / "results/pendulum/compare_plot"
 
 SAFETY_PATH: Path = DEFAULT_SAFETY_PATH
 REAL_TRAJ_PATH: Path = DEFAULT_REAL_TRAJ_PATH
@@ -77,8 +77,8 @@ DWM_KEY = "test_traj"
 # CartPole compares cart position x (dim 0) and pole angle theta (dim 2).
 # MountainCar and Pendulum continue to compare dimensions (0, 1).
 # DEFAULT_ENV = "cartpole"
-DEFAULT_ENV = "mountain_car"
-# DEFAULT_ENV = "pendulum"
+# DEFAULT_ENV = "mountain_car"
+DEFAULT_ENV = "pendulum"
 ENV_DEFAULT_DIMS = {
     "cartpole": {
         "plot_dims": (0, 2),
@@ -453,6 +453,26 @@ def draw_tube(ax: Any, bounds: Sequence[Any], max_states: int, cmap_name: str) -
     return sm
 
 
+def draw_initial_cell(ax: Any, initial_bounds: Sequence[Any]) -> None:
+    xdim, ydim = PLOT_DIMS
+    if len(initial_bounds) <= max(xdim, ydim):
+        return
+
+    first = True
+    for x0, x1 in dim_intervals(initial_bounds[xdim]):
+        for y0, y1 in dim_intervals(initial_bounds[ydim]):
+            ax.add_patch(Rectangle(
+                (x0, y0),
+                x1 - x0,
+                y1 - y0,
+                fill=False,
+                edgecolor="green",
+                linewidth=2.0,
+                label="initial cell" if first else None,
+            ))
+            first = False
+
+
 def add_goal_lines(ax: Any, safety: Dict[str, Any], grid: GridInfo) -> None:
     kwargs = safety.get("verifier", {}).get("kwargs", {})
     xdim, ydim = PLOT_DIMS
@@ -514,6 +534,7 @@ def plot_set(
             if sm is not None:
                 cbar = fig.colorbar(sm, ax=ax, pad=0.02)
                 cbar.set_label("time step")
+            draw_initial_cell(ax, bounds[0])
 
         plot_traj = traj[:desired]
         ax.plot(
@@ -524,6 +545,15 @@ def plot_set(
             linewidth=1.4,
             color=color,
             label=title_name,
+        )
+        ax.plot(
+            plot_traj[0, xdim],
+            plot_traj[0, ydim],
+            marker="o",
+            markersize=6.0,
+            color="green",
+            linestyle="None",
+            label="initial state",
         )
 
         add_goal_lines(ax, safety, grid)
