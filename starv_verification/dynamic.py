@@ -110,15 +110,14 @@ class CartPole(dynamic.CartPole):
         self.vel_bound = np.array([0.0,0.0])
         self.avel_bound = np.array([0.0,0.0])
 
-    @staticmethod
-    def cartpole(x, a):
+    def cartpole(self, x, a):
         dxdt = [None] * 4
-        a = a[0] * 10.0
+        a = a[0] * self.force_mag
         costheta = cos(x[2])
         sintheta = sin(x[2])
-        temp = (a + 0.05 * x[3] * x[3] * sintheta) / 1.1
-        thetaacc = (9.8 * sintheta - costheta * temp) / (0.5 * (4.0/3.0 - 0.1 * costheta * costheta / 1.1))
-        xacc = temp - 0.05 * thetaacc * costheta / 1.1
+        temp = (a + self.polemass_length * x[3] * x[3] * sintheta) / self.total_mass
+        thetaacc = (self.gravity * sintheta - costheta * temp) / (self.length * (4.0/3.0 - self.mass_pole * costheta * costheta / self.total_mass))
+        xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
         
         dxdt[0] = x[1]
         dxdt[1] = xacc
@@ -134,8 +133,8 @@ class CartPole(dynamic.CartPole):
         state_bound = bound[:,0:4]
 
         options = ASB2008CDC.Options()
-        options.t_end = 0.02
-        options.step = 0.02
+        options.t_end = self.dt
+        options.step = self.dt
         options.tensor_order = 3
         options.taylor_terms = 4
         u=Interval(action_bound[0],action_bound[1])
@@ -157,7 +156,10 @@ class CartPole(dynamic.CartPole):
         upper=np.full(4, np.finfo(np.float32).min, dtype=np.float32)
         for x in xs:
             ri_set, rp_set = ASB2008CDC.reach(
-                CartPole.cartpole, [4, 1], options, x
+                lambda x, a: self.cartpole(x, a), 
+                [4, 1], 
+                options, 
+                x
             )
 
             for i in ri_set:
