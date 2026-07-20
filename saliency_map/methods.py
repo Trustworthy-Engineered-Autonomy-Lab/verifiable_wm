@@ -106,10 +106,27 @@ def occlusion(controller, images, patch=8, stride=4, fill=1.0):
     heat = torch.zeros_like(images)
     counts = torch.zeros_like(images)
     _, _, height, width = images.shape
+    background = None
+    if torch.is_tensor(fill):
+        background = fill.to(device=images.device, dtype=images.dtype)
+        if background.ndim == 3:
+            background = background.unsqueeze(0)
+        expected_shape = (1, *images.shape[1:])
+        if tuple(background.shape) != expected_shape:
+            raise ValueError(
+                "background fill must have shape "
+                f"{expected_shape}, got {tuple(background.shape)}"
+            )
     for y in range(0, height - patch + 1, stride):
         for x0 in range(0, width - patch + 1, stride):
             occluded = images.clone()
-            occluded[:, :, y : y + patch, x0 : x0 + patch] = fill
+            if background is None:
+                occluded[:, :, y : y + patch, x0 : x0 + patch] = fill
+            else:
+                background_patch = background[:, :, y : y + patch, x0 : x0 + patch]
+                occluded[:, :, y : y + patch, x0 : x0 + patch] = background_patch.expand(
+                    images.shape[0], -1, -1, -1
+                )
             delta = (controller(occluded) - base_actions).abs().view(-1, 1, 1, 1)
             heat[:, :, y : y + patch, x0 : x0 + patch] += delta
             counts[:, :, y : y + patch, x0 : x0 + patch] += 1.0
