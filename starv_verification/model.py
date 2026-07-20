@@ -22,10 +22,11 @@ from collections import OrderedDict
 import model
 
 class Decoder(model.Decoder):
-    def __init__(self, weights, *args, **kwargs):
+    def __init__(self, weights, lp_solver='gurobi', *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.load_state_dict(torch.load(weights, 'cpu', weights_only=True))
+        self.lp_solver = lp_solver
     
     def forward(self, state_bound: np.ndarray) -> ImageStar:
         state_star = Star(state_bound[0], state_bound[1])
@@ -38,7 +39,9 @@ class Decoder(model.Decoder):
         L_fc_1 = FullyConnectedLayer([W1, b1])
         R_fc_1 = L_fc_1.reach([state_star])
         L_relu_1 = ReLULayer()
-        R_relu_1 = L_relu_1.reach(R_fc_1[0], method='approx')
+        R_relu_1 = L_relu_1.reach(
+            R_fc_1[0], method='approx', lp_solver=self.lp_solver
+        )
 
         # FC2 + ReLU
         W2 = self.fc2.weight.detach().cpu().numpy()
@@ -46,7 +49,9 @@ class Decoder(model.Decoder):
         L_fc_2 = FullyConnectedLayer([W2, b2])
         R_fc_2 = L_fc_2.reach([R_relu_1])
         L_relu_2 = ReLULayer()
-        R_relu_2 = L_relu_2.reach(R_fc_2[0], method='approx')
+        R_relu_2 = L_relu_2.reach(
+            R_fc_2[0], method='approx', lp_solver=self.lp_solver
+        )
 
         # FC3 + ReLU
         W3 = self.fc3.weight.detach().cpu().numpy()
@@ -54,7 +59,9 @@ class Decoder(model.Decoder):
         L_fc_3 = FullyConnectedLayer([W3, b3])
         R_fc_3 = L_fc_3.reach([R_relu_2])
         L_relu_3 = ReLULayer()
-        R_relu_3 = L_relu_3.reach(R_fc_3[0], method='approx')
+        R_relu_3 = L_relu_3.reach(
+            R_fc_3[0], method='approx', lp_solver=self.lp_solver
+        )
 
         # Convert to ImageStar
         nP = R_relu_3.nVars
@@ -66,10 +73,14 @@ class Decoder(model.Decoder):
         b_dec_conv1 = self.dec_conv1.bias.detach().cpu().numpy()
         w_dec_conv1 = np.transpose(w_dec_conv1, (2, 3, 1, 0))
         L_convt_1 = ConvTranspose2DLayer([w_dec_conv1, b_dec_conv1], [2, 2], [1, 1, 1, 1], [1, 1])
-        R_convt_1 = L_convt_1.reach(IM, method='approx')
+        R_convt_1 = L_convt_1.reach(
+            IM, method='approx', lp_solver=self.lp_solver
+        )
         R_star_convt_1 = R_convt_1.toStar()
         L_relu_convt_1 = ReLULayer()
-        R_star_relu_convt_1 = L_relu_convt_1.reach(R_star_convt_1, method='approx')
+        R_star_relu_convt_1 = L_relu_convt_1.reach(
+            R_star_convt_1, method='approx', lp_solver=self.lp_solver
+        )
         R_convt_1 = R_star_relu_convt_1.toImageStar(image_shape=(24, 24, 4))
 
         # ConvTranspose2 + ReLU
@@ -77,10 +88,14 @@ class Decoder(model.Decoder):
         b_dec_conv2 = self.dec_conv2.bias.detach().cpu().numpy()
         w_dec_conv2 = np.transpose(w_dec_conv2, (2, 3, 1, 0))
         L_convt_2 = ConvTranspose2DLayer([w_dec_conv2, b_dec_conv2], [2, 2], [1, 1, 1, 1], [1, 1])
-        R_convt_2 = L_convt_2.reach(R_convt_1, method='approx')
+        R_convt_2 = L_convt_2.reach(
+            R_convt_1, method='approx', lp_solver=self.lp_solver
+        )
         R_star_convt_2 = R_convt_2.toStar()
         L_relu_convt_2 = ReLULayer()
-        R_star_relu_convt_2 = L_relu_convt_2.reach(R_star_convt_2, method='approx')
+        R_star_relu_convt_2 = L_relu_convt_2.reach(
+            R_star_convt_2, method='approx', lp_solver=self.lp_solver
+        )
         R_convt_2 = R_star_relu_convt_2.toImageStar(image_shape=(48, 48, 8))
 
         # ConvTranspose3
@@ -88,12 +103,16 @@ class Decoder(model.Decoder):
         b_dec_conv3 = self.dec_conv3.bias.detach().cpu().numpy()
         w_dec_conv3 = np.transpose(w_dec_conv3, (2, 3, 1, 0))
         L_convt_3 = ConvTranspose2DLayer([w_dec_conv3, b_dec_conv3], [2, 2], [1, 1, 1, 1], [1, 1])
-        R_convt_3 = L_convt_3.reach(R_convt_2, method='approx')
+        R_convt_3 = L_convt_3.reach(
+            R_convt_2, method='approx', lp_solver=self.lp_solver
+        )
 
         # SatLin
         S1 = R_convt_3.toStar()
         L_satlin = SatLinLayer()
-        IM_satlin_list = L_satlin.reach(S1, method='approx', lp_solver='gurobi')
+        IM_satlin_list = L_satlin.reach(
+            S1, method='approx', lp_solver=self.lp_solver
+        )
         image_star = IM_satlin_list.toImageStar(image_shape=(96, 96, 1))
 
         return image_star
@@ -177,7 +196,8 @@ class Decoder(model.Decoder):
 #         return image_star
 
 class Controller(model.Controller):
-    def __init__(self, weights, activation = 'tanh', output_factor = 1, *args, **kwargs):
+    def __init__(self, weights, activation = 'tanh', output_factor = 1,
+                 lp_solver = 'gurobi', *args, **kwargs):
         super().__init__(activation=activation, *args, **kwargs)
 
         self.load_state_dict(torch.load(weights, 'cpu', weights_only=True))
@@ -190,10 +210,11 @@ class Controller(model.Controller):
             raise ValueError(f'Activation function {activation} is not supported')
         
         self.output_factor = output_factor
+        self.lp_solver = lp_solver
     
     def forward(self, image_star: ImageStar) -> np.ndarray:
         action_star = self._star_reach(image_star)
-        action_bound = np.array(action_star.getRanges('gurobi'))
+        action_bound = np.array(action_star.getRanges(self.lp_solver))
         return action_bound
     
     def _star_reach(self, image_star: ImageStar) -> Star:
@@ -202,12 +223,14 @@ class Controller(model.Controller):
         b_conv1 = self.conv1.bias.detach().cpu().numpy()
         w_conv1 = np.transpose(w_conv1, (2, 3, 1, 0))
         L_conv1 = Conv2DLayer([w_conv1, b_conv1], [2, 2], [1, 1, 1, 1], [1, 1])
-        R_conv1 = L_conv1.reach([image_star])
+        R_conv1 = L_conv1.reach([image_star], lp_solver=self.lp_solver)
         IM_conv1 = R_conv1[0]
 
         IM_conv1_star = IM_conv1.toStar()
         L_relu_conv1 = ReLULayer()
-        R_relu_conv1 = L_relu_conv1.reach(IM_conv1_star, method='approx')
+        R_relu_conv1 = L_relu_conv1.reach(
+            IM_conv1_star, method='approx', lp_solver=self.lp_solver
+        )
         IM_relu_conv1 = R_relu_conv1.toImageStar(image_shape=(48, 48, 4))
 
         # Conv2 + ReLU
@@ -215,12 +238,14 @@ class Controller(model.Controller):
         b_conv2 = self.conv2.bias.detach().cpu().numpy()
         w_conv2 = np.transpose(w_conv2, (2, 3, 1, 0))
         L_conv2 = Conv2DLayer([w_conv2, b_conv2], [2, 2], [1, 1, 1, 1], [1, 1])
-        R_conv2 = L_conv2.reach([IM_relu_conv1])
+        R_conv2 = L_conv2.reach([IM_relu_conv1], lp_solver=self.lp_solver)
         IM_conv2 = R_conv2[0]
 
         IM_conv2_star = IM_conv2.toStar()
         L_relu_conv2 = ReLULayer()
-        R_relu_conv2 = L_relu_conv2.reach(IM_conv2_star, method='approx')
+        R_relu_conv2 = L_relu_conv2.reach(
+            IM_conv2_star, method='approx', lp_solver=self.lp_solver
+        )
 
         # FC1 + ReLU
         Wc1 = self.fc1.weight.detach().cpu().numpy()
@@ -230,7 +255,9 @@ class Controller(model.Controller):
         star_fc_c1 = R_fc_c1[0]
 
         L_relu_fc1 = ReLULayer()
-        R_relu_fc1 = L_relu_fc1.reach(star_fc_c1, method='approx')
+        R_relu_fc1 = L_relu_fc1.reach(
+            star_fc_c1, method='approx', lp_solver=self.lp_solver
+        )
 
         # FC2
         Wc2 = self.fc2.weight.detach().cpu().numpy()
@@ -240,7 +267,9 @@ class Controller(model.Controller):
         star_fc_c2 = R_fc_c2[0]
 
         # Tanh activation
-        IM_act = self.starv_act.reach(star_fc_c2, method='approx', RF=0.0)
+        IM_act = self.starv_act.reach(
+            star_fc_c2, method='approx', lp_solver=self.lp_solver, RF=0.0
+        )
 
         if self.output_factor != 1:
             d = IM_act.dim
