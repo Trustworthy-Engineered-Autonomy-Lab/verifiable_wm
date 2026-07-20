@@ -23,3 +23,4 @@ settings.json
 metrics.json
 dwm_weight/now_weight/cartpole/intensity/metrics.json
 dwm_weight/now_weight/cartpole/saliency/metrics.json
+*.json
