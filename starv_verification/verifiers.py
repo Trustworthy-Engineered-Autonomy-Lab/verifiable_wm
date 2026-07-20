@@ -70,10 +70,11 @@ class Verifier(ABC):
 class PendulumVerifier(Verifier):
     """StarV-based Neural Network Verification for Pendulum System"""
 
-    def __init__(self, goal_angle_threshold = 0.15, *args, **kwargs):
+    def __init__(self, goal_angle_threshold = 0.15, lp_solver = 'gurobi',
+                 *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.goal_angle_threshold = goal_angle_threshold
-        self.dynamic = Pendulum()
+        self.dynamic = Pendulum(lp_solver=lp_solver)
 
     def split_merge_bounds(self, bounds):
         splited_bounds = []
