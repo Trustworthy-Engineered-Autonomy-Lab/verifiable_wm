@@ -50,7 +50,7 @@ from matplotlib.colors import Normalize
 
 DEFAULT_SAFETY_PATH = Path("results/cartpole/safety_result.json")
 DEFAULT_REAL_TRAJ_PATH = Path("datasets/cartpole/data/dataset_v1/real_trajectories.npz")
-DEFAULT_DWM_TRAJ_PATH = Path("datasets/cartpole/data/dataset_v1/dwm_trajectories_saliency.npz")
+DEFAULT_DWM_TRAJ_PATH = Path("datasets/cartpole/data/dataset_v1/dwm_trajectories.npz")
 DEFAULT_OUT_DIR = Path("results/cartpole/compare_plot")
 
 SAFETY_PATH: Path = DEFAULT_SAFETY_PATH
@@ -580,7 +580,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--real", type=Path, default=None,
                         help="Path to real_trajectories.npz. Default: datasets/<env>/data/dataset_v1/real_trajectories.npz")
     parser.add_argument("--dwm", type=Path, default=None,
-                        help="Path to DWM trajectories. Default: datasets/<env>/data/dataset_v1/dwm_trajectories_saliency.npz")
+                        help="Path to DWM trajectories. Default: datasets/<env>/data/dataset_v1/dwm_trajectories.npz")
     parser.add_argument("--outdir", type=Path, default=None,
                         help="Output directory for figures. Default: results/<env>/compare_plot")
 
@@ -632,7 +632,7 @@ def apply_args(args: argparse.Namespace) -> None:
     data_dir = Path("datasets") / args.env / "data" / "dataset_v1"
     SAFETY_PATH = args.safety or Path("results") / args.env / "safety_result.json"
     REAL_TRAJ_PATH = args.real or data_dir / "real_trajectories.npz"
-    DWM_TRAJ_PATH = args.dwm or data_dir / "dwm_trajectories_saliency.npz"
+    DWM_TRAJ_PATH = args.dwm or data_dir / "dwm_trajectories.npz"
     OUT_DIR = args.outdir or Path("results") / args.env / "compare_plot"
 
     REAL_KEY = args.real_key
