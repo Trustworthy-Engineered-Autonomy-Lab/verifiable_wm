@@ -20,27 +20,30 @@ import torch
 
 # 外部输入：真实轨迹数据
 DEFAULT_REAL_PATH = Path(
-    # "/home/tealab_shared/trajectories/mountain_car/starv_state/real_trajectories.npz"
-    #"/home/tealab_shared/trajectories/pendulum/starv_state/real_trajectories.npz"
-    "/home/tealab_shared/trajectories/cartpole/starv_state/real_trajectories.npz"
+#    "/home/tealab_shared/trajectories/mountain_car/starv_state/real_trajectories.npz"
+    "/home/tealab_shared/trajectories/pendulum/starv_state/real_trajectories.npz"
+#    "/home/tealab_shared/trajectories/cartpole/starv_state/real_trajectories.npz"
 )
 
 # 外部输入：DWM verification grid 和 cell 信息
 DEFAULT_GRID_RESULT_PATH = Path(
 #    "/home/tealab_shared/dwm_reachable_tube/mountain_car/safety_result.json"
-#    "/home/UFAD/xinyangwang/projects/verifiable_wm/results/mountain_car/safety_result.json"
-#    "/home/UFAD/xinyangwang/projects/verifiable_wm/results/pendulum/safety_result.json"
-    "/home/UFAD/xinyangwang/projects/verifiable_wm/results/cartpole/safety_result.json"
+    "/home/tealab_shared/dwm_reachable_tube/pendulum/safety_result.json"
+#    "/home/tealab_shared/dwm_reachable_tube/cartpole/safety_result.json"
 )
 
 # Predictor 模型输出
 DEFAULT_CHECKPOINT_PATH = Path(
-    "/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/predictor_transformer.pth"
+#    "/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/mountain_car/predictor_transformer.pth"
+    "/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/pendulum/predictor_transformer.pth"
+#    "/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/cartpole/predictor_transformer.pth"
 )
 
 # Predictor Tube 输出
 DEFAULT_TUBE_OUTPUT_PATH = Path(
-    "/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/predictor_tube.json"
+#    "/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/mountain_car/predictor_tube.json"
+    "/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/pendulum/predictor_tube.json"
+#    "/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/cartpole/predictor_tube.json"
 )
 
 
