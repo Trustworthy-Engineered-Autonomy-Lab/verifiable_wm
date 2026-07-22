@@ -14,6 +14,9 @@ import dynamic
 
 class Pendulum(dynamic.Pendulum):
     def __init__(self, *args, **kwargs):
+        # Keep existing callers that pass lp_solver= compatible; Pendulum
+        # reachability itself is intentionally fixed to Gurobi.
+        kwargs.pop("lp_solver", None)
         super().__init__(*args, **kwargs)
 
     def angle_normalize(self, x):
@@ -21,8 +24,11 @@ class Pendulum(dynamic.Pendulum):
         return ((x + np.pi) % (2 * np.pi)) - np.pi
 
     def step(self, bound: np.ndarray):
-        # theta' = theta + 0.05 * omega + 0.0075 * u + 0.0375 * sin(theta)
-        # omega' = omega + 0.15 * u + 0.75 * sin(theta), clipped to [-8, 8]
+        # Interval form of dynamic.Pendulum.step:
+        #   torque = clip(u, -1, 1) * max_torque
+        #   omega' = omega + (3g/(2l)*sin(theta) + 3/(m*l^2)*torque)*dt,
+        #            clipped to [-max_speed, max_speed]
+        #   theta' = theta + omega'*dt, normalized to [-pi, pi]
         # Compute sin(theta) using SinLayer
         theta_min, theta_max = bound[:,0]
 
@@ -31,26 +37,39 @@ class Pendulum(dynamic.Pendulum):
         ub_theta = np.array([theta_max], dtype=np.float32)
         S_theta = Star(lb_theta, ub_theta)
 
-        IM_sin = L_sin.reach(S_theta, method='approx', lp_solver='gurobi', RF=0.0)
+        IM_sin = L_sin.reach(
+            S_theta, method='approx', lp_solver='gurobi', RF=0.0
+        )
         try:
             z_bound = np.array(IM_sin.getRanges(lp_solver='gurobi'))
         except Exception as e:
             z_bound = np.array(IM_sin.getRanges(lp_solver='estimate'))
 
         full_bound = np.concatenate([bound, z_bound], axis = 1)
+        # dynamic.Pendulum clamps the raw action to [-1, 1] before scaling
+        # by max_torque; the interval version must match.
+        full_bound[:,2] = np.clip(full_bound[:,2], -1.0, 1.0)
         S_full = Star(full_bound[0], full_bound[1])
 
-        # Apply dynamics
-        M = np.array([[1.0, 0.05, 0.0075, 0.0375],
-                      [0.0, 1.0, 0.15, 0.75]], dtype=np.float32)
+        # Apply dynamics on [theta, omega, u, sin(theta)]. Coefficients are
+        # derived from the rollout parameters instead of hard-coded so both
+        # implementations always describe the same system. c_u multiplies
+        # the raw controller output u, so it must include the max_torque
+        # scaling that dynamic.Pendulum applies.
+        c_sin = 3.0 * self.g / (2.0 * self.l) * self.dt
+        c_u = 3.0 / (self.m * self.l ** 2) * self.max_torque * self.dt
+        # The theta' row uses the un-clipped omega'; whenever omega' exceeds
+        # max_speed this only widens theta', so the bound stays sound.
+        M = np.array([[1.0, self.dt, self.dt * c_u, self.dt * c_sin],
+                      [0.0, 1.0, c_u, c_sin]], dtype=np.float32)
         b_dyn = np.zeros(2, dtype=np.float32)
         S_next = S_full.affineMap(M, b_dyn)
 
         # Step 7: Get bounds BEFORE clipping
         next_bound = np.array(S_next.getRanges('gurobi', RF=0.0))
 
-        # Clip omega' to [-8, 8]
-        next_bound[:,1] = np.clip(next_bound[:,1], -8.0, 8.0)
+        # Clip omega' like the rollout dynamics
+        next_bound[:,1] = np.clip(next_bound[:,1], -self.max_speed, self.max_speed)
 
         # Normalize theta to [-π, π]
         next_bound[:,0] = self.angle_normalize(next_bound[:,0])
@@ -93,15 +112,14 @@ class CartPole(dynamic.CartPole):
         self.vel_bound = np.array([0.0,0.0])
         self.avel_bound = np.array([0.0,0.0])
 
-    @staticmethod
-    def cartpole(x, a):
+    def cartpole(self, x, a):
         dxdt = [None] * 4
-        a = a[0] * 10.0
+        a = a[0] * self.force_mag
         costheta = cos(x[2])
         sintheta = sin(x[2])
-        temp = (a + 0.05 * x[3] * x[3] * sintheta) / 1.1
-        thetaacc = (9.8 * sintheta - costheta * temp) / (0.5 * (4.0/3.0 - 0.1 * costheta * costheta / 1.1))
-        xacc = temp - 0.05 * thetaacc * costheta / 1.1
+        temp = (a + self.polemass_length * x[3] * x[3] * sintheta) / self.total_mass
+        thetaacc = (self.gravity * sintheta - costheta * temp) / (self.length * (4.0/3.0 - self.mass_pole * costheta * costheta / self.total_mass))
+        xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
         
         dxdt[0] = x[1]
         dxdt[1] = xacc
@@ -117,8 +135,8 @@ class CartPole(dynamic.CartPole):
         state_bound = bound[:,0:4]
 
         options = ASB2008CDC.Options()
-        options.t_end = 0.02
-        options.step = 0.02
+        options.t_end = self.dt
+        options.step = self.dt
         options.tensor_order = 3
         options.taylor_terms = 4
         u=Interval(action_bound[0],action_bound[1])
@@ -140,7 +158,10 @@ class CartPole(dynamic.CartPole):
         upper=np.full(4, np.finfo(np.float32).min, dtype=np.float32)
         for x in xs:
             ri_set, rp_set = ASB2008CDC.reach(
-                CartPole.cartpole, [4, 1], options, x
+                lambda x, a: self.cartpole(x, a), 
+                [4, 1], 
+                options, 
+                x
             )
 
             for i in ri_set:
