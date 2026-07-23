@@ -34,3 +34,4 @@ log/
 *.npy
 *.npz
 datasets/brake_system/ground_truth/
+*.zip
