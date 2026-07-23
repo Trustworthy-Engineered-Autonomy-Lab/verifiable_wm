@@ -23,6 +23,15 @@ class Pendulum(dynamic.Pendulum):
         """Normalize angle to [-π, π] range"""
         return ((x + np.pi) % (2 * np.pi)) - np.pi
 
+    @staticmethod
+    def _validate_star_bounds(full_bound: np.ndarray):
+        for index, name in enumerate(("theta", "omega", "action", "sin(theta)")):
+            lower, upper = full_bound[:, index]
+            if not np.isfinite([lower, upper]).all() or lower > upper:
+                raise ValueError(
+                    f"Invalid {name} bound: lower={lower}, upper={upper}"
+                )
+
     def step(self, bound: np.ndarray):
         # Interval form of dynamic.Pendulum.step:
         #   torque = clip(u, -1, 1) * max_torque
@@ -49,6 +58,7 @@ class Pendulum(dynamic.Pendulum):
         # dynamic.Pendulum clamps the raw action to [-1, 1] before scaling
         # by max_torque; the interval version must match.
         full_bound[:,2] = np.clip(full_bound[:,2], -1.0, 1.0)
+        self._validate_star_bounds(full_bound)
         S_full = Star(full_bound[0], full_bound[1])
 
         # Apply dynamics on [theta, omega, u, sin(theta)]. Coefficients are
@@ -71,9 +81,8 @@ class Pendulum(dynamic.Pendulum):
         # Clip omega' like the rollout dynamics
         next_bound[:,1] = np.clip(next_bound[:,1], -self.max_speed, self.max_speed)
 
-        # Normalize theta to [-π, π]
-        next_bound[:,0] = self.angle_normalize(next_bound[:,0])
-
+        # Keep the raw theta interval. PendulumVerifier.split_merge_bounds
+        # wraps it into valid state intervals before the next reachability step.
         return next_bound
     
 class MountainCar(dynamic.MountainCar):

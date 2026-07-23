@@ -10,7 +10,7 @@ from starv_verification.dynamic import Pendulum, MountainCar, CartPole
 from colorama import Fore, Style
 
 class Verifier(ABC):
-    def __init__(self, save_history = True, num_steps = 30, early_stop = False):
+    def __init__(self, save_history = True, num_steps = 20, early_stop = False):
         self.save_history = save_history
         self.num_steps = num_steps
         self.early_stop = early_stop
@@ -83,12 +83,30 @@ class PendulumVerifier(Verifier):
             omega_bound = bound[:,1]
             theta_min, theta_max = theta_bound
             omega_min, omega_max = omega_bound
-            if theta_min > theta_max:
-                # If the theta range is wrapped around, break the bound into two bounds
-                splited_bounds.append(np.array([[theta_min, omega_min], [np.pi, omega_max]]))
-                splited_bounds.append(np.array([[-np.pi, omega_min], [theta_max, omega_max]]))
+            two_pi = 2 * np.pi
+            if theta_max - theta_min >= two_pi:
+                splited_bounds.append(
+                    np.array([[-np.pi, omega_min], [np.pi, omega_max]])
+                )
+                continue
+
+            start_period = np.floor((theta_min + np.pi) / two_pi)
+            end_period = np.floor((theta_max + np.pi) / two_pi)
+            wrapped_min = self.dynamic.angle_normalize(theta_min)
+            wrapped_max = self.dynamic.angle_normalize(theta_max)
+
+            if start_period == end_period:
+                splited_bounds.append(
+                    np.array([[wrapped_min, omega_min], [wrapped_max, omega_max]])
+                )
             else:
-                splited_bounds.append(bound)
+                splited_bounds.append(
+                    np.array([[wrapped_min, omega_min], [np.pi, omega_max]])
+                )
+                if wrapped_max > -np.pi:
+                    splited_bounds.append(
+                        np.array([[-np.pi, omega_min], [wrapped_max, omega_max]])
+                    )
 
         return splited_bounds
     

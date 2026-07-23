@@ -55,15 +55,30 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 # DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/data_cell_100/dwm_trajectories_saliency.npz"
 # DEFAULT_OUT_DIR = PROJECT_ROOT / "results/cartpole/compare_plot"
 
+# DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/cartpole/safety_result_big_cell_a8_lamda01_early_false.json"
+# DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/big_cell/real_trajectories.npz"
+# DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/big_cell/dwm_trajectories_saliency.npz"
+# DEFAULT_OUT_DIR = PROJECT_ROOT / "results/cartpole/compare_plot_big_cell"
+
 # DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/mountain_car/safety_result_cell_100_a16_lambda05.json"
 # DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/real_trajectories.npz"
 # DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/dwm_trajectories_saliency.npz"
 # DEFAULT_OUT_DIR = PROJECT_ROOT / "results/mountain_car/compare_plot"
 
-DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/pendulum/safety_result_cell_100_a16_lambda05.json"
-DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/data_cell_100/real_trajectories.npz"
-DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/data_cell_100/dwm_trajectories_saliency.npz"
-DEFAULT_OUT_DIR = PROJECT_ROOT / "results/pendulum/compare_plot"
+# DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/mountain_car/safety_result_big_cell_best.json"
+# DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/big_cell_best/real_trajectories.npz"
+# DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/big_cell_best/dwm_trajectories_saliency.npz"
+# DEFAULT_OUT_DIR = PROJECT_ROOT / "results/mountain_car/compare_plot_big_cell_best"
+
+# DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/pendulum/safety_result_cell_100_a16_lambda05.json"
+# DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/data_cell_100/real_trajectories.npz"
+# DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/data_cell_100/dwm_trajectories_saliency.npz"
+# DEFAULT_OUT_DIR = PROJECT_ROOT / "results/pendulum/compare_plot"
+
+DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/pendulum/safety_result_big_cell_a16_lambda05.json"
+DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/big_cell/real_trajectories.npz"
+DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/big_cell/dwm_trajectories_saliency.npz"
+DEFAULT_OUT_DIR = PROJECT_ROOT / "results/pendulum/compare_plot_big_cell"
 
 SAFETY_PATH: Path = DEFAULT_SAFETY_PATH
 REAL_TRAJ_PATH: Path = DEFAULT_REAL_TRAJ_PATH
@@ -102,6 +117,8 @@ PLOT_DIMS = ENV_DEFAULT_DIMS[DEFAULT_ENV]["plot_dims"]
 CHECK_DIMS = ENV_DEFAULT_DIMS[DEFAULT_ENV]["check_dims"]
 MAX_STEPS: Optional[int] = None
 DELTA = 0.0
+REAL_PLOT_INDICES: Optional[Tuple[int, int]] = None
+DWM_PLOT_INDICES: Optional[Tuple[int, int]] = None
 PRINT_KEYS_ONLY = False
 DPI = 230
 
@@ -184,6 +201,15 @@ def load_npz_array(path: Path, key: str) -> np.ndarray:
         return np.asarray(z[key], dtype=float)
 
 
+def load_npz_metadata(path: Path) -> Dict[str, str]:
+    with np.load(path, allow_pickle=False) as z:
+        return {
+            key: str(z[key].item())
+            for key in ("variant", "decoder_weights")
+            if key in z.files
+        }
+
+
 def load_safety_result(path: Path) -> Tuple[Dict[str, Any], GridInfo, List[Dict[str, Any]]]:
     data = load_json(path)
     if "grid" not in data or "cells" not in data:
@@ -206,6 +232,42 @@ def ensure_traj_shape(arr: np.ndarray, label: str) -> np.ndarray:
     if arr.ndim != 3:
         raise ValueError(f"{label} should have shape (N, T+1, dim), got {arr.shape}")
     return arr
+
+
+def validate_trajectory_inputs(
+    safety: Dict[str, Any],
+    real_traj: np.ndarray,
+    dwm_traj: np.ndarray,
+    dwm_metadata: Dict[str, str],
+) -> None:
+    if real_traj.shape != dwm_traj.shape:
+        raise ValueError(
+            f"real/DWM trajectory shape mismatch: real={real_traj.shape}, dwm={dwm_traj.shape}"
+        )
+
+    verifier_kwargs = safety.get("verifier", {}).get("kwargs", {})
+    if not bool(verifier_kwargs.get("early_stop", False)) and "num_steps" in verifier_kwargs:
+        expected_states = int(verifier_kwargs["num_steps"]) + 1
+        if real_traj.shape[1] != expected_states:
+            raise ValueError(
+                f"safety result expects {expected_states} states, "
+                f"but trajectories contain {real_traj.shape[1]}"
+            )
+
+    expected_weights = (
+        safety.get("layers", {})
+        .get("Decoder", {})
+        .get("kwargs", {})
+        .get("weights")
+    )
+    actual_weights = dwm_metadata.get("decoder_weights")
+    if expected_weights and actual_weights:
+        expected = Path(str(expected_weights)).as_posix()
+        actual = Path(actual_weights).as_posix()
+        if expected != actual:
+            raise ValueError(
+                f"decoder checkpoint mismatch: safety={expected!r}, DWM={actual!r}"
+            )
 
 
 def dim_intervals(dim_bounds: Sequence[float]) -> List[Tuple[float, float]]:
@@ -310,6 +372,7 @@ def compare_traj(traj: np.ndarray, traj_index: int, grid: GridInfo, cells: List[
         "cell_index": "" if cell_idx is None else int(cell_idx),
         "cell_status": "no_cell",
         "desired_states": int(desired),
+        "compared_states": 0,
         "checked_states": 0,
         "inside_states": 0,
         "inside_ratio": 0.0,
@@ -332,6 +395,7 @@ def compare_traj(traj: np.ndarray, traj_index: int, grid: GridInfo, cells: List[
 
     bounds = cell.get("bounds", [])
     checked = min(len(bounds), desired)
+    row["compared_states"] = int(checked)
     row["checked_states"] = int(checked)
 
     inside_flags = []
@@ -343,7 +407,7 @@ def compare_traj(traj: np.ndarray, traj_index: int, grid: GridInfo, cells: List[
 
     inside_count = int(np.sum(inside_flags)) if inside_flags else 0
     row["inside_states"] = inside_count
-    row["inside_ratio"] = float(inside_count / desired) if desired else 0.0
+    row["inside_ratio"] = float(inside_count / checked) if checked else 0.0
     row["max_violation"] = float(np.max(violations)) if violations else np.nan
 
     first_out = None
@@ -351,15 +415,12 @@ def compare_traj(traj: np.ndarray, traj_index: int, grid: GridInfo, cells: List[
         if not inside:
             first_out = t
             break
-    if first_out is None and checked < desired:
-        first_out = checked
-
     row["first_out_step"] = "" if first_out is None else int(first_out)
     row["fully_inside"] = (
         row["cell_status"] != "error"
-        and checked == desired
+        and checked > 0
         and first_out is None
-        and inside_count == desired
+        and inside_count == checked
     )
     return row
 
@@ -404,8 +465,12 @@ def choose_best_worst(rows: List[Dict[str, Any]]) -> List[Tuple[int, str]]:
 
     # Best: higher containment ratio is better; fully contained is preferred;
     # for ties, smaller violation is better.
+    best_candidates = [
+        row for row in rows
+        if int(row["traj_index"]) != int(worst_row["traj_index"])
+    ] or rows
     best_row = max(
-        rows,
+        best_candidates,
         key=lambda r: (
             float(r["inside_ratio"]),
             bool(r["fully_inside"]),
@@ -420,7 +485,31 @@ def choose_best_worst(rows: List[Dict[str, Any]]) -> List[Tuple[int, str]]:
     ]
 
 
-def draw_tube(ax: Any, bounds: Sequence[Any], max_states: int, cmap_name: str) -> Optional[ScalarMappable]:
+def resolve_panels(
+    rows: List[Dict[str, Any]],
+    panel_indices: Optional[Sequence[int]] = None,
+) -> List[Tuple[int, str]]:
+    if panel_indices is None:
+        return choose_best_worst(rows)
+    indices = tuple(int(index) for index in panel_indices)
+    if len(indices) != 2:
+        raise ValueError("exactly two panel indices are required")
+    if indices[0] == indices[1]:
+        raise ValueError("panel indices must be distinct")
+    available = {int(row["traj_index"]) for row in rows}
+    missing = [index for index in indices if index not in available]
+    if missing:
+        raise ValueError(f"panel indices are absent from trajectories: {missing}")
+    return [(index, f"Trajectory {index}") for index in indices]
+
+
+def draw_tube(
+    ax: Any,
+    bounds: Sequence[Any],
+    max_states: int,
+    cmap_name: str,
+    delta: float = 0.0,
+) -> Optional[ScalarMappable]:
     if not bounds:
         return None
 
@@ -436,6 +525,10 @@ def draw_tube(ax: Any, bounds: Sequence[Any], max_states: int, cmap_name: str) -
             continue
         for x0, x1 in dim_intervals(b[xdim]):
             for y0, y1 in dim_intervals(b[ydim]):
+                x0 -= delta
+                x1 += delta
+                y0 -= delta
+                y1 += delta
                 ax.add_patch(Rectangle(
                     (x0, y0),
                     x1 - x0,
@@ -444,7 +537,7 @@ def draw_tube(ax: Any, bounds: Sequence[Any], max_states: int, cmap_name: str) -
                     edgecolor=cmap(norm(t)),
                     linewidth=1.2,
                     alpha=0.55,
-                    label="reachable tube" if first else None,
+                    label=("inflated reachable tube" if delta else "reachable tube") if first else None,
                 ))
                 first = False
 
@@ -505,12 +598,13 @@ def plot_set(
     cells: List[Dict[str, Any]],
     safety: Dict[str, Any],
     cmap_name: str,
-) -> None:
+    panel_indices: Optional[Sequence[int]] = None,
+) -> List[int]:
     row_by_idx = {int(r["traj_index"]): r for r in rows}
-    panels = choose_best_worst(rows)
+    panels = resolve_panels(rows, panel_indices)
     if not panels:
         print(f"[Warning] no trajectories for {title_name}")
-        return
+        return []
 
     while len(panels) < 2:
         panels.append(panels[-1])
@@ -528,15 +622,22 @@ def plot_set(
         _, cell = find_cell(traj[0], grid, cells)
         bounds = None if cell is None else cell.get("bounds", [])
         desired = int(row["desired_states"])
+        compared = int(row["compared_states"])
 
         if bounds:
-            sm = draw_tube(ax, bounds, max_states=min(len(bounds), desired), cmap_name=cmap_name)
+            sm = draw_tube(
+                ax,
+                bounds,
+                max_states=compared,
+                cmap_name=cmap_name,
+                delta=DELTA,
+            )
             if sm is not None:
                 cbar = fig.colorbar(sm, ax=ax, pad=0.02)
                 cbar.set_label("time step")
             draw_initial_cell(ax, bounds[0])
 
-        plot_traj = traj[:desired]
+        plot_traj = traj[:compared]
         ax.plot(
             plot_traj[:, xdim],
             plot_traj[:, ydim],
@@ -547,8 +648,8 @@ def plot_set(
             label=title_name,
         )
         ax.plot(
-            plot_traj[0, xdim],
-            plot_traj[0, ydim],
+            traj[0, xdim],
+            traj[0, ydim],
             marker="o",
             markersize=6.0,
             color="green",
@@ -562,8 +663,8 @@ def plot_set(
         first_out = "None" if row["first_out_step"] == "" else str(row["first_out_step"])
         box = (
             f"{status}\n"
-            f"inside: {row['inside_states']}/{row['desired_states']} ({pct(row['inside_ratio'])})\n"
-            f"checked: {row['checked_states']}\n"
+            f"inside: {row['inside_states']}/{row['compared_states']} ({pct(row['inside_ratio'])})\n"
+            f"requested: {row['desired_states']}\n"
             f"first out: {first_out}\n"
             f"max violation: {float(row['max_violation']):.4g}\n"
             f"cell: {row['cell_index']} ({row['cell_status']})"
@@ -589,12 +690,56 @@ def plot_set(
         f"{title_name} vs reachable tube | "
         f"fully contained: {summary['fully']}/{summary['total']} ({pct(summary['rate'])}) | "
         f"mean step containment: {pct(summary['mean_ratio'])} | "
-        f"plot dims={PLOT_DIMS} | check dims={CHECK_DIMS} | {horizon}",
+        f"delta={DELTA:.10g} | plot dims={PLOT_DIMS} | check dims={CHECK_DIMS} | {horizon}",
         fontsize=12,
     )
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     fig.savefig(out_path, dpi=DPI)
     plt.close(fig)
+    return [int(index) for index, _ in panels]
+
+
+def write_containment_summary(
+    path: Path,
+    *,
+    env: str,
+    delta: float,
+    max_steps: Optional[int],
+    plot_dims: Sequence[int],
+    check_dims: Sequence[int],
+    safety_path: Path,
+    real_path: Path,
+    dwm_path: Path,
+    real_key: str,
+    dwm_key: str,
+    real_shape: Sequence[int],
+    dwm_shape: Sequence[int],
+    real_panels: Sequence[int],
+    dwm_panels: Sequence[int],
+    real_summary: Dict[str, Any],
+    dwm_summary: Dict[str, Any],
+) -> None:
+    payload = {
+        "env": env,
+        "delta": float(delta),
+        "max_steps": max_steps,
+        "plot_dims": [int(dim) for dim in plot_dims],
+        "check_dims": [int(dim) for dim in check_dims],
+        "inputs": {
+            "safety": str(safety_path),
+            "real": {"path": str(real_path), "key": real_key, "shape": list(real_shape)},
+            "dwm": {"path": str(dwm_path), "key": dwm_key, "shape": list(dwm_shape)},
+        },
+        "panels": {
+            "real": [int(index) for index in real_panels],
+            "dwm": [int(index) for index in dwm_panels],
+        },
+        "containment": {
+            "real": real_summary,
+            "dwm": dwm_summary,
+        },
+    }
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 
@@ -659,6 +804,20 @@ def parse_args() -> argparse.Namespace:
                         help="Compare only the first K transition steps, checking states 0..K. Default: full trajectory.")
     parser.add_argument("--delta", type=float, default=0.0,
                         help="Inflate reachable tube bounds by this amount during containment checking. Default: 0.0")
+    parser.add_argument(
+        "--real-plot-indices",
+        type=int,
+        nargs=2,
+        default=None,
+        help="Plot these two Real trajectory indices instead of selecting panels automatically.",
+    )
+    parser.add_argument(
+        "--dwm-plot-indices",
+        type=int,
+        nargs=2,
+        default=None,
+        help="Plot these two DWM trajectory indices instead of selecting panels automatically.",
+    )
     # Utility.
     parser.add_argument("--print-keys", action="store_true",
                         help="Only print keys inside real/dwm npz files, then exit.")
@@ -671,7 +830,7 @@ def parse_args() -> argparse.Namespace:
 def apply_args(args: argparse.Namespace) -> None:
     global SAFETY_PATH, REAL_TRAJ_PATH, DWM_TRAJ_PATH, OUT_DIR
     global REAL_KEY, DWM_KEY, ENV_NAME, PLOT_DIMS, CHECK_DIMS, MAX_STEPS
-    global DELTA, PRINT_KEYS_ONLY, DPI
+    global DELTA, REAL_PLOT_INDICES, DWM_PLOT_INDICES, PRINT_KEYS_ONLY, DPI
 
     SAFETY_PATH = args.safety or DEFAULT_SAFETY_PATH
     REAL_TRAJ_PATH = args.real or DEFAULT_REAL_TRAJ_PATH
@@ -691,6 +850,14 @@ def apply_args(args: argparse.Namespace) -> None:
     CHECK_DIMS = tuple(int(x) for x in selected_check_dims)
     MAX_STEPS = args.max_steps
     DELTA = float(args.delta)
+    REAL_PLOT_INDICES = (
+        None if args.real_plot_indices is None
+        else tuple(int(index) for index in args.real_plot_indices)
+    )
+    DWM_PLOT_INDICES = (
+        None if args.dwm_plot_indices is None
+        else tuple(int(index) for index in args.dwm_plot_indices)
+    )
     PRINT_KEYS_ONLY = bool(args.print_keys)
     DPI = int(args.dpi)
 
@@ -717,6 +884,8 @@ def main() -> None:
     safety, grid, cells = load_safety_result(SAFETY_PATH)
     real_traj = ensure_traj_shape(load_npz_array(REAL_TRAJ_PATH, REAL_KEY), f"real[{REAL_KEY}]")
     dwm_traj = ensure_traj_shape(load_npz_array(DWM_TRAJ_PATH, DWM_KEY), f"dwm[{DWM_KEY}]")
+    dwm_metadata = load_npz_metadata(DWM_TRAJ_PATH)
+    validate_trajectory_inputs(safety, real_traj, dwm_traj, dwm_metadata)
 
     if max(PLOT_DIMS) >= real_traj.shape[2] or max(PLOT_DIMS) >= dwm_traj.shape[2]:
         raise ValueError(f"PLOT_DIMS={PLOT_DIMS} exceeds trajectory dimension")
@@ -735,25 +904,69 @@ def main() -> None:
     print(f"plot   : {PLOT_DIMS}")
     print(f"check  : {CHECK_DIMS}")
     print(f"steps  : {MAX_STEPS}")
+    print(f"delta  : {DELTA}")
 
     real_rows = compare_set(real_traj, grid, cells)
     dwm_rows = compare_set(dwm_traj, grid, cells)
 
-    for name, rows in [("Real trajectory", real_rows), ("DWM trajectory", dwm_rows)]:
-        s = summarize(rows)
+    real_summary = summarize(real_rows)
+    dwm_summary = summarize(dwm_rows)
+    for name, summary in [("Real trajectory", real_summary), ("DWM trajectory", dwm_summary)]:
         print(f"\n[{name}]")
-        print(f"  checked trajectories : {s['total']}")
-        print(f"  fully contained      : {s['fully']}/{s['total']} ({pct(s['rate'])})")
-        print(f"  mean step containment: {pct(s['mean_ratio'])}")
+        print(f"  checked trajectories : {summary['total']}")
+        print(f"  fully contained      : {summary['fully']}/{summary['total']} ({pct(summary['rate'])})")
+        print(f"  mean step containment: {pct(summary['mean_ratio'])}")
 
     real_out = OUT_DIR / "real_vs_reachable_tube.png"
     dwm_out = OUT_DIR / "dwm_vs_reachable_tube.png"
 
-    plot_set(real_out, "Real trajectory", real_traj, real_rows, grid, cells, safety, cmap_name="Oranges")
-    plot_set(dwm_out, "DWM trajectory", dwm_traj, dwm_rows, grid, cells, safety, cmap_name="Blues")
+    real_panels = plot_set(
+        real_out,
+        "Real trajectory",
+        real_traj,
+        real_rows,
+        grid,
+        cells,
+        safety,
+        cmap_name="Oranges",
+        panel_indices=REAL_PLOT_INDICES,
+    )
+    dwm_panels = plot_set(
+        dwm_out,
+        "DWM trajectory",
+        dwm_traj,
+        dwm_rows,
+        grid,
+        cells,
+        safety,
+        cmap_name="Blues",
+        panel_indices=DWM_PLOT_INDICES,
+    )
+
+    summary_out = OUT_DIR / "containment_summary.json"
+    write_containment_summary(
+        summary_out,
+        env=ENV_NAME,
+        delta=DELTA,
+        max_steps=MAX_STEPS,
+        plot_dims=PLOT_DIMS,
+        check_dims=CHECK_DIMS,
+        safety_path=SAFETY_PATH,
+        real_path=REAL_TRAJ_PATH,
+        dwm_path=DWM_TRAJ_PATH,
+        real_key=REAL_KEY,
+        dwm_key=DWM_KEY,
+        real_shape=real_traj.shape,
+        dwm_shape=dwm_traj.shape,
+        real_panels=real_panels,
+        dwm_panels=dwm_panels,
+        real_summary=real_summary,
+        dwm_summary=dwm_summary,
+    )
 
     print(f"\n[Saved] {real_out}")
     print(f"[Saved] {dwm_out}")
+    print(f"[Saved] {summary_out}")
 
 
 if __name__ == "__main__":
