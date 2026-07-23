@@ -11,8 +11,8 @@ state -> renderer / decoder -> controller -> dynamics -> next state
 decoder-controller-dynamics 闭环的 reachable set。
 
 仓库提供 CartPole、Pendulum 和 MountainCar 的数据生成、decoder 训练、闭环 rollout 与 StarV 验证入口。
-当前实验以 CartPole 和 Pendulum 为主。MountainCar 的 controller 仍有问题，occlusion heatmap
-的关注区域不合理，因此暂时冻结实验内容，只维护代码和配置结构的一致性。
+MountainCar 使用训练图像的逐像素中位数作为 occlusion baseline，并在新数据上重新选择
+`alpha/lambda_ctrl`。
 
 当前 saliency 主线参数为：CartPole `(alpha=8, lambda_ctrl=0.1)`，Pendulum
 `(alpha=16, lambda_ctrl=0.5)`。
@@ -111,8 +111,8 @@ CartPole starv_states.npz:
   test_states            (N, 4)
 
 CartPole real/DWM trajectories:
-  test_traj              (N, 31, 4)   # t=0 + 30 steps
-  test_actions           (N, 30, 1)
+  test_traj              (N, 21, 4)   # t=0 + 20 steps
+  test_actions           (N, 20, 1)
 ```
 
 ### 1. 生成 decoder 训练数据
@@ -154,11 +154,16 @@ real_trajectories.npz
 python saliency_map/scripts/precompute_saliency_maps.py \
   --config config/make_decoder_dataset/cartpole.json
 
+python saliency_map/scripts/precompute_saliency_maps.py \
+  --config config/make_decoder_dataset/mountain_car.json \
+  --occlusion-baseline background_median
+
 python train_decoder.py config/train_decoder/cartpole/saliency.json
 python train_decoder.py config/train_decoder/cartpole/intensity.json
 ```
 
-Pendulum 的运行方式相同，只需换成对应配置。
+MountainCar 命令会生成 `saliency_occlusion_background_median.npz`。Pendulum 使用默认的
+white occlusion baseline，只需换成对应配置。
 
 `notebooks/train_decoder.ipynb` 也提供完整的 saliency `alpha × lambda_ctrl` 消融入口：
 
@@ -305,23 +310,35 @@ CartPole 直接对四维完整 state 计算 L2。Pendulum 的 theta 差先映射
 test 分别报告：
 
 ```text
-mean_step_l2   所有 trajectory、所有 t=0..30 的均值
-final_l2       t=30 的均值
+mean_step_l2   所有 trajectory、所有 t=0..20 的均值
+final_l2       t=20 的均值
 max_l2_mean    每条 trajectory 最大偏差的均值
 max_l2_p95     每条 trajectory 最大偏差的 95% 分位数
 ```
 
 `ablation.py` 将单帧 controller/pixel MSE 与闭环 L2 合并，并在网格根目录写出
-`training_metrics.csv`、`rollout_l2.csv` 和 `combined_metrics.csv`。validation 用于选择
-`alpha/lambda_ctrl`；test 只用于最终候选报告。主线晋升必须在 notebook 中显式调用
+`training_metrics.csv`、`rollout_l2.csv` 和 `combined_metrics.csv`。MountainCar 的 validation split 用于选择
+`alpha/lambda_ctrl`；独立的 400 条 test trajectory 不参与选择，只用于最终 conformal 校准。主线晋升必须在 notebook 中显式调用
 `promote_mainline(..., force=True)`，不会由排序结果自动覆盖。
 
 StarV 为每个初始 grid cell 计算 decoder world model 的 reachable tube。`compare.py` 根据轨迹的
 初始 state 找到对应 cell，然后逐时间步检查真实轨迹和 DWM 轨迹是否位于 bounds 内。
 
-未经 inflation 的 tube 不能直接作为真实系统的安全保证。要复现论文中的统计保证，还需要在与
-StarV 初始分布一致的 trajectory 上计算 L1 non-conformity score，并按 Theorem 1 对 tube 做
-inflation。
+未经 inflation 的 tube 不能直接作为真实系统的安全保证。对独立 test split 中的第 $i$ 条轨迹，
+L2 non-conformity score 为：
+
+$$
+\delta_i=\max_{t=0,\ldots,20}
+\lVert s_{i,t,\mathcal D}^{real}-s_{i,t,\mathcal D}^{dwm}\rVert_2.
+$$
+
+其中 $\mathcal D$ 为校准维度：CartPole 使用 position-angle，MountainCar 使用
+position-velocity，Pendulum 使用 theta-omega，且 theta 差先映射为最短圆周差。
+
+对 $n=400$ 和 $\alpha=0.05$，取 $k=\lceil(n+1)(1-\alpha)\rceil=381$，校准半径
+$\Gamma_{0.95}$ 为排序后的第 381 个 $\delta_i$（不做插值）。validation 只用于 MountainCar
+的超参数选择；这 400 条 test trajectory 只用于固定模型后的 $\Gamma_{0.95}$ 校准。然后按
+Theorem 1 在每个时间步用同一个 $\Gamma_{0.95}$ 对 DWM reachable tube 做 inflation。
 
 ## 测试
 
