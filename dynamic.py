@@ -24,8 +24,8 @@ class DynmaicModel(ABC):
 
 class MountainCar(DynmaicModel):
     def __init__(self, 
-            # min_pos=-1.2, 
-            # max_pos=0.6, 
+            min_pos=-1.2,
+            max_pos=0.6,
             min_speed=-0.07, 
             max_speed=0.07, 
             min_action=-1.0,
@@ -33,8 +33,8 @@ class MountainCar(DynmaicModel):
             power=0.0015
         ):
         super().__init__()
-        # self.min_pos = min_pos
-        # self.max_pos = max_pos
+        self.min_pos = min_pos
+        self.max_pos = max_pos
         self.min_speed = min_speed
         self.max_speed = max_speed
         self.power = power
@@ -49,12 +49,17 @@ class MountainCar(DynmaicModel):
         pos = states[:, 0]
         vel = states[:, 1]
         force = torch.clamp(actions.squeeze(1), self.min_action, self.max_action)
+        already_at_goal = pos >= self.max_pos
 
         vel = vel + force * self.power - 0.0025 * torch.cos(3.0 * pos)
         vel = torch.clamp(vel, self.min_speed, self.max_speed)
         pos = pos + vel
-        # pos = torch.clamp(pos, self.min_pos, self.max_pos)
-        # vel = torch.where((pos == self.min_pos) & (vel < 0), torch.zeros_like(vel), vel)
+        reached_goal = already_at_goal | (pos >= self.max_pos)
+        pos = torch.clamp(pos, self.min_pos, self.max_pos)
+        vel = torch.where((pos == self.min_pos) & (vel < 0), torch.zeros_like(vel), vel)
+        pos = torch.where(reached_goal, torch.full_like(pos, self.max_pos), pos)
+        vel = torch.where(reached_goal, torch.zeros_like(vel), vel)
+
         return torch.stack([pos, vel], dim=1)
     
     def render(self, state: NDArray) -> NDArray:
@@ -189,9 +194,39 @@ class CartPole(DynmaicModel):
         self.env.unwrapped.state = state
         return self.env.render()
 
-    
+class Brake(DynmaicModel):
+    def __init__(self, dt=0.1, v_lead=0.0):
+        super().__init__()
+        self.dt = dt
+        self.v_lead = v_lead
+
+    @torch.no_grad()
+    def step(self, states: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+        dist = states[:, 0]
+        vel = states[:, 1]
+        # The vision closed loop maps the controller output a through
+        # brake = 0.5 * (a + 1); the controller was trained with this
+        # remap in the loop, so it is part of the system, not a bug.
+        brake = torch.clamp(0.5 * (actions.squeeze(1) + 1.0), 0.0, 1.0)
+
+        decel = 0.009 * brake + 0.0042
+        next_dist = dist + (self.v_lead - vel) * self.dt
+        next_vel = vel - decel * self.dt
+
+        next_dist = torch.clamp(next_dist, min=0.0)
+        next_vel = torch.clamp(next_vel, min=0.0)
+        return torch.stack([next_dist, next_vel], dim=1)
+
+    def render(self, state: NDArray) -> NDArray:
+        raise NotImplementedError(
+            "Brake rendering requires a CARLA server; collect real "
+            "trajectories with tools/collect_brake_real_trajectories.py "
+            "on a CARLA machine instead."
+        )
+
 __all__ = [
     "MountainCar",
     "Pendulum",
-    "CartPole"
+    "CartPole",
+    "Brake"
 ]
