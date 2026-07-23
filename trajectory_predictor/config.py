@@ -20,9 +20,9 @@ import torch
 
 # 外部输入：真实轨迹数据
 DEFAULT_REAL_PATH = Path(
-#    "/home/tealab_shared/trajectories/mountain_car/starv_state/real_trajectories.npz"
-    "/home/tealab_shared/trajectories/pendulum/starv_state/real_trajectories.npz"
-#    "/home/tealab_shared/trajectories/cartpole/starv_state/real_trajectories.npz"
+#    "/home/tealab_shared/trajectories/mountain_car/starv_state/dwm_trajectories.npz"
+    "/home/tealab_shared/trajectories/pendulum/starv_state/dwm_trajectories.npz"
+#    "/home/tealab_shared/trajectories/cartpole/starv_state/dwm_trajectories.npz"
 )
 
 # 外部输入：DWM verification grid 和 cell 信息
