@@ -23,4 +23,15 @@ settings.json
 metrics.json
 dwm_weight/now_weight/cartpole/intensity/metrics.json
 dwm_weight/now_weight/cartpole/saliency/metrics.json
+/tests
 *.json
+/aebs_carla.zip
+/aebs_carla/
+/paper/
+EMSOFT2026__World_Model_Closed_loop_Safety_Verification.zip
+log/
+*.log
+*.npy
+*.npz
+datasets/brake_system/ground_truth/
+*.zip

@@ -5,12 +5,12 @@ from abc import ABC, abstractmethod
 import random
 
 from starv_verification.model import FullModel
-from starv_verification.dynamic import Pendulum, MountainCar, CartPole
+from starv_verification.dynamic import Pendulum, MountainCar, CartPole, Brake
 
 from colorama import Fore, Style
 
 class Verifier(ABC):
-    def __init__(self, save_history = True, num_steps = 30, early_stop = False):
+    def __init__(self, save_history = True, num_steps = 20, early_stop = False):
         self.save_history = save_history
         self.num_steps = num_steps
         self.early_stop = early_stop
@@ -20,6 +20,7 @@ class Verifier(ABC):
             
         # Verify one cell
         current_bounds = [inital_bound]
+        result = True
 
         for step in range(1, self.num_steps + 1):
             current_bounds = self.verify_single_step(model, current_bounds)
@@ -27,9 +28,14 @@ class Verifier(ABC):
             if self.save_history:
                 cell['bounds'].append(np.concatenate(current_bounds).T)
 
-            result = self.criteria(current_bounds)
-            if result and self.early_stop:
-                break
+            if self.is_unsafe(current_bounds):
+                result = False
+                if self.early_stop:
+                    break
+            else:
+                result = self.criteria(current_bounds)
+                if result and self.early_stop:
+                    break
 
         if step < self.num_steps:
             print(Fore.YELLOW + f"early stop at step {step}" + Style.RESET_ALL)
@@ -42,7 +48,13 @@ class Verifier(ABC):
     
     def split_merge_bounds(self, bounds: List[np.ndarray]) -> List[np.ndarray]:
         return bounds
-    
+
+    def is_unsafe(self, bounds: List[np.ndarray]) -> bool:
+        # Reach-avoid verifiers (e.g. BrakeVerifier) override this to flag
+        # cells whose reachable set already touched the unsafe region; a
+        # flagged cell stays unsafe even if a later step satisfies criteria.
+        return False
+
     @abstractmethod
     def criteria(self, bounds: List[np.ndarray]) -> bool:
         pass
@@ -83,12 +95,30 @@ class PendulumVerifier(Verifier):
             omega_bound = bound[:,1]
             theta_min, theta_max = theta_bound
             omega_min, omega_max = omega_bound
-            if theta_min > theta_max:
-                # If the theta range is wrapped around, break the bound into two bounds
-                splited_bounds.append(np.array([[theta_min, omega_min], [np.pi, omega_max]]))
-                splited_bounds.append(np.array([[-np.pi, omega_min], [theta_max, omega_max]]))
+            two_pi = 2 * np.pi
+            if theta_max - theta_min >= two_pi:
+                splited_bounds.append(
+                    np.array([[-np.pi, omega_min], [np.pi, omega_max]])
+                )
+                continue
+
+            start_period = np.floor((theta_min + np.pi) / two_pi)
+            end_period = np.floor((theta_max + np.pi) / two_pi)
+            wrapped_min = self.dynamic.angle_normalize(theta_min)
+            wrapped_max = self.dynamic.angle_normalize(theta_max)
+
+            if start_period == end_period:
+                splited_bounds.append(
+                    np.array([[wrapped_min, omega_min], [wrapped_max, omega_max]])
+                )
             else:
-                splited_bounds.append(bound)
+                splited_bounds.append(
+                    np.array([[wrapped_min, omega_min], [np.pi, omega_max]])
+                )
+                if wrapped_max > -np.pi:
+                    splited_bounds.append(
+                        np.array([[-np.pi, omega_min], [wrapped_max, omega_max]])
+                    )
 
         return splited_bounds
     
@@ -135,6 +165,25 @@ class CartpoleVerifier(Verifier):
         # Check safety condition
         angle_bound = np.array(bounds)[:,:,2]
         return True if np.all(np.abs(angle_bound) <= self.goal_angle_threshold) else False
+
+class BrakeVerifier(Verifier):
+    """StarV-based Neural Network Verification for the AEBS brake system"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dynamic = Brake()
+
+    def dynamic_step(self, bound: np.ndarray):
+        return self.dynamic.step(bound)
+
+    def is_unsafe(self, bounds: List[np.ndarray]) -> bool:
+        # Collision: distance lower bound reaching 0 at any step
+        dis_lb = np.array(bounds)[:, 0, 0]
+        return bool(np.any(dis_lb <= 0.0))
+
+    def criteria(self, bounds: List[np.ndarray]) -> bool:
+        dis_bound = np.array(bounds)[:, :, 0]
+        return bool(np.all(dis_bound > 0.0))
 
 # class _Test(Verifier):
     # def __init__(self, raise_error = True):
