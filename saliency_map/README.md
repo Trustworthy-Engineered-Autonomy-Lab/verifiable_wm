@@ -42,9 +42,7 @@ saliency_map/
 
 共享库，两处调用者：
 
-- `precompute_saliency_maps.py` 只用其中的 `occlusion`（当前唯一的主线方法）。它支持
-  `--occlusion-baseline white|background_median`；后者仅从 `train_images` 构造逐像素中位背景，
-  并把同一张背景用于所有 split，适合 MountainCar 的静态轨道场景。
+- `precompute_saliency_maps.py` 只用其中的 `occlusion`（当前唯一的主线方法）。
 - `compare_heatmap_methods.py` 用全部六种方法做诊断对比。
 
 包含：`load_json`、`load_state_dict`、`build_controller`、`normalize_per_image`，以及
@@ -66,18 +64,6 @@ saliency_map/
   saliency_map/scripts/precompute_saliency_maps.py \
   --config config/make_decoder_dataset/pendulum.json
 ```
-
-MountainCar 的背景填充对照会默认写入独立文件，避免覆盖 white map：
-
-```bash
-/home/tealab_shared/starv/env/starv_shared/bin/python \
-  saliency_map/scripts/precompute_saliency_maps.py \
-  --config config/make_decoder_dataset/mountain_car.json \
-  --occlusion-baseline background_median
-```
-
-输出为 `saliency_occlusion_background_median.npz`，其中记录
-`occlusion_baseline=background_median` 和 `background_source=train_images_median`。
 
 如果之后某个 case 用不同 saliency 算法，应该在 `methods.py` 里加新方法，而不是另起一堆只服务某个 case
 的脚本。目前实现：`occlusion`。后续可以继续加：`integrated_gradients`、`object_occlusion`、

@@ -143,7 +143,7 @@ def calibrate_gamma(
     dwm_path: Path,
     dims: Sequence[int],
     alpha: float,
-    split: str = "test",
+    split: str = "val",
     circular_dims: Sequence[int] = (),
     period: float = 2 * math.pi,
     horizon: int = EXPECTED_HORIZON,
@@ -233,7 +233,7 @@ def parse_args(argv=None) -> argparse.Namespace:
         "--variant", default="saliency", help="DWM trajectory variant suffix"
     )
     parser.add_argument("--alpha", type=float, default=0.05)
-    parser.add_argument("--split", default="test", choices=["train", "val", "test"])
+    parser.add_argument("--split", default="val", choices=["train", "val", "test"])
     parser.add_argument("--real", type=Path, default=None)
     parser.add_argument("--dwm", type=Path, default=None)
     parser.add_argument("--output", type=Path, default=None)
