@@ -27,8 +27,15 @@ class Controller(nn.Module):
         return self.act(x)
 
 class Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self, output_activation='sigmoid'):
         super().__init__()
+        # 'sigmoid' for the gym environments; 'clamp' (== SatLin) for the
+        # brake system, whose decoder was trained with clamp(x, 0, 1).
+        if output_activation not in ('sigmoid', 'clamp'):
+            raise ValueError(
+                "Unsupported output_activation: {}".format(output_activation)
+            )
+        self.output_activation = output_activation
         self.fc1 = nn.Linear(2, 32)
         self.fc2 = nn.Linear(32, 64)
         self.fc3 = nn.Linear(64, 3 * 12 * 12)
@@ -44,7 +51,10 @@ class Decoder(nn.Module):
         x = x.view(batch_size, 3, 12, 12)
         x = F.relu(self.dec_conv1(x))
         x = F.relu(self.dec_conv2(x))
-        return torch.sigmoid(self.dec_conv3(x))
+        x = self.dec_conv3(x)
+        if self.output_activation == 'clamp':
+            return torch.clamp(x, 0.0, 1.0)
+        return torch.sigmoid(x)
 
     
 __all__ = [

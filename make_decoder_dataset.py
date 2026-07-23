@@ -90,18 +90,6 @@ def save_dataset(config, splits):
     return output_dir
 
 
-def save_real_trajectories(config, trajectory_splits):
-    output_dir = Path(config["output_dir"])
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    arrays = {}
-    for split_name, split_data in trajectory_splits.items():
-        arrays[f"{split_name}_traj"] = to_numpy(split_data["traj"])
-        arrays[f"{split_name}_actions"] = to_numpy(split_data["actions"])
-
-    np.savez_compressed(output_dir / "real_trajectories.npz", **arrays)
-
-
 def load_starv_config(config):
     starv_config_path = config.get("starv_config")
     if not starv_config_path:
@@ -109,7 +97,6 @@ def load_starv_config(config):
     return load_config(starv_config_path)
 
 
-
 def save_real_trajectories(config, trajectory_splits):
     output_dir = Path(config["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -118,6 +105,12 @@ def save_real_trajectories(config, trajectory_splits):
     for split_name, split_data in trajectory_splits.items():
         arrays[f"{split_name}_traj"] = to_numpy(split_data["traj"])
         arrays[f"{split_name}_actions"] = to_numpy(split_data["actions"])
+
+    arrays["rollout_steps"] = np.array(int(config["rollout_steps"]))
+    arrays["starv_config"] = np.array(str(config["starv_config"]))
+    arrays["controller_weights"] = np.array(
+        str(config["controller"]["weights"])
+    )
 
     np.savez_compressed(output_dir / "real_trajectories.npz", **arrays)
 

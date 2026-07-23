@@ -110,6 +110,11 @@ ENV_DEFAULT_DIMS = {
         "check_dims": (0, 1),
         "description": "theta vs omega",
     },
+    "brake_system": {
+        "plot_dims": (0, 1),
+        "check_dims": (0, 1),
+        "description": "distance vs velocity",
+    },
 }
 
 ENV_NAME = DEFAULT_ENV
@@ -754,7 +759,7 @@ def parse_args() -> argparse.Namespace:
     # Environment selects the default state dimensions used for plotting and containment.
     parser.add_argument(
         "--env",
-        choices=["cartpole", "mountain_car", "pendulum"],
+        choices=["cartpole", "mountain_car", "pendulum", "brake_system"],
         default=DEFAULT_ENV,
         help=(
             "Environment used to select default dimensions: "

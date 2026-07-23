@@ -31,17 +31,15 @@ class Experiment:
     lambda_ctrl: float
     seed: int = DEFAULT_SEED
     weight_root: Path = GRID_ROOT
+    condition: str = "default"
+    base_config_path: Path | None = None
 
     @property
     def output_dir(self) -> Path:
-        return (
-            self.weight_root
-            / self.env
-            / "alpha_lambda_grid"
-            / f"alpha_{format_value(self.alpha)}"
-            / f"lambda_{format_value(self.lambda_ctrl)}"
-            / f"seed_{self.seed}"
-        )
+        root = self.weight_root / self.env / "alpha_lambda_grid"
+        if self.condition != "default":
+            root = root / self.condition
+        return root / f"alpha_{format_value(self.alpha)}" / f"lambda_{format_value(self.lambda_ctrl)}" / f"seed_{self.seed}"
 
     @property
     def best_checkpoint(self) -> Path:
@@ -65,6 +63,7 @@ class Experiment:
             "alpha": self.alpha,
             "lambda_ctrl": self.lambda_ctrl,
             "seed": self.seed,
+            "condition": self.condition,
             "output_dir": self.output_dir.as_posix(),
         }
 
@@ -75,11 +74,21 @@ def build_experiments(
     lambdas: Sequence[float] = DEFAULT_LAMBDAS,
     seed: int = DEFAULT_SEED,
     weight_root: Path = GRID_ROOT,
+    condition: str = "default",
+    base_config_path: Path | None = None,
 ) -> list[Experiment]:
-    if env not in {"cartpole", "pendulum"}:
+    if env not in {"cartpole", "mountain_car", "pendulum"}:
         raise ValueError(f"Unsupported ablation environment: {env}")
     return [
-        Experiment(env, float(alpha), float(lambda_ctrl), int(seed), Path(weight_root))
+        Experiment(
+            env,
+            float(alpha),
+            float(lambda_ctrl),
+            int(seed),
+            Path(weight_root),
+            condition,
+            Path(base_config_path) if base_config_path is not None else None,
+        )
         for alpha, lambda_ctrl in product(alphas, lambdas)
     ]
 
@@ -90,9 +99,16 @@ def build_train_config(
 ) -> dict:
     source = base_config
     if source is None:
-        source = load_config(
-            Path("config/train_decoder") / experiment.env / "saliency.json"
+        config_name = "saliency.json"
+        if (
+            experiment.env == "mountain_car"
+            and experiment.condition in {"background", "background_v008_t20"}
+        ):
+            config_name = "saliency_background.json"
+        config_path = experiment.base_config_path or (
+            Path("config/train_decoder") / experiment.env / config_name
         )
+        source = load_config(config_path)
     config = copy.deepcopy(dict(source))
     if config.get("weight_mode") != "saliency":
         raise ValueError("Alpha-lambda grid requires weight_mode='saliency'")
@@ -120,12 +136,20 @@ def validate_training_artifacts(experiment: Experiment) -> tuple[bool, str]:
     try:
         metrics = json.loads(experiment.metrics_path.read_text(encoding="utf-8"))
         config = metrics["config"]
+        expected = build_train_config(experiment)
+        scientific_keys = (
+            "dataset_dir",
+            "saliency_file",
+            "weight_mode",
+            "weight",
+            "lambda_ctrl",
+            "training",
+            "controller",
+            "device",
+        )
         matches = (
-            config["weight_mode"] == "saliency"
-            and float(config["weight"]["alpha"]) == experiment.alpha
-            and float(config["lambda_ctrl"]) == experiment.lambda_ctrl
-            and int(config["training"]["seed"]) == experiment.seed
-            and _same_path(config["output_dir"], experiment.output_dir)
+            all(config[key] == expected[key] for key in scientific_keys)
+            and _same_path(config["output_dir"], expected["output_dir"])
             and metrics["best_checkpoint"] == experiment.best_checkpoint.name
         )
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
@@ -197,6 +221,9 @@ def _validate_trajectory_file(
     variant: str,
     decoder_weights: str | Path,
     states_path: Path,
+    expected_steps: int,
+    starv_config: str | Path,
+    controller_weights: str | Path,
 ) -> tuple[bool, str]:
     if not trajectory_path.exists():
         return False, "missing trajectory"
@@ -213,12 +240,37 @@ def _validate_trajectory_file(
                 decoder_weights,
             ):
                 return False, "checkpoint mismatch"
+            if int(trajectory["rollout_steps"].item()) != expected_steps:
+                return False, "horizon metadata mismatch"
+            if not _same_path(
+                trajectory["starv_config"].item(),
+                starv_config,
+            ):
+                return False, "StarV config mismatch"
+            if not _same_path(
+                trajectory["controller_weights"].item(),
+                controller_weights,
+            ):
+                return False, "controller checkpoint mismatch"
             for split in ("train", "val", "test"):
                 expected = states[f"{split}_states"]
-                actual = trajectory[f"{split}_traj"][:, 0, :]
+                traj = trajectory[f"{split}_traj"]
+                actions = trajectory[f"{split}_actions"]
+                if (
+                    traj.ndim != 3
+                    or actions.ndim != 3
+                    or traj.shape[1] != expected_steps + 1
+                    or actions.shape[1] != expected_steps
+                ):
+                    return False, f"{split} horizon mismatch"
+                if actions.shape[0] != traj.shape[0]:
+                    return False, f"{split} action sample count mismatch"
+                if not np.isfinite(traj).all() or not np.isfinite(actions).all():
+                    return False, f"{split} contains non-finite values"
+                actual = traj[:, 0, :]
                 if not np.array_equal(expected, actual):
                     return False, f"{split} initial state mismatch"
-    except (OSError, ValueError, KeyError, TypeError) as exc:
+    except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
         return False, f"invalid trajectory: {exc}"
 
     return True, "complete"
@@ -228,12 +280,21 @@ def validate_rollout_artifact(
     experiment: Experiment,
     *,
     states_path: Path | None = None,
+    expected_steps: int | None = None,
 ) -> tuple[bool, str]:
+    sampling_config = load_config(
+        Path("config/sampling") / f"{experiment.env}.json"
+    )
+    if expected_steps is None:
+        expected_steps = int(sampling_config["rollout_steps"])
     return _validate_trajectory_file(
         experiment.trajectory_path,
         variant="saliency",
         decoder_weights=experiment.best_checkpoint,
         states_path=states_path or _starv_states_path_for_env(experiment.env),
+        expected_steps=expected_steps,
+        starv_config=sampling_config["starv_config"],
+        controller_weights=sampling_config["controller"]["weights"],
     )
 
 
@@ -320,6 +381,9 @@ def run_mainline_rollouts(
             variant=variant,
             decoder_weights=checkpoint,
             states_path=states_path,
+            expected_steps=int(base_config["rollout_steps"]),
+            starv_config=base_config["starv_config"],
+            controller_weights=base_config["controller"]["weights"],
         )
         row = {"env": env, "variant": variant, "decoder_weights": checkpoint}
         if skip_existing and valid:
@@ -333,6 +397,9 @@ def run_mainline_rollouts(
                 variant=variant,
                 decoder_weights=checkpoint,
                 states_path=states_path,
+                expected_steps=int(base_config["rollout_steps"]),
+                starv_config=base_config["starv_config"],
+                controller_weights=base_config["controller"]["weights"],
             )
             if not valid:
                 raise RuntimeError(f"rollout artifact validation failed: {reason}")
@@ -423,6 +490,7 @@ def collect_training_metrics(
             "alpha": experiment.alpha,
             "lambda_ctrl": experiment.lambda_ctrl,
             "seed": experiment.seed,
+            "condition": experiment.condition,
             "best_epoch": best_epoch,
         }
         rows.append(
@@ -470,13 +538,23 @@ def collect_rollout_metrics(
                         dwm_data[f"{split}_traj"],
                         circular_dims=circular_dims,
                     )
+                    action_key = f"{split}_actions"
+                    action_mse = float("nan")
+                    if action_key in real_data and action_key in dwm_data:
+                        action_mse = float(
+                            np.mean(
+                                (real_data[action_key] - dwm_data[action_key]) ** 2
+                            )
+                        )
                     rows.append(
                         {
                             "env": experiment.env,
                             "alpha": experiment.alpha,
                             "lambda_ctrl": experiment.lambda_ctrl,
                             "seed": experiment.seed,
+                            "condition": experiment.condition,
                             "split": split,
+                            "action_mse": action_mse,
                             **metrics,
                         }
                     )
@@ -493,7 +571,7 @@ def build_combined_metrics(
     selected = list(build_experiments(env) if experiments is None else experiments)
     training = collect_training_metrics(selected)
     rollout = collect_rollout_metrics(env, selected, real_path=real_path)
-    keys = ["env", "alpha", "lambda_ctrl", "seed", "split"]
+    keys = ["env", "condition", "alpha", "lambda_ctrl", "seed", "split"]
     combined = training.merge(rollout, on=keys, how="inner", validate="one_to_one")
     if len(combined) != 2 * len(selected):
         raise ValueError(
@@ -502,6 +580,7 @@ def build_combined_metrics(
         )
     columns = [
         "env",
+        "condition",
         "alpha",
         "lambda_ctrl",
         "seed",
@@ -509,6 +588,7 @@ def build_combined_metrics(
         "best_epoch",
         "ctrl_mse",
         "pixel_mse",
+        "action_mse",
         "mean_step_l2",
         "final_l2",
         "max_l2_mean",
@@ -526,6 +606,15 @@ def write_summary_tables(
     real_path: Path | None = None,
 ) -> dict[str, pd.DataFrame | dict[str, Path]]:
     selected = list(build_experiments(env) if experiments is None else experiments)
+    conditions = {experiment.condition for experiment in selected}
+    if len(conditions) != 1:
+        raise ValueError("summary experiments must share one condition")
+    condition = conditions.pop()
+    weight_roots = {experiment.weight_root.resolve() for experiment in selected}
+    if len(weight_roots) != 1:
+        raise ValueError("summary experiments must share one weight_root")
+    weight_root = selected[0].weight_root
+
     training = collect_training_metrics(selected)
     rollout = collect_rollout_metrics(env, selected, real_path=real_path)
     combined = build_combined_metrics(
@@ -533,7 +622,9 @@ def write_summary_tables(
         experiments=selected,
         real_path=real_path,
     )
-    output_dir = GRID_ROOT / env / "alpha_lambda_grid"
+    output_dir = weight_root / env / "alpha_lambda_grid"
+    if condition != "default":
+        output_dir = output_dir / condition
     output_dir.mkdir(parents=True, exist_ok=True)
     paths = {
         "training": output_dir / "training_metrics.csv",
@@ -619,6 +710,7 @@ def compare_with_mainline(
 
     base = {
         "env": experiment.env,
+        "condition": "mainline",
         "alpha": float(train_config["weight"]["alpha"]),
         "lambda_ctrl": float(train_config["lambda_ctrl"]),
         "seed": int(train_config["training"]["seed"]),

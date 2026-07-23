@@ -1,0 +1,43 @@
+{
+  "layers": {
+    "Decoder": {
+      "args": [],
+      "kwargs": {
+        "weights": "dwm_weight/now_weight/mountain_car/alpha_lambda_grid/background/alpha_16/lambda_0.5/seed_2025/decoder_best_total.pth"
+      }
+    },
+    "Controller": {
+      "args": [],
+      "kwargs": {
+        "weights": "/home/tealab_shared/starv/weights/mountain_car/controller_mc.pth"
+      }
+    }
+  },
+  "verifier": {
+    "name": "MountainCarVerifier",
+    "args": [],
+    "kwargs": {
+      "goal_position_threshold": 0.6,
+      "num_steps": 30,
+      "early_stop": false,
+      "save_history": true
+    }
+  },
+  "grid": {
+    "dims": [
+      {
+        "name": "pos",
+        "start": 0.03,
+        "stop": 0.07,
+        "num": 4
+      },
+      {
+        "name": "vel",
+        "start": 0.003,
+        "stop": 0.007,
+        "num": 4
+      }
+    ]
+  },
+  "output_prefix": "results/smoke/mountain_car/safety_result"
+}

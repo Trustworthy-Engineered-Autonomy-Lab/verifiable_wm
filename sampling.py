@@ -142,6 +142,11 @@ def save_dwm_trajectories(config, trajectory_splits):
     # 同名文件，只有文件内部记录才说得清当前这份是哪个 checkpoint 跑出来的
     arrays["variant"] = np.array(decoder_variant(config))
     arrays["decoder_weights"] = np.array(resolve_decoder_weights(config))
+    arrays["rollout_steps"] = np.array(int(config["rollout_steps"]))
+    arrays["starv_config"] = np.array(str(config["starv_config"]))
+    arrays["controller_weights"] = np.array(
+        str(config["controller"]["weights"])
+    )
 
     output_path = output_dir / f"dwm_trajectories_{decoder_variant(config)}.npz"
     np.savez_compressed(output_path, **arrays)
