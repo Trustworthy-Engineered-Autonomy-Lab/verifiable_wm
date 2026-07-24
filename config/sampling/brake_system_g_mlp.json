@@ -14,6 +14,9 @@
   "decoder": {
     "name": "G_MLP",
     "variant": "g_mlp",
+    "args": {
+      "z_range": 0.05
+    },
     "weights": {
       "g_mlp": "dwm_weight/brake_system/g_mlp/G_brake.pth"
     }

@@ -15,6 +15,9 @@
   "decoder": {
     "name": "G_MLP",
     "variant": "g_mlp",
+    "args": {
+      "z_range": 0.8
+    },
     "weights": {
       "g_mlp": "dwm_weight/cartpole/g_mlp/G_cp.pth"
     }

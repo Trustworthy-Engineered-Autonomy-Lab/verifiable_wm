@@ -64,9 +64,15 @@ class G_MLP(nn.Module):
     directly reachable by StarV's FullyConnectedLayer/ReLULayer/SatLinLayer
     stack. Matches aebs_carla/model_2.py's Generator, which is what
     gan_brake_ckpts/G_brake.pth was trained against.
+
+    z_range defaults to 0.8, matching the cGAN_mlp/train_{cp,mc,pen}.ipynb
+    training recipe (pure adversarial loss, no reconstruction term -- a
+    wide latent range is what makes that worth anything). G_brake.pth was
+    trained with z_range=0.05 instead, so brake's config passes that value
+    explicitly rather than relying on this default.
     """
 
-    def __init__(self, state_dim=2, latent_dim=2, output_dim=96 * 96, z_range=0.05):
+    def __init__(self, state_dim=2, latent_dim=2, output_dim=96 * 96, z_range=0.8):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(state_dim + latent_dim, 256),
@@ -84,8 +90,7 @@ class G_MLP(nn.Module):
 
     def forward(self, state, z=None):
         if z is None:
-            # Fresh latent each call, matching the training-time distribution
-            # (see aebs_carla/cp_0.95_gan.py: sample_latent, z_range=0.05).
+            # Fresh latent each call, matching the training-time distribution.
             z = torch.empty(
                 state.size(0), self.latent_dim, device=state.device
             ).uniform_(-self.z_range, self.z_range)

@@ -3,7 +3,8 @@
         "G_MLP": {
             "args": [],
             "kwargs": {
-                "weights": "dwm_weight/pendulum/g_mlp/G_pen.pth"
+                "weights": "dwm_weight/pendulum/g_mlp/G_pen.pth",
+                "z_range": 0.8
             }
         },
         "Controller": {

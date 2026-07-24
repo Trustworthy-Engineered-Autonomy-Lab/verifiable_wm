@@ -3,7 +3,8 @@
         "G_MLP" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "dwm_weight/cartpole/g_mlp/G_cp.pth"
+                "weights" : "dwm_weight/cartpole/g_mlp/G_cp.pth",
+                "z_range" : 0.8
             }
         },
         "Controller" : {
