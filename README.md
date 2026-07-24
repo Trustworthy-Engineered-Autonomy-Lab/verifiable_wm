@@ -1,261 +1,90 @@
-# Trajectory Predictor Baseline
+# Trajectory Predictor
 
-## 1. 分支目的
+该目录实现一个基于 Transformer 的轨迹预测器：模型根据初始状态
+\(s_0\) 直接预测未来轨迹，并在 DWM verification grid 的每个 cell
+中采样 3 个初始点，用三条预测轨迹的逐步最小值和最大值构造
+Predictor Tube。
 
-本分支在 `verifiable_wm` 项目中新增一个 **Trajectory Predictor baseline**，用于与 DWM（Deterministic World Model）生成的 reachable tube 进行对比。
+当前版本的默认实验设置为：
 
-DWM 通过“状态 → 图像 → 控制器 → 动力学”的闭环可达性分析得到 reachable tube；本分支不使用世界模型或符号可达性，而是直接从真实闭环轨迹中训练一个 Transformer，根据初始状态预测未来轨迹，再将多个预测轨迹转换为 Predictor Tube，并通过 Conformal Prediction 对该 Tube 进行校准。
+- 每个 cell **总共采样 3 个点**，不是每个维度采样 3 个点；
+- 三个点为 cell 的 lower corner、center 和 upper corner；
+- 预测 **20 个 transition steps**；
+- 每条轨迹包含 \(s_0,s_1,\ldots,s_{20}\)，因此共有 21 个状态；
+- 所有 cell 的预测轨迹集中保存在一个
+  `predictor_trajectories.npz` 文件中；
+- `predictor_tube.json` 中的上下界直接由三条轨迹的 min/max 决定；
+- 不使用 conformal inflation。
 
-最终比较对象为：
+> 当前 Predictor Tube 是有限采样得到的经验包络，不是形式化
+> reachable set，也不保证覆盖 cell 内所有未采样的初始状态。
+
+## 1. 工作流程
 
 ```text
-DWM reachable tube
-        vs
-Conformal Predictor Tube
-```
-
-两种方法都输出按初始 cell 和时间步组织的状态范围，因此可以使用同一个 `compare.py`，在相同测试轨迹上比较覆盖率和 Tube 大小。
-
-> 注意：Trajectory Predictor 是数据驱动的概率基线，不是 StarV 意义下的确定性形式化可达性方法。其保证来自独立校准数据上的 Conformal Prediction。
-
----
-
-## 2. 整体方法
-
-```text
-real_trajectories.npz
+trajectory data (.npz)
         │
-        ├── train_traj
-        │      ├── fit：训练 Transformer
-        │      └── selection：选择最佳 checkpoint / early stopping
+        ├── 读取 train_traj / val_traj / test_traj
+        ├── 截取 s0...s20
+        └── 训练 Transformer
+                    │
+                    ▼
+        predictor_transformer.pth
+
+safety_result.json + predictor_transformer.pth
         │
-        ├── val_traj：Conformal calibration
-        │
-        └── test_traj：最终 containment evaluation
-
-训练阶段：
-initial state s0
-        ↓
-Transformer trajectory predictor
-        ↓
-predicted trajectory [s0, s1, ..., sT]
-        ↓
-predictor_transformer.pth
-
-Tube 构建阶段：
-verification grid / initial cells
-        ↓
-在每个 cell 内规则采样多个初始状态
-        ↓
-Transformer 预测对应轨迹
-        ↓
-每个时间步、每个状态维度取 min/max
-        ↓
-Raw Predictor Tube
-        ↓
-用 val_traj 计算 conformal margin Δ
-        ↓
-Raw Tube 上下界扩张
-        ↓
-Conformal Predictor Tube
-        ↓
-predictor_tube.json
+        ├── 读取 verification grid 和 cell
+        ├── 每个 cell 采样 lower / center / upper
+        ├── 分别预测 20 步
+        ├── 保存所有 cell 的预测轨迹
+        └── 对三条轨迹逐步、逐维取 min/max
+                    │
+                    ├── predictor_trajectories.npz
+                    └── predictor_tube.json
 ```
 
-### 2.1 Transformer 点轨迹预测
-
-模型学习映射：
-
-```text
-Fθ(s0) → [ŝ0, ŝ1, ..., ŝT]
-```
-
-输入是一个初始状态，输出是完整的未来状态序列。模型内部使用：
-
-- 初始状态编码器；
-- 可学习的时间查询向量；
-- Transformer Encoder；
-- 状态输出层。
-
-预测结果的第 0 步会被强制设置为输入初始状态，避免模型重复近似已知的 `s0`。
-
-### 2.2 Raw Predictor Tube
-
-从 `safety_result.json` 读取与 DWM verification 相同的 grid 和 initial cells。对每个 cell，在每个状态维度上均匀取 `samples_per_dim` 个点。
-
-对于二维 MountainCar，默认：
-
-```text
-samples_per_dim = 11
-samples_per_cell = 11 × 11 = 121
-```
-
-将一个 cell 内全部采样点送入 Transformer，得到多条预测轨迹；随后在每个时间步和状态维度上取预测值的最小值与最大值，形成该 cell 的 Raw Predictor Tube。
-
-该 Raw Tube 是有限采样得到的预测包络，本身不等同于形式化 reachable set。
-
-### 2.3 Conformal calibration
-
-使用独立的 `val_traj`，计算每条真实轨迹相对于对应 Raw Tube 的最大越界距离：
-
-```text
-score = max over all time steps and state dimensions
-        of the distance outside the Raw Tube
-```
-
-根据指定的 `alpha` 选择 conformal quantile，得到全局校准量 `delta`。然后对未来时间步的上下界进行扩张：
-
-```text
-lower = raw_lower - delta
-upper = raw_upper + delta
-```
-
-默认 `alpha=0.05`，对应 95% 的边际轨迹包含目标。校准样本必须与测试样本来自相同的初始状态分布，并且必须有足够多的有效 grid 内轨迹。
-
-### 2.4 测试评估
-
-使用从未参与训练或校准的 `test_traj`，分别评估：
-
-- Raw Predictor Tube；
-- Conformal Predictor Tube。
-
-主要指标包括：
-
-- fully contained trajectories；
-- trajectory containment rate；
-- mean step containment；
-- mean / worst maximum violation。
-
----
-
-## 3. 目录结构
+## 2. 文件说明
 
 ```text
 trajectory_predictor/
+├── README.md
 ├── __init__.py
 ├── config.py
 ├── data_utils.py
 ├── predictor_model.py
-├── tube_utils.py
 ├── train_predictor.py
 ├── build_tube.py
-├── README.md
-└── models/
-    └── mountain_car/
-        ├── predictor_transformer.pth   # 训练后生成
-        └── predictor_tube.json         # Tube 构建后生成
+└── tube_utils.py
 ```
 
-外部输入数据不属于本模块：
+| 文件 | 作用 |
+| --- | --- |
+| `config.py` | 默认路径、默认 horizon、随机种子和 device 设置 |
+| `data_utils.py` | 读取、检查、截断和归一化轨迹数据 |
+| `predictor_model.py` | Transformer 模型、loss、checkpoint 加载和批量推理 |
+| `train_predictor.py` | 训练 Predictor 并保存 `.pth` checkpoint |
+| `build_tube.py` | 读取 grid 和 checkpoint，生成 NPZ 与最终 tube JSON |
+| `tube_utils.py` | cell 采样、轨迹汇总、min/max tube 和 JSON 保存 |
 
-```text
-real_trajectories.npz
-safety_result.json
+## 3. 环境依赖
+
+代码需要：
+
+- Python 3
+- NumPy
+- PyTorch
+
+请在已经能够运行本项目其他 PyTorch 脚本的环境中执行。例如：
+
+```bash
+conda activate starv_shared
 ```
 
----
+## 4. 训练 Predictor
 
-## 4. 各程序作用
+### 4.1 输入轨迹格式
 
-### `config.py`
-
-集中管理默认绝对路径、随机种子、计算设备和输出目录创建。
-
-当前默认路径：
-
-```text
-真实轨迹：
-/home/tealab_shared/trajectories/mountain_car/starv_state/real_trajectories.npz
-
-Verification grid：
-/home/tealab_shared/dwm_reachable_tube/mountain_car/safety_result.json
-
-模型 checkpoint：
-/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/mountain_car/predictor_transformer.pth
-
-Predictor Tube：
-/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/mountain_car/predictor_tube.json
-```
-
-所有路径都可以通过终端参数覆盖。
-
-### `data_utils.py`
-
-负责：
-
-- 读取并检查 `train_traj`、`val_traj`、`test_traj`；
-- 将 `train_traj` 拆分为 fit 和 selection；
-- 只根据 fit 数据计算状态均值和标准差；
-- 构造 PyTorch `TrajectoryDataset`。
-
-### `predictor_model.py`
-
-负责：
-
-- 定义 `TrajectoryTransformer`；
-- 计算 trajectory loss；
-- 加载 checkpoint；
-- 对大量初始状态进行批量轨迹预测；
-- 完成归一化和反归一化。
-
-### `train_predictor.py`
-
-训练入口程序。它只训练点轨迹预测器，不生成 Tube。
-
-主要流程：
-
-```text
-读取 real_trajectories.npz
-→ 拆分 fit / selection
-→ 计算 normalization
-→ 训练 Transformer
-→ 根据 selection loss 保存最佳模型
-→ early stopping
-```
-
-输出：
-
-```text
-predictor_transformer.pth
-```
-
-### `tube_utils.py`
-
-负责 Predictor Tube 的核心功能：
-
-- 读取 grid；
-- 将初始状态映射到 cell；
-- 在 cell 内规则采样；
-- 构造 Raw Predictor Tube；
-- 计算 trajectory-tube violation；
-- 计算 conformal score 和 `delta`；
-- 扩张 Tube；
-- 在 test 数据上评估 containment；
-- 保存与 `compare.py` 兼容的 JSON。
-
-### `build_tube.py`
-
-Tube 构建入口程序。它不会重新训练模型。
-
-主要流程：
-
-```text
-加载 predictor_transformer.pth
-→ 读取 safety_result.json 中的 grid/cells
-→ 每个 cell 内采样并预测
-→ 构造 Raw Predictor Tube
-→ val_traj 做 conformal calibration
-→ test_traj 做最终评估
-→ 保存 predictor_tube.json
-```
-
----
-
-## 5. 输入数据要求
-
-### `real_trajectories.npz`
-
-必须包含：
+训练输入是一个 `.npz` 文件，必须包含以下三个数组：
 
 ```text
 train_traj
@@ -263,250 +92,295 @@ val_traj
 test_traj
 ```
 
-每个数组的形状必须为：
+三个数组的形状都必须是：
 
 ```text
-(N, T+1, state_dim)
+(num_trajectories, T + 1, state_dim)
 ```
 
-三个 split 必须具有相同的时间长度和状态维度。
+输入数据至少需要包含 20 个 transition steps，即第二个维度至少为
+21。即使输入轨迹包含 30 步，默认训练也只使用
+\(s_0,\ldots,s_{20}\)。
 
-### `safety_result.json`
+训练时：
 
-至少需要包含：
+- `train_traj` 被进一步划分为 parameter-fit set 和
+  checkpoint-selection set；
+- `val_traj` 保留为 calibration split，但当前无 conformal
+  calibration，因此不会参与训练；
+- `test_traj` 不参与训练。
 
-```text
-grid.dims
-cells
-```
+### 4.2 训练命令
 
-本模块使用其中的 grid 定义和每个 cell 的初始边界。DWM 后续时间步的 reachable bounds 不参与 Predictor Tube 的生成。
-
-为了保证实验有效，`real_trajectories.npz` 的初始状态范围应与 `safety_result.json` 的 verification grid 一致。
-
----
-
-## 6. 使用方法
-
-从项目根目录运行：
-
-```bash
-cd /home/UFAD/xinyangwang/projects/verifiable_wm
-```
-
-### 6.1 训练 Predictor
-
-使用默认路径：
-
-```bash
-python trajectory_predictor/train_predictor.py
-```
-
-小规模运行测试：
+建议显式填写输入和输出路径：
 
 ```bash
 python trajectory_predictor/train_predictor.py \
-  --epochs 10 \
-  --batch-size 64 \
-  --patience 5 \
-  --device auto
-```
-
-正式训练示例：
-
-```bash
-python trajectory_predictor/train_predictor.py \
-  --real /home/tealab_shared/trajectories/mountain_car/starv_state/real_trajectories.npz \
-  --checkpoint /home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/mountain_car/predictor_transformer.pth \
+  --real /path/to/trajectories.npz \
+  --checkpoint trajectory_predictor/models/pendulum/predictor_transformer.pth \
+  --horizon 20 \
   --epochs 300 \
-  --batch-size 64 \
-  --patience 30 \
   --device auto
 ```
 
-### 6.2 构建 Predictor Tube
+常用参数：
 
-必须先完成训练并生成 checkpoint。
+| 参数 | 默认值 | 含义 |
+| --- | ---: | --- |
+| `--horizon` | `20` | transition steps 数量 |
+| `--fit-ratio` | `0.9` | `train_traj` 中用于拟合模型的比例 |
+| `--epochs` | `300` | 最大训练轮数 |
+| `--batch-size` | `64` | 训练 batch size |
+| `--learning-rate` | `1e-4` | AdamW learning rate |
+| `--patience` | `30` | early stopping patience |
+| `--device` | `auto` | 自动选择 CUDA 或 CPU |
 
-使用默认路径：
-
-```bash
-python trajectory_predictor/build_tube.py
-```
-
-小规模测试：
-
-```bash
-python trajectory_predictor/build_tube.py \
-  --samples-per-dim 5 \
-  --alpha 0.05 \
-  --device auto
-```
-
-正式运行示例：
+查看全部参数：
 
 ```bash
-python trajectory_predictor/build_tube.py \
-  --real /home/tealab_shared/trajectories/mountain_car/starv_state/real_trajectories.npz \
-  --grid-result /home/tealab_shared/dwm_reachable_tube/mountain_car/safety_result.json \
-  --checkpoint /home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/mountain_car/predictor_transformer.pth \
-  --tube-output /home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/mountain_car/predictor_tube.json \
-  --samples-per-dim 11 \
-  --alpha 0.05 \
-  --device auto
+python trajectory_predictor/train_predictor.py --help
 ```
 
----
+### 4.3 Checkpoint
 
-## 7. 输出文件
+训练结果保存在 `predictor_transformer.pth`。该文件主要包含：
 
-### `predictor_transformer.pth`
-
-保存：
-
-- Transformer 参数；
-- 状态归一化参数；
-- horizon 和 state dimension；
-- 模型结构配置；
+- Transformer 权重 `model_state_dict`；
+- 模型结构参数 `model_config`；
+- `state_mean` 和 `state_std`；
+- `state_dim` 和 `horizon`；
 - 最佳 epoch 和 selection loss；
-- 数据划分协议。
+- 训练数据来源与 split 信息。
 
-该文件只由 `build_tube.py` 加载，不直接传给 `compare.py`。
+`.pth` 是模型 checkpoint，不是预测轨迹。预测轨迹保存在后续生成的
+`.npz` 文件中。
 
-### `predictor_tube.json`
+## 5. 构建 Predictor Tube
 
-核心字段：
+### 5.1 输入
 
-```text
-cells[i]["raw_bounds"]
+构建 tube 需要：
+
+1. `safety_result.json`：提供 DWM verification 使用的 grid 和 cells；
+2. `predictor_transformer.pth`：训练好的 Predictor checkpoint。
+
+如果 JSON 中每个 cell 已包含有效的初始 `bounds[0]`，代码会直接使用；
+否则会根据 `grid.dims` 重建所有 cell 的初始边界。
+
+### 5.2 构建命令
+
+```bash
+python trajectory_predictor/build_tube.py \
+  --grid-result /path/to/safety_result.json \
+  --checkpoint trajectory_predictor/models/pendulum/predictor_transformer.pth \
+  --tube-output trajectory_predictor/models/pendulum/predictor_tube.json \
+  --trajectory-output trajectory_predictor/models/pendulum/predictor_trajectories.npz \
+  --samples-per-cell 3 \
+  --horizon 20 \
+  --env-name pendulum \
+  --device auto
 ```
 
-有限采样得到的 Raw Predictor Tube。
+其中：
 
-```text
-cells[i]["bounds"]
+- `--samples-per-cell 3` 表示每个 cell **总共**采样 3 个初始状态；
+- `--horizon 20` 表示预测 20 次状态转移，输出 21 个状态；
+- `--trajectory-output` 必须是一个以 `.npz` 结尾的文件路径；
+- 如果省略 `--trajectory-output`，默认在
+  `predictor_tube.json` 同级目录生成 `predictor_trajectories.npz`；
+- `--cell-batch-size` 是模型推理时的 batch size，不改变每个 cell
+  的采样点数。
+
+查看全部参数：
+
+```bash
+python trajectory_predictor/build_tube.py --help
 ```
 
-经过 conformal inflation 的最终 Predictor Tube。`compare.py` 默认读取该字段。
+如果 checkpoint 能够预测 30 步，可以通过 `--horizon 20` 只保留前
+20 步；如果 checkpoint 的 horizon 小于 20，程序会报错。为了让训练
+和 tube 构建设置完全一致，推荐重新训练 20-step checkpoint。
 
-JSON 还包含：
+## 6. 三点采样与 Tube 计算
 
-- alpha / coverage；
-- conformal delta；
-- calibration statistics；
-- raw 和 conformal test evaluation；
-- grid 信息；
-- checkpoint 与数据来源。
+对状态维度为 \(D\) 的 cell，初始边界为：
 
----
+```text
+initial_bounds.shape == (D, 2)
+```
 
-## 8. 与 DWM 的比较
+代码在 lower corner 到 upper corner 的对角线上等距采样。默认
+`samples_per_cell=3` 时得到：
 
-`predictor_transformer.pth` 不直接参与比较。先通过 `build_tube.py` 生成 `predictor_tube.json`，再用相同的 `real test trajectories` 分别评估两种 Tube。
+```text
+p0 = lower corner
+p1 = (lower corner + upper corner) / 2
+p2 = upper corner
+```
 
-### 8.1 DWM reachable tube
+对第 \(c\) 个 cell、时间步 \(t\) 和状态维度 \(d\)，tube 定义为：
+
+\[
+L_{c,t,d}=\min_{k\in\{0,1,2\}}\hat{s}_{c,k,t,d},
+\qquad
+U_{c,t,d}=\max_{k\in\{0,1,2\}}\hat{s}_{c,k,t,d}.
+\]
+
+因此，最终 bounds 的形状为：
+
+```text
+(num_cells, 21, state_dim, 2)
+```
+
+最后一个维度中的 `0` 是 lower，`1` 是 upper。
+
+## 7. 输出格式
+
+### 7.1 `predictor_trajectories.npz`
+
+所有 cell 的轨迹保存在同一个压缩 NPZ 文件中：
+
+| key | 形状 | 含义 |
+| --- | --- | --- |
+| `cell_indices` | `(num_cells,)` | cell 的线性索引 |
+| `initial_bounds` | `(num_cells, state_dim, 2)` | 每个 cell 的初始范围 |
+| `initial_states` | `(num_cells, 3, state_dim)` | 每个 cell 的 3 个采样点 |
+| `trajectories` | `(num_cells, 3, 21, state_dim)` | 所有预测轨迹 |
+| `lower` | `(num_cells, 21, state_dim)` | 三条轨迹逐元素最小值 |
+| `upper` | `(num_cells, 21, state_dim)` | 三条轨迹逐元素最大值 |
+| `horizon` | scalar | transition steps，默认为 `20` |
+| `samples_per_cell` | scalar | 每个 cell 的采样数，默认为 `3` |
+
+读取第 10 个 cell：
+
+```python
+import numpy as np
+
+with np.load("predictor_trajectories.npz", allow_pickle=False) as data:
+    cell_index = 10
+    initial_states = data["initial_states"][cell_index]  # (3, state_dim)
+    trajectories = data["trajectories"][cell_index]     # (3, 21, state_dim)
+    lower = data["lower"][cell_index]                    # (21, state_dim)
+    upper = data["upper"][cell_index]                    # (21, state_dim)
+```
+
+如果需要通过 `cell_indices` 查找 cell，而不是假设数组位置与 cell
+索引相同：
+
+```python
+with np.load("predictor_trajectories.npz", allow_pickle=False) as data:
+    wanted_cell = 10
+    trajectory_index = np.flatnonzero(
+        data["cell_indices"] == wanted_cell
+    )[0]
+    trajectories = data["trajectories"][trajectory_index]
+```
+
+### 7.2 `predictor_tube.json`
+
+JSON 的顶层包含：
+
+- `method`、`environment` 和 `guarantee_type`；
+- `sampling_strategy`、`samples_per_cell` 和 `horizon`；
+- grid、checkpoint 和集中 NPZ 的路径；
+- `cells`：所有 cell 的 tube。
+
+每个 cell 的核心字段为：
+
+```text
+cells[i]["bounds"][step][state_dim] = [lower, upper]
+```
+
+每个 cell 还包含：
+
+| 字段 | 含义 |
+| --- | --- |
+| `raw_bounds` | 与 `bounds` 相同，均为三条轨迹的直接 min/max |
+| `initial_bounds` | 该 cell 的原始初始边界 |
+| `trajectory_file` | 集中 NPZ 文件的路径 |
+| `trajectory_index` | 该 cell 在 NPZ 第一个维度中的位置 |
+
+所有 cell 都指向同一个 `trajectory_file`，通过不同的
+`trajectory_index` 读取对应数据。
+
+## 8. 结果检查
+
+快速查看 JSON 元数据：
+
+```bash
+jq \
+  '{method, samples_per_cell, horizon, trajectory_file, cell_count: (.cells | length)}' \
+  trajectory_predictor/models/pendulum/predictor_tube.json
+```
+
+检查 NPZ 形状以及 min/max 是否一致：
+
+```python
+import numpy as np
+
+with np.load("predictor_trajectories.npz", allow_pickle=False) as data:
+    trajectories = data["trajectories"]
+
+    print("trajectories:", trajectories.shape)
+    print("initial_states:", data["initial_states"].shape)
+    print("lower:", data["lower"].shape)
+    print("upper:", data["upper"].shape)
+
+    np.testing.assert_allclose(
+        data["lower"],
+        trajectories.min(axis=1),
+    )
+    np.testing.assert_allclose(
+        data["upper"],
+        trajectories.max(axis=1),
+    )
+
+print("NPZ min/max check passed")
+```
+
+## 9. 与 `compare.py` 配合
+
+比较时应保证 Predictor、DWM 和 real trajectories 使用相同的：
+
+- environment；
+- verification grid；
+- 最大比较步数；
+- 状态维度和状态顺序；
+- 测试轨迹。
+
+20-step Predictor 的比较命令示例：
 
 ```bash
 python compare.py \
-  --env mountain_car \
-  --safety /home/tealab_shared/dwm_reachable_tube/mountain_car/safety_result.json \
-  --real /home/tealab_shared/trajectories/mountain_car/starv_state/real_trajectories.npz \
-  --dwm /home/tealab_shared/trajectories/mountain_car/starv_state/dwm_trajectories.npz \
-  --real-key test_traj \
-  --dwm-key test_traj \
-  --plot-dims 0 1 \
-  --check-dims 0 1 \
-  --max-steps 30 \
-  --outdir trajectory_predictor/mountain_car/dwm_result
+  --env pendulum \
+  --safety trajectory_predictor/models/pendulum/predictor_tube.json \
+  --real /path/to/real_trajectories.npz \
+  --dwm /path/to/dwm_trajectories.npz \
+  --max-steps 20 \
+  --outdir trajectory_predictor/predictor_results/pendulum
 ```
 
-### 8.2 Predictor Tube
+## 10. 当前版本的主要修改
 
-```bash
-python compare.py \
-  --env mountain_car \
-  --safety /home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/mountain_car/predictor_tube.json \
-  --real /home/tealab_shared/trajectories/mountain_car/starv_state/real_trajectories.npz \
-  --dwm /home/tealab_shared/trajectories/mountain_car/starv_state/dwm_trajectories.npz \
-  --real-key test_traj \
-  --dwm-key test_traj \
-  --plot-dims 0 1 \
-  --check-dims 0 1 \
-  --max-steps 30 \
-  --outdir trajectory_predictor/mountain_car/predictor_result
-```
+相较于原始 Predictor，本版本进行了以下修改：
 
-公平比较时，重点记录两次运行中的 `[Real trajectory]`：
+1. 将采样参数从“每个维度的采样数”改为“每个 cell 的总采样数”；
+2. 默认每个 cell 仅采样 lower corner、center、upper corner 三个点；
+3. 默认 horizon 从 30 个 transition steps 改为 20；
+4. tube 直接使用三条预测轨迹的逐步、逐维 min/max；
+5. 移除 conformal calibration 和 conformal inflation；
+6. 将所有 cell 的预测轨迹集中保存到一个 NPZ 文件；
+7. 在 JSON 中增加 `trajectory_file` 和 `trajectory_index`，用于定位
+   NPZ 中对应 cell 的轨迹；
+8. 保留 `bounds` / `raw_bounds` 结构，便于现有比较程序读取。
 
-- fully contained；
-- containment rate；
-- mean step containment。
+## 11. 注意事项
 
-还应同时比较 Tube width / area / volume，否则仅靠覆盖率无法反映保守性。两次实验必须使用完全相同的：
-
-- `test_traj`；
-- grid；
-- horizon；
-- checked dimensions；
-- cell 定位方式。
-
----
-
-## 9. 常见问题
-
-### Conformal delta is infinite
-
-错误示例：
-
-```text
-ValueError: conformal delta is infinite; calibration set is too small for alpha=0.05
-```
-
-原因是落在 verification grid 内的有效 `val_traj` 数量不足。对于 `alpha=0.05`，至少需要 19 条有效 calibration trajectories 才可能得到有限 quantile；实际实验建议使用更多样本。
-
-应首先检查：
-
-- `val_traj` 总数；
-- 初始状态落在 grid 内的数量；
-- trajectory 数据范围是否与 verification grid 一致。
-
-不要直接截断 rank 或删除附加的 `inf`，否则会破坏标准 conformal 的有限样本规则。
-
-### Transformer nested tensor warning
-
-```text
-enable_nested_tensor is True ... norm_first was True
-```
-
-这是 PyTorch 的性能提示，不是运行错误，不影响 checkpoint 或 Tube 生成。
-
-### Real trajectory containment 明显高于 DWM trajectory containment
-
-如果 `--safety` 使用的是 `predictor_tube.json`，这是可能的，因为 Predictor Tube 是使用真实轨迹训练和校准的，其目标是覆盖新的真实轨迹，而不是保证覆盖 DWM rollout。
-
-DWM 与 Predictor 的公平比较应始终比较：
-
-```text
-相同 real test trajectories vs DWM reachable tube
-相同 real test trajectories vs Predictor Tube
-```
-
-而不是直接比较同一次运行中的 real containment 与 DWM containment。
-
----
-
-## 10. 当前方法的定位与限制
-
-本分支提供的是一个直接的数据驱动 baseline：
-
-- 优点：实现简单，不依赖世界模型、图像生成器和符号网络传播；
-- 优点：可输出与 DWM reachable tube 格式一致的 Predictor Tube；
-- 优点：可以通过 conformal calibration 获得分布无关的边际覆盖保证；
-- 限制：Raw Tube 由有限初始状态采样构造，不覆盖 cell 内未采样状态的最坏情况；
-- 限制：保证依赖训练、校准和测试数据的分布一致性；
-- 限制：使用全局 `delta` 可能导致部分 cell 过度保守；
-- 限制：高覆盖率并不一定意味着 Tube 更好，还需要结合 Tube 大小判断。
-
-因此，该 baseline 的主要作用是回答：
-
-> 在相同真实轨迹数据、initial grid 和测试条件下，一个直接学习初始状态到未来轨迹映射的 Transformer，经过采样包络与 conformal calibration 后，能否生成比 DWM reachable tube 更紧或更有效的概率 Tube？
+- 三点只覆盖 cell 对角线上的 lower、center 和 upper，不代表覆盖
+  整个高维 cell；
+- 减少采样点会降低计算量，但也可能遗漏 cell 内其他位置产生的极值；
+- 当前 tube 没有 conformal coverage guarantee；
+- `predictor_trajectories.npz` 的大小约与
+  `num_cells × 3 × 21 × state_dim` 成正比；
+- 建议在实验记录中同时保存 checkpoint、grid JSON、集中 NPZ 和最终
+  tube JSON，以保证结果可复现。
