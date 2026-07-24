@@ -1,0 +1,16 @@
+{
+  "dataset_dir": "datasets/cartpole/data/dataset_v1",
+  "output_dir": "dwm_weight/cartpole/g_mlp",
+  "g_out_name": "G_cp.pth",
+  "d_out_name": "D_cp.pth",
+  "z_range": 0.8,
+  "training": {
+    "seed": 2025,
+    "batch_size": 128,
+    "epochs": 50,
+    "lr_g": 0.0002,
+    "lr_d": 0.0002,
+    "beta1": 0.5,
+    "beta2": 0.999
+  }
+}

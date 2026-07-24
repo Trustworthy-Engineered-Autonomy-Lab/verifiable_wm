@@ -122,11 +122,12 @@ class G_MLP(model.G_MLP):
 
     Verification treats the latent as an interval [-z_range, z_range] per
     dim (not a fixed point), since rollout resamples it uniformly from that
-    range every step (aebs_carla/cp_0.95_gan.py). The reachable tube has to
-    cover the whole latent range to actually contain those rollouts.
+    range every step. The reachable tube has to cover the whole latent
+    range to actually contain those rollouts, so z_range here must match
+    whatever the checkpoint was trained with (see model.G_MLP's docstring).
     """
 
-    def __init__(self, weights, z_range=0.05, lp_solver='gurobi', *args, **kwargs):
+    def __init__(self, weights, z_range=0.8, lp_solver='gurobi', *args, **kwargs):
         super().__init__(z_range=z_range, *args, **kwargs)
 
         self.load_state_dict(torch.load(weights, 'cpu', weights_only=True))

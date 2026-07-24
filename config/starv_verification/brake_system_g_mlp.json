@@ -3,13 +3,14 @@
         "G_MLP" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "dwm_weight/now_weight/brake_system/g_mlp/G_brake.pth"
+                "weights" : "dwm_weight/brake_system/g_mlp/G_brake.pth",
+                "z_range" : 0.05
             }
         },
         "Controller" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "dwm_weight/now_weight/brake_system/controller.pth",
+                "weights" : "dwm_weight/brake_system/controller.pth",
                 "activation" : "sigmoid"
             }
         }

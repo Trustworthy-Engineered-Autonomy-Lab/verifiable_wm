@@ -1,0 +1,31 @@
+{
+  "env": "pendulum",
+  "dataset_name": "dataset_v1",
+  "seed_pool": 2024,
+  "seed_train": 2025,
+  "seed_val": 2026,
+  "seed_test": 2027,
+  "num_pool": 2000,
+  "num_train": 1600,
+  "num_val": 400,
+  "num_test": 400,
+  "rollout_steps": 20,
+  "device": "auto",
+  "render_batch_size": 64,
+  "starv_config": "config/starv_verification/pendulum.json",
+  "state_space": [
+    {"name": "theta", "low": -3.141592653589793, "high": 3.141592653589793},
+    {"name": "omega", "low": -8.0, "high": 8.0}
+  ],
+  "controller": {
+    "name": "Controller",
+    "weights": "/home/tealab_shared/starv/weights/pendulum/controller_pen.pth",
+    "args": {
+      "activation": "tanh"
+    }
+  },
+  "dynamic": {
+    "name": "Pendulum"
+  },
+  "output_dir": "datasets/pendulum/data/dataset_v1"
+}

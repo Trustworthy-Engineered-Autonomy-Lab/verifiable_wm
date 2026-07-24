@@ -5,7 +5,7 @@
 # CARLA server (CARLA_HOST/CARLA_PORT, default decaf:8000).
 #
 #   python tools/gt_brake_grid_eval.py \
-#       --controller_path dwm_weight/now_weight/brake_system/controller.pth \
+#       --controller_path dwm_weight/brake_system/controller.pth \
 #       --out_dir datasets/brake_system/ground_truth/gt_grid_out_0.01 \
 #       --samples_per_cell 3
 import os

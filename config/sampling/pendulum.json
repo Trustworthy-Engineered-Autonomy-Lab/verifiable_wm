@@ -1,0 +1,29 @@
+{
+  "env": "pendulum",
+  "dataset_name": "dataset_v1",
+  "rollout_steps": 20,
+  "device": "auto",
+  "render_batch_size": 64,
+  "starv_config": "config/starv_verification/pendulum.json",
+  "controller": {
+    "name": "Controller",
+    "weights": "dwm_weight/pendulum/controller.pth",
+    "args": {
+      "activation": "tanh"
+    }
+  },
+  "decoder": {
+    "name": "Decoder",
+    "variant": "saliency",
+    "weights": {
+      "old": "dwm_weight/pendulum/old/decoder_pen.pth",
+      "intensity": "dwm_weight/pendulum/intensity/decoder_best_total.pth",
+      "saliency": "dwm_weight/pendulum/alpha_lambda_grid/t20_matched/alpha_16/lambda_0.5/seed_2025/decoder_best_total.pth",
+      "saliency_lambda0": "dwm_weight/pendulum/alpha_lambda_grid/t20_matched/alpha_16/lambda_0/seed_2025/decoder_best_total.pth"
+    }
+  },
+  "dynamic": {
+    "name": "Pendulum"
+  },
+  "output_dir": "datasets/pendulum/data/dataset_v1"
+}
