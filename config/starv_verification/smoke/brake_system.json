@@ -1,0 +1,44 @@
+{
+  "layers": {
+    "Decoder": {
+      "args": [],
+      "kwargs": {
+        "weights": "dwm_weight/brake_system/decoder.pth",
+        "output_activation": "clamp"
+      }
+    },
+    "Controller": {
+      "args": [],
+      "kwargs": {
+        "weights": "dwm_weight/brake_system/controller.pth",
+        "activation": "sigmoid"
+      }
+    }
+  },
+  "verifier": {
+    "name": "BrakeVerifier",
+    "args": [],
+    "kwargs": {
+      "num_steps": 10,
+      "early_stop": false,
+      "save_history": true
+    }
+  },
+  "grid": {
+    "dims": [
+      {
+        "name": "dis",
+        "start": 6.0,
+        "stop": 6.04,
+        "num": 4
+      },
+      {
+        "name": "vel",
+        "start": 6.0,
+        "stop": 6.04,
+        "num": 4
+      }
+    ]
+  },
+  "output_prefix": "results/smoke/brake_system/safety_result"
+}

@@ -1,9 +1,9 @@
 {
     "layers" : {
-        "G_MLP" : {
+        "Decoder" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "dwm_weight/mountain_car/g_mlp/G_mc.pth"
+                "weights" : "dwm_weight/mountain_car/alpha_lambda_grid/background_v008_t20/alpha_8/lambda_0.5/seed_2025/decoder_best_total.pth"
             }
         },
         "Controller" : {
@@ -49,5 +49,5 @@
         "seed_test": 2027,
         "output_file": "datasets/mountain_car/data/dataset_v1/starv_states.npz"
     },
-    "output_prefix": "results/mountain_car/safety_result_g_mlp"
+    "output_prefix": "results/mountain_car/safety_result"
 }

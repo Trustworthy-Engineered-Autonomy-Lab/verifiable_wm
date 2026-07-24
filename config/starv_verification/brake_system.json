@@ -1,25 +1,26 @@
 {
     "layers" : {
-        "G_MLP" : {
+        "Decoder" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "dwm_weight/mountain_car/g_mlp/G_mc.pth"
+                "weights" : "dwm_weight/brake_system/decoder.pth",
+                "output_activation" : "clamp"
             }
         },
         "Controller" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "dwm_weight/mountain_car/controller.pth"
+                "weights" : "dwm_weight/brake_system/controller.pth",
+                "activation" : "sigmoid"
             }
         }
     },
     "verifier": {
-        "name": "MountainCarVerifier",
+        "name": "BrakeVerifier",
         "args": [
         ],
         "kwargs": {
-            "goal_position_threshold": 0.6,
-            "num_steps": 20,
+            "num_steps": 10,
             "early_stop": false,
             "save_history": true
         }
@@ -27,16 +28,16 @@
     "grid": {
         "dims": [
             {
-                "name": "pos",
-                "start": -0.20,
-                "stop": 0.60,
-                "num": 80
+                "name": "dis",
+                "start": 6.00,
+                "stop": 6.40,
+                "num": 40
             },
             {
                 "name": "vel",
-                "start": 0.000,
-                "stop": 0.080,
-                "num": 80
+                "start": 6.00,
+                "stop": 6.40,
+                "num": 40
             }
         ]
     },
@@ -47,7 +48,7 @@
         "seed_train": 2025,
         "seed_val": 2026,
         "seed_test": 2027,
-        "output_file": "datasets/mountain_car/data/dataset_v1/starv_states.npz"
+        "output_file": "datasets/brake_system/data/dataset_v1/starv_states.npz"
     },
-    "output_prefix": "results/mountain_car/safety_result_g_mlp"
+    "output_prefix": "results/brake_system/safety_result"
 }

@@ -1,0 +1,29 @@
+{
+  "dataset_name": "dataset_v1",
+  "rollout_steps": 20,
+  "device": "auto",
+  "render_batch_size": 64,
+  "starv_config": "config/starv_verification/cartpole.json",
+  "decoder_state_indices": [0, 2],
+  "controller": {
+    "name": "Controller",
+    "weights": "dwm_weight/cartpole/controller.pth",
+    "args": {
+      "activation": "sigmoid"
+    }
+  },
+  "decoder": {
+    "name": "Decoder",
+    "variant": "saliency",
+    "weights": {
+      "old": "dwm_weight/cartpole/old/decoder_cp.pth",
+      "intensity": "dwm_weight/cartpole/intensity/decoder_best_total.pth",
+      "saliency": "dwm_weight/cartpole/alpha_lambda_grid/t20_matched/alpha_8/lambda_0.1/seed_2025/decoder_best_total.pth",
+      "saliency_lambda0": "dwm_weight/cartpole/alpha_lambda_grid/t20_matched/alpha_8/lambda_0/seed_2025/decoder_best_total.pth"
+    }
+  },
+  "dynamic": {
+    "name": "CartPole"
+  },
+  "output_dir": "datasets/cartpole/data/dataset_v1"
+}

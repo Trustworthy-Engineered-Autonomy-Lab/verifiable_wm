@@ -1,0 +1,31 @@
+{
+  "dataset_name": "dataset_v1",
+  "rollout_steps": 20,
+  "device": "auto",
+  "render_batch_size": 64,
+  "starv_config": "config/starv_verification/mountain_car.json",
+  "decoder": {
+    "name": "Decoder",
+    "variant": "saliency",
+    "weights": {
+      "old": "dwm_weight/mountain_car/old/decoder_mc.pth",
+      "baseline": "dwm_weight/mountain_car/baseline/decoder_best_total.pth",
+      "intensity": "dwm_weight/mountain_car/intensity/decoder_best_total.pth",
+      "saliency": "dwm_weight/mountain_car/alpha_lambda_grid/background_v008_t20/alpha_8/lambda_0.5/seed_2025/decoder_best_total.pth",
+      "saliency_lambda0": "dwm_weight/mountain_car/alpha_lambda_grid/background_v008_t20/alpha_8/lambda_0/seed_2025/decoder_best_total.pth",
+      "saliency_background": "dwm_weight/mountain_car/alpha_lambda_grid/background_v008_t20/alpha_8/lambda_0.5/seed_2025/decoder_best_total.pth",
+      "saliency_background_lambda0": "dwm_weight/mountain_car/alpha_lambda_grid/background_v008_t20/alpha_8/lambda_0/seed_2025/decoder_best_total.pth"
+    }
+  },
+  "controller": {
+    "name": "Controller",
+    "weights": "dwm_weight/mountain_car/controller.pth",
+    "args": {
+      "activation": "tanh"
+    }
+  },
+  "dynamic": {
+    "name": "MountainCar"
+  },
+  "output_dir": "datasets/mountain_car/data/dataset_v1"
+}

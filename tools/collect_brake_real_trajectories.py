@@ -37,7 +37,7 @@ from utils import load_config, load_state_splits  # noqa: E402
 
 ENV_ID = "AdvancedEmergencyBrakingSystemWithRendering-v0"
 STARV_CONFIG = "config/starv_verification/brake_system.json"
-CONTROLLER_WEIGHTS = "dwm_weight/now_weight/brake_system/controller.pth"
+CONTROLLER_WEIGHTS = "dwm_weight/brake_system/controller.pth"
 ROLLOUT_STEPS = 10
 DT = 0.1
 V_LEAD = 0.0

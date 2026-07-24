@@ -1,9 +1,9 @@
 {
     "layers" : {
-        "G_MLP" : {
+        "Decoder" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "dwm_weight/cartpole/g_mlp/G_cp.pth"
+                "weights" : "dwm_weight/cartpole/alpha_lambda_grid/t20_matched/alpha_8/lambda_0.1/seed_2025/decoder_best_total.pth"
             }
         },
         "Controller" : {
@@ -61,5 +61,5 @@
         "seed_test": 2027,
         "output_file": "datasets/cartpole/data/dataset_v1/starv_states.npz"
     },
-    "output_prefix": "results/cartpole/safety_result_g_mlp"
+    "output_prefix": "results/cartpole/safety_result"
 }

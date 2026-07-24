@@ -7,7 +7,7 @@
   "starv_config": "config/starv_verification/pendulum_g_mlp.json",
   "controller": {
     "name": "Controller",
-    "weights": "/home/tealab_shared/starv/weights/pendulum/controller_pen.pth",
+    "weights": "dwm_weight/pendulum/controller.pth",
     "args": {
       "activation": "tanh"
     }
@@ -16,7 +16,7 @@
     "name": "G_MLP",
     "variant": "g_mlp",
     "weights": {
-      "g_mlp": "dwm_weight/now_weight/pendulum/g_mlp/G_pen.pth"
+      "g_mlp": "dwm_weight/pendulum/g_mlp/G_pen.pth"
     }
   },
   "dynamic": {

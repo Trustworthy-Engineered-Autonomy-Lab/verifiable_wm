@@ -1,9 +1,9 @@
 {
-  "dataset_name": "dataset_v1_g_mlp",
+  "dataset_name": "dataset_v1",
   "rollout_steps": 10,
   "device": "auto",
   "render_batch_size": 64,
-  "starv_config": "config/starv_verification/brake_system_g_mlp.json",
+  "starv_config": "config/starv_verification/brake_system.json",
   "controller": {
     "name": "Controller",
     "weights": "dwm_weight/brake_system/controller.pth",
@@ -12,14 +12,14 @@
     }
   },
   "decoder": {
-    "name": "G_MLP",
-    "variant": "g_mlp",
-    "weights": {
-      "g_mlp": "dwm_weight/brake_system/g_mlp/G_brake.pth"
+    "name": "Decoder",
+    "weights": "dwm_weight/brake_system/decoder.pth",
+    "args": {
+      "output_activation": "clamp"
     }
   },
   "dynamic": {
     "name": "Brake"
   },
-  "output_dir": "datasets/brake_system/data/dataset_v1_g_mlp"
+  "output_dir": "datasets/brake_system/data/dataset_v1"
 }

@@ -7,7 +7,7 @@
   "decoder_state_indices": [0, 2],
   "controller": {
     "name": "Controller",
-    "weights": "/home/tealab_shared/starv/weights/cartpole/controller_cp.pth",
+    "weights": "dwm_weight/cartpole/controller.pth",
     "args": {
       "activation": "sigmoid"
     }
@@ -16,7 +16,7 @@
     "name": "G_MLP",
     "variant": "g_mlp",
     "weights": {
-      "g_mlp": "dwm_weight/now_weight/cartpole/g_mlp/G_cp.pth"
+      "g_mlp": "dwm_weight/cartpole/g_mlp/G_cp.pth"
     }
   },
   "dynamic": {

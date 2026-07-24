@@ -1,0 +1,28 @@
+{
+  "dataset_dir": "datasets/mountain_car/data/dataset_v1",
+  "saliency_file": "saliency_occlusion.npz",
+  "weight_mode": "intensity",
+  "weight": {
+    "obj_w": 10.0,
+    "bg_w": 1.0,
+    "threshold": 0.7,
+    "alpha": 0.0
+  },
+  "lambda_ctrl": 0.001,
+  "training": {
+    "epochs": 200,
+    "lr": 0.0005,
+    "batch_size": 128,
+    "seed": 2025,
+    "selection_metric": "total_loss"
+  },
+  "controller": {
+    "name": "Controller",
+    "weights": "/home/tealab_shared/starv/weights/mountain_car/controller_mc.pth",
+    "args": {
+      "activation": "tanh"
+    }
+  },
+  "device": "auto",
+  "output_dir": "dwm_weight/mountain_car/intensity"
+}

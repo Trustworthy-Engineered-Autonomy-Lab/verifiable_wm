@@ -8,12 +8,12 @@
     "name": "G_MLP",
     "variant": "g_mlp",
     "weights": {
-      "g_mlp": "dwm_weight/now_weight/mountain_car/g_mlp/G_mc.pth"
+      "g_mlp": "dwm_weight/mountain_car/g_mlp/G_mc.pth"
     }
   },
   "controller": {
     "name": "Controller",
-    "weights": "/home/tealab_shared/starv/weights/mountain_car/controller_mc.pth",
+    "weights": "dwm_weight/mountain_car/controller.pth",
     "args": {
       "activation": "tanh"
     }

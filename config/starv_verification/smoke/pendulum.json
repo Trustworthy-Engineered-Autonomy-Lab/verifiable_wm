@@ -1,0 +1,46 @@
+{
+  "layers": {
+    "Decoder": {
+      "args": [],
+      "kwargs": {
+        "weights": "dwm_weight/pendulum/alpha_lambda_grid/t20_matched/alpha_16/lambda_0.5/seed_2025/decoder_best_total.pth",
+        "lp_solver": "linprog"
+      }
+    },
+    "Controller": {
+      "args": [],
+      "kwargs": {
+        "weights": "/home/tealab_shared/starv/weights/pendulum/controller_pen.pth",
+        "lp_solver": "linprog"
+      }
+    }
+  },
+  "verifier": {
+    "name": "PendulumVerifier",
+    "args": [],
+    "kwargs": {
+      "goal_angle_threshold": 0.15,
+      "num_steps": 20,
+      "early_stop": false,
+      "save_history": true,
+      "lp_solver": "linprog"
+    }
+  },
+  "grid": {
+    "dims": [
+      {
+        "name": "theta",
+        "start": 1.03,
+        "stop": 1.07,
+        "num": 4
+      },
+      {
+        "name": "omega",
+        "start": 4.53,
+        "stop": 4.57,
+        "num": 4
+      }
+    ]
+  },
+  "output_prefix": "results/smoke/pendulum/safety_result"
+}
