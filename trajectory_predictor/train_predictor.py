@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 
 from config import (
     DEFAULT_CHECKPOINT_PATH,
+    DEFAULT_HORIZON,
     DEFAULT_REAL_PATH,
     absolute_path,
     ensure_parent,
@@ -25,6 +26,7 @@ from data_utils import (
     compute_normalization,
     load_real_trajectories,
     split_fit_selection,
+    truncate_trajectory_splits,
 )
 from predictor_model import TrajectoryTransformer, trajectory_loss
 
@@ -37,6 +39,12 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--real", type=Path, default=DEFAULT_REAL_PATH)
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT_PATH)
+    parser.add_argument(
+        "--horizon",
+        type=int,
+        default=DEFAULT_HORIZON,
+        help="Number of transition steps to train; states s_0...s_horizon are used.",
+    )
 
     parser.add_argument("--fit-ratio", type=float, default=0.9)
     parser.add_argument("--split-seed", type=int, default=2025)
@@ -68,6 +76,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("epochs, batch-size, and patience must be positive")
     if args.learning_rate <= 0 or args.gradient_clip <= 0:
         raise ValueError("learning-rate and gradient-clip must be positive")
+    if args.horizon <= 0:
+        raise ValueError("--horizon must be positive")
 
     args.real = absolute_path(args.real)
     args.checkpoint = absolute_path(args.checkpoint)
@@ -115,7 +125,10 @@ def main() -> None:
     set_seed(args.seed)
     device = resolve_device(args.device)
 
-    splits = load_real_trajectories(args.real)
+    splits = truncate_trajectory_splits(
+        load_real_trajectories(args.real),
+        args.horizon,
+    )
     fit_traj, selection_traj = split_fit_selection(
         splits["train_traj"], args.fit_ratio, args.split_seed
     )

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Grid handling, sampled tube construction, conformal calibration, and saving."""
+"""Grid handling, three-point trajectory prediction, and tube saving."""
 
 from __future__ import annotations
 
@@ -120,13 +120,26 @@ def load_grid(path: Path) -> Tuple[Dict[str, Any], Grid, np.ndarray]:
     return source, grid, np.stack(cell_bounds, axis=0)
 
 
-def sample_cell(bounds: np.ndarray, samples_per_dim: int) -> np.ndarray:
-    axes = [
-        np.linspace(bounds[d, 0], bounds[d, 1], samples_per_dim)
-        for d in range(bounds.shape[0])
-    ]
-    mesh = np.meshgrid(*axes, indexing="ij")
-    return np.stack([axis.reshape(-1) for axis in mesh], axis=1).astype(np.float32)
+def sample_cell(bounds: np.ndarray, samples_per_cell: int = 3) -> np.ndarray:
+    """Return exactly ``samples_per_cell`` deterministic points in a cell.
+
+    Points are evenly spaced on the diagonal from the lower corner to the
+    upper corner.  With the required default of three this gives the lower
+    corner, cell center, and upper corner.  Including both corners also makes
+    the min/max envelope at step zero equal to the full initial cell.
+    """
+    bounds = np.asarray(bounds, dtype=np.float32)
+    if bounds.ndim != 2 or bounds.shape[1] != 2:
+        raise ValueError(f"bounds must have shape (state_dim, 2), got {bounds.shape}")
+    if samples_per_cell < 2:
+        raise ValueError("samples_per_cell must be at least 2")
+    if np.any(bounds[:, 0] > bounds[:, 1]):
+        raise ValueError("cell lower bounds must not exceed upper bounds")
+
+    weights = np.linspace(0.0, 1.0, samples_per_cell, dtype=np.float32)[:, None]
+    lower = bounds[:, 0][None, :]
+    upper = bounds[:, 1][None, :]
+    return lower + weights * (upper - lower)
 
 
 def build_raw_tubes(
@@ -134,152 +147,75 @@ def build_raw_tubes(
     mean: np.ndarray,
     std: np.ndarray,
     cell_bounds: np.ndarray,
-    samples_per_dim: int,
+    samples_per_cell: int,
+    horizon: int,
     batch_size: int,
     device: torch.device,
+    trajectory_output_path: Path,
 ) -> np.ndarray:
+    """Predict every cell, save one aggregate NPZ, and form min/max tubes."""
+    if horizon < 1 or horizon > model.horizon:
+        raise ValueError(
+            f"horizon must be in [1, {model.horizon}], got {horizon}"
+        )
+    trajectory_output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    num_cells = len(cell_bounds)
     raw_tubes = np.empty(
         (
-            len(cell_bounds),
-            model.horizon + 1,
+            num_cells,
+            horizon + 1,
             model.state_dim,
             2,
         ),
         dtype=np.float32,
     )
-    samples_per_cell = samples_per_dim ** cell_bounds.shape[1]
+    all_initial_states = np.empty(
+        (num_cells, samples_per_cell, model.state_dim),
+        dtype=np.float32,
+    )
+    all_trajectories = np.empty(
+        (num_cells, samples_per_cell, horizon + 1, model.state_dim),
+        dtype=np.float32,
+    )
 
     print("========== Raw predictor tube ==========")
-    print(f"cells             : {len(cell_bounds)}")
-    print(f"samples per dim   : {samples_per_dim}")
+    print(f"cells             : {num_cells}")
     print(f"samples per cell  : {samples_per_cell}")
-    print(f"total predictions : {len(cell_bounds) * samples_per_cell}")
+    print(f"transition steps  : {horizon}")
+    print(f"total predictions : {num_cells * samples_per_cell}")
+    print(f"trajectory output : {trajectory_output_path}")
 
-    progress_interval = max(1, len(cell_bounds) // 10)
+    progress_interval = max(1, num_cells // 10)
     for cell_index, bounds in enumerate(cell_bounds):
-        initial_states = sample_cell(bounds, samples_per_dim)
+        initial_states = sample_cell(bounds, samples_per_cell)
         predictions = predict_trajectories(
             model, initial_states, mean, std, batch_size, device
-        )
+        )[:, : horizon + 1, :]
         lower = predictions.min(axis=0)
         upper = predictions.max(axis=0)
 
-        # Exact initial cell, rather than sampled min/max.
-        lower[0] = bounds[:, 0]
-        upper[0] = bounds[:, 1]
+        all_initial_states[cell_index] = initial_states
+        all_trajectories[cell_index] = predictions
         raw_tubes[cell_index, :, :, 0] = lower
         raw_tubes[cell_index, :, :, 1] = upper
 
         completed = cell_index + 1
-        if completed % progress_interval == 0 or completed == len(cell_bounds):
-            print(f"built cells       : {completed}/{len(cell_bounds)}")
+        if completed % progress_interval == 0 or completed == num_cells:
+            print(f"built cells       : {completed}/{num_cells}")
 
+    np.savez_compressed(
+        trajectory_output_path,
+        cell_indices=np.arange(num_cells, dtype=np.int64),
+        initial_bounds=np.asarray(cell_bounds, dtype=np.float32),
+        initial_states=all_initial_states,
+        trajectories=all_trajectories,
+        lower=raw_tubes[..., 0],
+        upper=raw_tubes[..., 1],
+        horizon=np.asarray(horizon, dtype=np.int64),
+        samples_per_cell=np.asarray(samples_per_cell, dtype=np.int64),
+    )
     return raw_tubes
-
-
-def trajectory_tube_violation(
-    trajectory: np.ndarray,
-    tube: np.ndarray,
-) -> Tuple[float, np.ndarray]:
-    trajectory = np.asarray(trajectory, dtype=float)
-    lower = np.asarray(tube[:, :, 0], dtype=float)
-    upper = np.asarray(tube[:, :, 1], dtype=float)
-    if trajectory.shape != lower.shape:
-        raise ValueError(
-            f"trajectory/tube shape mismatch: {trajectory.shape} vs {lower.shape}"
-        )
-
-    violation = np.maximum(np.maximum(lower - trajectory, trajectory - upper), 0.0)
-    state_inside = np.all(violation <= EPS, axis=1)
-    return float(np.max(violation)), state_inside
-
-
-def calibration_scores(
-    trajectories: np.ndarray,
-    raw_tubes: np.ndarray,
-    grid: Grid,
-) -> Tuple[np.ndarray, int]:
-    scores = []
-    outside = 0
-    for trajectory in trajectories:
-        try:
-            cell_index = grid.point_to_cell_index(trajectory[0])
-        except ValueError:
-            outside += 1
-            continue
-        score, _ = trajectory_tube_violation(trajectory, raw_tubes[cell_index])
-        scores.append(score)
-
-    if not scores:
-        raise ValueError("no calibration trajectories start inside the grid")
-    return np.asarray(scores, dtype=float), outside
-
-
-def conformal_delta(scores: np.ndarray, alpha: float) -> Tuple[float, int]:
-    if not 0.0 < alpha < 1.0:
-        raise ValueError("alpha must be between 0 and 1")
-
-    scores = np.asarray(scores, dtype=float).reshape(-1)
-    rank = int(math.ceil((len(scores) + 1) * (1.0 - alpha)))
-    augmented = np.concatenate([scores, np.asarray([np.inf])])
-    augmented.sort()
-    delta = float(augmented[rank - 1])
-
-    if not math.isfinite(delta):
-        raise ValueError(
-            f"conformal delta is infinite; calibration set is too small for alpha={alpha}"
-        )
-    return delta, rank
-
-
-def inflate_tubes(raw_tubes: np.ndarray, delta: float) -> np.ndarray:
-    certified = raw_tubes.copy()
-    certified[:, 1:, :, 0] -= np.float32(delta)
-    certified[:, 1:, :, 1] += np.float32(delta)
-    return certified
-
-
-def evaluate_tubes(
-    trajectories: np.ndarray,
-    tubes: np.ndarray,
-    grid: Grid,
-) -> Dict[str, Any]:
-    in_grid = 0
-    outside = 0
-    fully_contained = 0
-    step_rates = []
-    max_violations = []
-
-    for trajectory in trajectories:
-        try:
-            cell_index = grid.point_to_cell_index(trajectory[0])
-        except ValueError:
-            outside += 1
-            continue
-
-        in_grid += 1
-        maximum_violation, state_inside = trajectory_tube_violation(
-            trajectory, tubes[cell_index]
-        )
-        fully_contained += int(np.all(state_inside))
-        step_rates.append(float(np.mean(state_inside)))
-        max_violations.append(maximum_violation)
-
-    return {
-        "total_trajectories": int(len(trajectories)),
-        "in_grid_trajectories": int(in_grid),
-        "outside_grid_trajectories": int(outside),
-        "fully_contained": int(fully_contained),
-        "not_fully_contained": int(in_grid - fully_contained),
-        "containment_rate": float(fully_contained / in_grid) if in_grid else 0.0,
-        "mean_step_containment": float(np.mean(step_rates)) if step_rates else 0.0,
-        "mean_max_violation": (
-            float(np.mean(max_violations)) if max_violations else 0.0
-        ),
-        "worst_max_violation": (
-            float(np.max(max_violations)) if max_violations else 0.0
-        ),
-    }
 
 
 def save_tube_json(
@@ -288,19 +224,11 @@ def save_tube_json(
     grid: Grid,
     cell_bounds: np.ndarray,
     raw_tubes: np.ndarray,
-    certified_tubes: np.ndarray,
-    scores: np.ndarray,
-    calibration_outside: int,
-    delta: float,
-    rank: int,
-    raw_evaluation: Dict[str, Any],
-    certified_evaluation: Dict[str, Any],
+    trajectory_path: Path,
     checkpoint: Dict[str, Any],
-    real_path: Path,
     grid_path: Path,
     checkpoint_path: Path,
-    samples_per_dim: int,
-    alpha: float,
+    samples_per_cell: int,
     environment: str,
 ) -> None:
     grid_json = dict(source_grid["grid"])
@@ -316,49 +244,48 @@ def save_tube_json(
         for i in range(grid.ndim)
     ]
 
-    cells = [
-        {
-            "bounds": certified_tubes[i].astype(float).tolist(),
-            "raw_bounds": raw_tubes[i].astype(float).tolist(),
-            "initial_bounds": cell_bounds[i].astype(float).tolist(),
-        }
-        for i in range(grid.total_cells)
-    ]
+    if raw_tubes.shape[0] != grid.total_cells:
+        raise ValueError(
+            f"expected {grid.total_cells} cell tubes, got {raw_tubes.shape[0]}"
+        )
 
+    try:
+        trajectory_file = str(trajectory_path.relative_to(path.parent))
+    except ValueError:
+        trajectory_file = str(trajectory_path)
+
+    cells = []
+    for i in range(grid.total_cells):
+        cells.append(
+            {
+                "bounds": raw_tubes[i].astype(float).tolist(),
+                "raw_bounds": raw_tubes[i].astype(float).tolist(),
+                "initial_bounds": cell_bounds[i].astype(float).tolist(),
+                "trajectory_file": trajectory_file,
+                "trajectory_index": i,
+            }
+        )
+
+    best_selection_loss = checkpoint.get("best_selection_loss")
     payload = {
-        "method": "transformer_sampled_envelope_conformal",
+        "method": "transformer_three_sample_minmax_envelope",
         "environment": environment,
-        "guarantee_type": "marginal probabilistic trajectory containment",
-        "alpha": float(alpha),
-        "coverage": float(1.0 - alpha),
-        "conformal_delta": float(delta),
-        "conformal_rank": int(rank),
-        "samples_per_dim": int(samples_per_dim),
-        "samples_per_cell": int(samples_per_dim ** grid.ndim),
+        "guarantee_type": "sampled envelope; no formal coverage guarantee",
+        "sampling_strategy": "lower_corner_center_upper_corner",
+        "samples_per_cell": int(samples_per_cell),
         "horizon": int(raw_tubes.shape[1] - 1),
         "state_dim": int(raw_tubes.shape[2]),
-        "source_real_trajectories": str(real_path),
         "source_grid_result": str(grid_path),
         "checkpoint": str(checkpoint_path),
+        "trajectory_file": trajectory_file,
         "best_epoch": int(checkpoint.get("best_epoch", -1)),
-        "best_selection_loss": float(
-            checkpoint.get("best_selection_loss", math.nan)
+        "best_selection_loss": (
+            None
+            if best_selection_loss is None
+            else float(best_selection_loss)
         ),
         "training_protocol": checkpoint.get("training_protocol", {}),
         "grid": grid_json,
-        "calibration": {
-            "source_split": "val_traj",
-            "score_count": int(len(scores)),
-            "outside_grid_count": int(calibration_outside),
-            "score_min": float(scores.min()),
-            "score_mean": float(scores.mean()),
-            "score_max": float(scores.max()),
-        },
-        "evaluation": {
-            "source_split": "test_traj",
-            "raw_tube": raw_evaluation,
-            "certified_tube": certified_evaluation,
-        },
         "cells": cells,
     }
 

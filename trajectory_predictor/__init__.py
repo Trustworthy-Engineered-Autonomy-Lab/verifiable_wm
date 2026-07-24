@@ -1,1 +1,1 @@
-"""Transformer conformal predictor-tube package."""
+"""Transformer sampled-envelope predictor-tube package."""

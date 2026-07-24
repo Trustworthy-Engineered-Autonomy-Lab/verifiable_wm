@@ -50,35 +50,10 @@ from matplotlib.colors import Normalize
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
-# DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/cartpole/safety_result_cell_100_a8_lamda01.json"
-# DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/data_cell_100/real_trajectories.npz"
-# DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/data_cell_100/dwm_trajectories_saliency.npz"
-# DEFAULT_OUT_DIR = PROJECT_ROOT / "results/cartpole/compare_plot"
-
-# DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/cartpole/safety_result_big_cell_a8_lamda01_early_false.json"
-# DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/big_cell/real_trajectories.npz"
-# DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/big_cell/dwm_trajectories_saliency.npz"
-# DEFAULT_OUT_DIR = PROJECT_ROOT / "results/cartpole/compare_plot_big_cell"
-
-# DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/mountain_car/safety_result_cell_100_a16_lambda05.json"
-# DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/real_trajectories.npz"
-# DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/dwm_trajectories_saliency.npz"
-# DEFAULT_OUT_DIR = PROJECT_ROOT / "results/mountain_car/compare_plot"
-
-# DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/mountain_car/safety_result_big_cell_best.json"
-# DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/big_cell_best/real_trajectories.npz"
-# DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/big_cell_best/dwm_trajectories_saliency.npz"
-# DEFAULT_OUT_DIR = PROJECT_ROOT / "results/mountain_car/compare_plot_big_cell_best"
-
-# DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/pendulum/safety_result_cell_100_a16_lambda05.json"
-# DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/data_cell_100/real_trajectories.npz"
-# DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/data_cell_100/dwm_trajectories_saliency.npz"
-# DEFAULT_OUT_DIR = PROJECT_ROOT / "results/pendulum/compare_plot"
-
-DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/pendulum/safety_result_big_cell_a16_lambda05.json"
-DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/big_cell/real_trajectories.npz"
-DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/big_cell/dwm_trajectories_saliency.npz"
-DEFAULT_OUT_DIR = PROJECT_ROOT / "results/pendulum/compare_plot_big_cell"
+DEFAULT_SAFETY_PATH = PROJECT_ROOT / "trajectory_predictor/models/pendulum/predictor_tube.json"
+DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "/home/tealab_shared/trajectories/pendulum/starv_state/real_trajectories.npz"
+DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "/home/tealab_shared/trajectories/pendulum/starv_state/dwm_trajectories.npz"
+DEFAULT_OUT_DIR = PROJECT_ROOT / "trajectory_predictor/predictor_results/pendulum"
 
 SAFETY_PATH: Path = DEFAULT_SAFETY_PATH
 REAL_TRAJ_PATH: Path = DEFAULT_REAL_TRAJ_PATH
@@ -91,8 +66,8 @@ DWM_KEY = "test_traj"
 # Environment-specific dimensions used by default.
 # CartPole compares cart position x (dim 0) and pole angle theta (dim 2).
 # MountainCar and Pendulum continue to compare dimensions (0, 1).
-# DEFAULT_ENV = "cartpole"
-# DEFAULT_ENV = "mountain_car"
+#DEFAULT_ENV = "mountain_car"
+#DEFAULT_ENV = "cartpole"
 DEFAULT_ENV = "pendulum"
 ENV_DEFAULT_DIMS = {
     "cartpole": {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Build the sampled raw tube, conformalize it, and evaluate on test_traj."""
+"""Build a 20-step predictor tube from three trajectories in every cell."""
 
 from __future__ import annotations
 
@@ -10,21 +10,17 @@ from pathlib import Path
 from config import (
     DEFAULT_CHECKPOINT_PATH,
     DEFAULT_GRID_RESULT_PATH,
-    DEFAULT_REAL_PATH,
+    DEFAULT_HORIZON,
+    DEFAULT_SAMPLES_PER_CELL,
     DEFAULT_TUBE_OUTPUT_PATH,
     absolute_path,
     ensure_parent,
     resolve_device,
     set_seed,
 )
-from data_utils import load_real_trajectories
 from predictor_model import load_predictor_checkpoint
 from tube_utils import (
     build_raw_tubes,
-    calibration_scores,
-    conformal_delta,
-    evaluate_tubes,
-    inflate_tubes,
     load_grid,
     save_tube_json,
 )
@@ -32,43 +28,71 @@ from tube_utils import (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build a conformal predictor tube.",
+        description=(
+            "Sample exactly three points per cell, predict 20 steps, save all "
+            "cells' trajectories in one NPZ file, and build their min/max envelope."
+        ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--real", type=Path, default=DEFAULT_REAL_PATH)
     parser.add_argument("--grid-result", type=Path, default=DEFAULT_GRID_RESULT_PATH)
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT_PATH)
     parser.add_argument("--tube-output", type=Path, default=DEFAULT_TUBE_OUTPUT_PATH)
-    parser.add_argument("--samples-per-dim", type=int, default=11)
-    parser.add_argument("--alpha", type=float, default=0.05)
+    parser.add_argument(
+        "--trajectory-output",
+        type=Path,
+        default=None,
+        help=(
+            "Single NPZ file containing every cell's trajectories. "
+            "Defaults to predictor_trajectories.npz beside --tube-output."
+        ),
+    )
+    parser.add_argument(
+        "--samples-per-cell",
+        type=int,
+        default=DEFAULT_SAMPLES_PER_CELL,
+        help="Total sampled initial states in each cell (not per dimension).",
+    )
+    parser.add_argument(
+        "--horizon",
+        type=int,
+        default=DEFAULT_HORIZON,
+        help="Number of transition steps; output contains horizon+1 states.",
+    )
     parser.add_argument("--cell-batch-size", type=int, default=1024)
-    parser.add_argument("--env-name", default="mountain_car")
+    parser.add_argument("--env-name", default="pendulum")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--seed", type=int, default=2025)
     return parser.parse_args()
 
 
 def validate_args(args: argparse.Namespace) -> None:
-    if args.samples_per_dim < 2:
-        raise ValueError("--samples-per-dim must be at least 2")
+    if args.samples_per_cell < 2:
+        raise ValueError("--samples-per-cell must be at least 2")
+    if args.horizon <= 0:
+        raise ValueError("--horizon must be positive")
     if args.cell_batch_size <= 0:
         raise ValueError("--cell-batch-size must be positive")
-    if not 0.0 < args.alpha < 1.0:
-        raise ValueError("--alpha must be between 0 and 1")
 
-    args.real = absolute_path(args.real)
     args.grid_result = absolute_path(args.grid_result)
     args.checkpoint = absolute_path(args.checkpoint)
     args.tube_output = absolute_path(args.tube_output)
+    if args.trajectory_output is None:
+        args.trajectory_output = (
+            args.tube_output.parent / "predictor_trajectories.npz"
+        )
+    else:
+        args.trajectory_output = absolute_path(args.trajectory_output)
+    if args.trajectory_output.suffix.lower() != ".npz":
+        raise ValueError("--trajectory-output must end with .npz")
 
     for label, path in (
-        ("real trajectories", args.real),
         ("grid result", args.grid_result),
         ("checkpoint", args.checkpoint),
     ):
         if not path.exists():
             raise FileNotFoundError(f"{label} does not exist: {path}")
     ensure_parent(args.tube_output)
+    ensure_parent(args.trajectory_output)
 
 
 def main() -> None:
@@ -78,22 +102,19 @@ def main() -> None:
     device = resolve_device(args.device)
 
     print("========== Tube paths ==========")
-    print(f"real trajectories : {args.real}")
     print(f"grid result       : {args.grid_result}")
     print(f"checkpoint        : {args.checkpoint}")
     print(f"tube output       : {args.tube_output}")
+    print(f"trajectory output : {args.trajectory_output}")
     print(f"device            : {device}")
 
-    splits = load_real_trajectories(args.real)
     model, mean, std, checkpoint = load_predictor_checkpoint(
         args.checkpoint, device
     )
-
-    protocol = checkpoint.get("training_protocol", {})
-    if protocol.get("calibration_source") != "val_traj":
+    if model.horizon < args.horizon:
         raise ValueError(
-            "checkpoint does not reserve val_traj for calibration; "
-            "retrain it with train_predictor.py"
+            f"checkpoint only predicts {model.horizon} steps, "
+            f"but --horizon={args.horizon} was requested"
         )
 
     source_grid, grid, cell_bounds = load_grid(args.grid_result)
@@ -102,53 +123,16 @@ def main() -> None:
             f"grid_dim={grid.ndim} does not match model state_dim={model.state_dim}"
         )
 
-    expected = (model.horizon + 1, model.state_dim)
-    for key in ("val_traj", "test_traj"):
-        if splits[key].shape[1:] != expected:
-            raise ValueError(
-                f"{key} shape {splits[key].shape} does not match expected (*, {expected})"
-            )
-
     raw_tubes = build_raw_tubes(
         model=model,
         mean=mean,
         std=std,
         cell_bounds=cell_bounds,
-        samples_per_dim=args.samples_per_dim,
+        samples_per_cell=args.samples_per_cell,
+        horizon=args.horizon,
         batch_size=args.cell_batch_size,
         device=device,
-    )
-
-    scores, calibration_outside = calibration_scores(
-        splits["val_traj"], raw_tubes, grid
-    )
-    delta, rank = conformal_delta(scores, args.alpha)
-    certified_tubes = inflate_tubes(raw_tubes, delta)
-
-    raw_evaluation = evaluate_tubes(splits["test_traj"], raw_tubes, grid)
-    certified_evaluation = evaluate_tubes(
-        splits["test_traj"], certified_tubes, grid
-    )
-
-    print("========== Conformal calibration ==========")
-    print(f"calibration scores  : {len(scores)}")
-    print(f"outside grid        : {calibration_outside}")
-    print(f"alpha               : {args.alpha}")
-    print(f"conformal rank      : {rank}")
-    print(f"conformal delta     : {delta:.10f}")
-
-    print("========== Test containment ==========")
-    print(
-        "raw tube       : "
-        f"{raw_evaluation['fully_contained']}/"
-        f"{raw_evaluation['in_grid_trajectories']} "
-        f"({100.0 * raw_evaluation['containment_rate']:.2f}%)"
-    )
-    print(
-        "conformal tube : "
-        f"{certified_evaluation['fully_contained']}/"
-        f"{certified_evaluation['in_grid_trajectories']} "
-        f"({100.0 * certified_evaluation['containment_rate']:.2f}%)"
+        trajectory_output_path=args.trajectory_output,
     )
 
     save_tube_json(
@@ -157,21 +141,14 @@ def main() -> None:
         grid=grid,
         cell_bounds=cell_bounds,
         raw_tubes=raw_tubes,
-        certified_tubes=certified_tubes,
-        scores=scores,
-        calibration_outside=calibration_outside,
-        delta=delta,
-        rank=rank,
-        raw_evaluation=raw_evaluation,
-        certified_evaluation=certified_evaluation,
+        trajectory_path=args.trajectory_output,
         checkpoint=checkpoint,
-        real_path=args.real,
         grid_path=args.grid_result,
         checkpoint_path=args.checkpoint,
-        samples_per_dim=args.samples_per_dim,
-        alpha=args.alpha,
+        samples_per_cell=args.samples_per_cell,
         environment=args.env_name,
     )
+    print(f"[Saved] all cell trajectories: {args.trajectory_output}")
     print(f"[Saved] predictor tube: {args.tube_output}")
 
 

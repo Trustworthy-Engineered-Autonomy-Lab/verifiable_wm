@@ -49,6 +49,27 @@ def load_real_trajectories(path: Path) -> Dict[str, np.ndarray]:
     return splits
 
 
+def truncate_trajectory_splits(
+    splits: Dict[str, np.ndarray],
+    horizon: int,
+) -> Dict[str, np.ndarray]:
+    """Keep states s_0...s_horizon in every trajectory split."""
+    if horizon < 1:
+        raise ValueError("horizon must be positive")
+
+    required_states = horizon + 1
+    truncated = {}
+    for key in REQUIRED_SPLITS:
+        trajectories = splits[key]
+        if trajectories.shape[1] < required_states:
+            raise ValueError(
+                f"{key} only contains {trajectories.shape[1] - 1} transition "
+                f"steps, but horizon={horizon} was requested"
+            )
+        truncated[key] = trajectories[:, :required_states, :].copy()
+    return truncated
+
+
 def split_fit_selection(
     train_traj: np.ndarray,
     fit_ratio: float,
