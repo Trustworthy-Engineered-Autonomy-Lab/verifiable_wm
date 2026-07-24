@@ -117,83 +117,75 @@ class Decoder(model.Decoder):
 
         return image_star
 
-# MLP-based GAN Generator Baseline Added
-# class G_MLP(Module):
-#     def __init__(self, weights, state_dim=2, latent_dim=2, output_dim=96*96, latent_min=-0.05, latent_max=0.05, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         input_dim = state_dim + latent_dim  # e.g., (θ, ω, z1, z2) → 4 total
-        
-#         # MLP structure: 4 → 256 → 1024 → 4096 → 9216
-#         self.net = nn.Sequential(
-#             nn.Linear(input_dim, 256),
-#             nn.ReLU(),
-#             nn.Linear(256, 1024),
-#             nn.ReLU(),
-#             nn.Linear(1024, 4096),
-#             nn.ReLU(),
-#             nn.Linear(4096, output_dim),
-#         )
+class G_MLP(model.G_MLP):
+    """StarV counterpart of model.G_MLP.
 
-#         self.load_state_dict(torch.load(weights, 'cpu', weights_only=True))
-        
-#         self.state_dim = state_dim
-#         self.latent_dim = latent_dim
-#         self.output_dim = output_dim
+    Verification treats the latent as an interval [-z_range, z_range] per
+    dim (not a fixed point), since rollout resamples it uniformly from that
+    range every step (aebs_carla/cp_0.95_gan.py). The reachable tube has to
+    cover the whole latent range to actually contain those rollouts.
+    """
 
-#         self.latent_min = latent_min
-#         self.latent_max = latent_max
+    def __init__(self, weights, z_range=0.05, lp_solver='gurobi', *args, **kwargs):
+        super().__init__(z_range=z_range, *args, **kwargs)
 
-#     def forward(self, state, z):
-#         x = torch.cat([state, z], dim=1)
-#         x = self.net(x)
-#         return torch.clamp(x, 0.0, 1.0)
-    
-#     def reach(self, state_bound: np.ndarray) -> ImageStar:
-#         lb = np.concatenate([state_bound[0], np.array([self.latent_min, self.latent_min])])
-#         ub = np.concatenate([state_bound[1], np.array([self.latent_max, self.latent_max])])
-#         state_star = Star(lb, ub)
-#         return self.star_reach(state_star)
-    
-#     def star_reach(self, input_star: Star) -> ImageStar:
-#         # FC1 + ReLU
-#         W1 = self.net[0].weight.detach().cpu().numpy()
-#         b1 = self.net[0].bias.detach().cpu().numpy()
-#         L_fc_1 = FullyConnectedLayer([W1, b1])
-#         R_fc_1 = L_fc_1.reach([input_star])
-#         L_relu_1 = ReLULayer()
-#         R_relu_1 = L_relu_1.reach(R_fc_1[0], method='approx')
+        self.load_state_dict(torch.load(weights, 'cpu', weights_only=True))
+        self.lp_solver = lp_solver
 
-#         # FC2 + ReLU
-#         W2 = self.net[2].weight.detach().cpu().numpy()
-#         b2 = self.net[2].bias.detach().cpu().numpy()
-#         L_fc_2 = FullyConnectedLayer([W2, b2])
-#         R_fc_2 = L_fc_2.reach([R_relu_1])
-#         L_relu_2 = ReLULayer()
-#         R_relu_2 = L_relu_2.reach(R_fc_2[0], method='approx')
+    def forward(self, state_bound: np.ndarray) -> ImageStar:
+        latent_lb = np.full(self.latent_dim, -self.z_range, dtype=state_bound.dtype)
+        latent_ub = np.full(self.latent_dim, self.z_range, dtype=state_bound.dtype)
+        lb = np.concatenate([state_bound[0], latent_lb])
+        ub = np.concatenate([state_bound[1], latent_ub])
+        state_star = Star(lb, ub)
+        return self._star_reach(state_star)
 
-#         # FC3 + ReLU
-#         W3 = self.net[4].weight.detach().cpu().numpy()
-#         b3 = self.net[4].bias.detach().cpu().numpy()
-#         L_fc_3 = FullyConnectedLayer([W3, b3])
-#         R_fc_3 = L_fc_3.reach([R_relu_2])
-#         L_relu_3 = ReLULayer()
-#         R_relu_3 = L_relu_3.reach(R_fc_3[0], method='approx')
+    def _star_reach(self, input_star: Star) -> ImageStar:
+        # FC1 + ReLU
+        W1 = self.net[0].weight.detach().cpu().numpy()
+        b1 = self.net[0].bias.detach().cpu().numpy()
+        L_fc_1 = FullyConnectedLayer([W1, b1])
+        R_fc_1 = L_fc_1.reach([input_star])
+        L_relu_1 = ReLULayer()
+        R_relu_1 = L_relu_1.reach(
+            R_fc_1[0], method='approx', lp_solver=self.lp_solver
+        )
 
-#         # FC4
-#         W4 = self.net[6].weight.detach().cpu().numpy()
-#         b4 = self.net[6].bias.detach().cpu().numpy()
-#         L_fc_4 = FullyConnectedLayer([W4, b4])
-#         R_fc_4 = L_fc_4.reach([R_relu_3])
-#         star_fc_4 = R_fc_4[0]
+        # FC2 + ReLU
+        W2 = self.net[2].weight.detach().cpu().numpy()
+        b2 = self.net[2].bias.detach().cpu().numpy()
+        L_fc_2 = FullyConnectedLayer([W2, b2])
+        R_fc_2 = L_fc_2.reach([R_relu_1])
+        L_relu_2 = ReLULayer()
+        R_relu_2 = L_relu_2.reach(
+            R_fc_2[0], method='approx', lp_solver=self.lp_solver
+        )
 
-#         # SatLin Layer
-#         L_satlin = SatLinLayer()
-#         IM_satlin = L_satlin.reach(star_fc_4, method='approx', lp_solver='gurobi')
-        
-#         # Convert to ImageStar
-#         image_star = IM_satlin.toImageStar(image_shape=(96, 96, 1))
+        # FC3 + ReLU
+        W3 = self.net[4].weight.detach().cpu().numpy()
+        b3 = self.net[4].bias.detach().cpu().numpy()
+        L_fc_3 = FullyConnectedLayer([W3, b3])
+        R_fc_3 = L_fc_3.reach([R_relu_2])
+        L_relu_3 = ReLULayer()
+        R_relu_3 = L_relu_3.reach(
+            R_fc_3[0], method='approx', lp_solver=self.lp_solver
+        )
 
-#         return image_star
+        # FC4
+        W4 = self.net[6].weight.detach().cpu().numpy()
+        b4 = self.net[6].bias.detach().cpu().numpy()
+        L_fc_4 = FullyConnectedLayer([W4, b4])
+        R_fc_4 = L_fc_4.reach([R_relu_3])
+        star_fc_4 = R_fc_4[0]
+
+        # SatLin (== clamp(x, 0, 1), matching G_MLP.forward's clamp)
+        L_satlin = SatLinLayer()
+        IM_satlin = L_satlin.reach(
+            star_fc_4, method='approx', lp_solver=self.lp_solver
+        )
+        image_star = IM_satlin.toImageStar(image_shape=(96, 96, 1))
+
+        return image_star
 
 class Controller(model.Controller):
     def __init__(self, weights, activation = 'tanh', output_factor = 1,

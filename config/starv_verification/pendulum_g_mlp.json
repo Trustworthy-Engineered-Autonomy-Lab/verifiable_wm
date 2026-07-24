@@ -1,0 +1,52 @@
+{
+    "layers": {
+        "G_MLP": {
+            "args": [],
+            "kwargs": {
+                "weights": "dwm_weight/now_weight/pendulum/g_mlp/G_pen.pth"
+            }
+        },
+        "Controller": {
+            "args": [],
+            "kwargs": {
+                "weights": "/home/tealab_shared/starv/weights/pendulum/controller_pen.pth"
+            }
+        }
+    },
+    "verifier": {
+        "name": "PendulumVerifier",
+        "args": [],
+        "kwargs": {
+            "goal_angle_threshold": 0.15,
+            "num_steps": 20,
+            "early_stop": false,
+            "save_history": true
+        }
+    },
+    "grid": {
+        "dims": [
+            {
+                "name": "theta",
+                "start": 1.0,
+                "stop": 2.0,
+                "num": 100
+            },
+            {
+                "name": "omega",
+                "start": 4.5,
+                "stop": 5.0,
+                "num": 50
+            }
+        ]
+    },
+    "starv_states": {
+        "num_train": 1600,
+        "num_val": 400,
+        "num_test": 400,
+        "seed_train": 2025,
+        "seed_val": 2026,
+        "seed_test": 2027,
+        "output_file": "datasets/pendulum/data/dataset_v1/starv_states.npz"
+    },
+    "output_prefix": "results/pendulum/safety_result_g_mlp"
+}

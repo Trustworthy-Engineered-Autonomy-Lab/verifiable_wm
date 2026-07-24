@@ -1,0 +1,53 @@
+{
+    "layers" : {
+        "G_MLP" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "dwm_weight/now_weight/brake_system/g_mlp/G_brake.pth"
+            }
+        },
+        "Controller" : {
+            "args" : [],
+            "kwargs" : {
+                "weights" : "dwm_weight/now_weight/brake_system/controller.pth",
+                "activation" : "sigmoid"
+            }
+        }
+    },
+    "verifier": {
+        "name": "BrakeVerifier",
+        "args": [
+        ],
+        "kwargs": {
+            "num_steps": 10,
+            "early_stop": false,
+            "save_history": true
+        }
+    },
+    "grid": {
+        "dims": [
+            {
+                "name": "dis",
+                "start": 6.00,
+                "stop": 6.40,
+                "num": 40
+            },
+            {
+                "name": "vel",
+                "start": 6.00,
+                "stop": 6.40,
+                "num": 40
+            }
+        ]
+    },
+    "starv_states": {
+        "num_train": 1600,
+        "num_val": 400,
+        "num_test": 400,
+        "seed_train": 2025,
+        "seed_val": 2026,
+        "seed_test": 2027,
+        "output_file": "datasets/brake_system/data/dataset_v1/starv_states.npz"
+    },
+    "output_prefix": "results/brake_system/safety_result_g_mlp"
+}
