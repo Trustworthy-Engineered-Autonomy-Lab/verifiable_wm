@@ -1,0 +1,25 @@
+{
+  "dataset_name": "dataset_v1_g_mlp",
+  "rollout_steps": 10,
+  "device": "auto",
+  "render_batch_size": 64,
+  "starv_config": "config/starv_verification/brake_system_g_mlp.json",
+  "controller": {
+    "name": "Controller",
+    "weights": "dwm_weight/now_weight/brake_system/controller.pth",
+    "args": {
+      "activation": "sigmoid"
+    }
+  },
+  "decoder": {
+    "name": "G_MLP",
+    "variant": "g_mlp",
+    "weights": {
+      "g_mlp": "dwm_weight/now_weight/brake_system/g_mlp/G_brake.pth"
+    }
+  },
+  "dynamic": {
+    "name": "Brake"
+  },
+  "output_dir": "datasets/brake_system/data/dataset_v1_g_mlp"
+}

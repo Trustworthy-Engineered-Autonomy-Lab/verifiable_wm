@@ -1,9 +1,9 @@
 {
     "layers" : {
-        "Decoder" : {
+        "G_MLP" : {
             "args" : [],
             "kwargs" : {
-                "weights" : "dwm_weight/now_weight/cartpole/alpha_lambda_grid/alpha_8/lambda_0.1/seed_2025/decoder_best_total.pth"
+                "weights" : "dwm_weight/now_weight/cartpole/g_mlp/G_cp.pth"
             }
         },
         "Controller" : {
@@ -20,7 +20,7 @@
         ],
         "kwargs": {
             "goal_angle_threshold" : 0.209,
-            "num_steps": 30,
+            "num_steps": 20,
             "early_stop": false
         }
     },
@@ -29,8 +29,8 @@
             {
                 "name": "pos",
                 "start": 0.00,
-                "stop": 0.10,
-                "num": 10
+                "stop": 0.60,
+                "num": 60
             },
             {
                 "name": "vel",
@@ -40,9 +40,9 @@
             },
             {
                 "name": "angle",
-                "start": 0.60,
-                "stop": 0.70,
-                "num": 10
+                "start": 0.06,
+                "stop": 0.12,
+                "num": 60
             },
             {
                 "name": "avel",
@@ -61,5 +61,5 @@
         "seed_test": 2027,
         "output_file": "datasets/cartpole/data/dataset_v1/starv_states.npz"
     },
-    "output_prefix": "results/cartpole/safety_result"
+    "output_prefix": "results/cartpole/safety_result_g_mlp"
 }

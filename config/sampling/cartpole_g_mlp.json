@@ -1,0 +1,26 @@
+{
+  "dataset_name": "dataset_v1_g_mlp",
+  "rollout_steps": 20,
+  "device": "auto",
+  "render_batch_size": 64,
+  "starv_config": "config/starv_verification/cartpole_g_mlp.json",
+  "decoder_state_indices": [0, 2],
+  "controller": {
+    "name": "Controller",
+    "weights": "/home/tealab_shared/starv/weights/cartpole/controller_cp.pth",
+    "args": {
+      "activation": "sigmoid"
+    }
+  },
+  "decoder": {
+    "name": "G_MLP",
+    "variant": "g_mlp",
+    "weights": {
+      "g_mlp": "dwm_weight/now_weight/cartpole/g_mlp/G_cp.pth"
+    }
+  },
+  "dynamic": {
+    "name": "CartPole"
+  },
+  "output_dir": "datasets/cartpole/data/dataset_v1_g_mlp"
+}
