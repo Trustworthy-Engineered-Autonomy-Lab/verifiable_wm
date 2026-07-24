@@ -36,3 +36,4 @@ log/
 *.npz
 datasets/brake_system/ground_truth/
 *.zip
+*.tar.gz
