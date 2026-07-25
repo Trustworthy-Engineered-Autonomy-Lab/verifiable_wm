@@ -153,7 +153,8 @@ def train(config, device):
     test_weights = compute_weight(weight_mode, test_images, test_heat, weight_cfg)
 
     controller = load_controller(config, device)
-    decoder = Decoder().to(device)
+    output_activation = config.get("output_activation", "sigmoid")
+    decoder = Decoder(output_activation=output_activation).to(device)
     optimizer = torch.optim.Adam(decoder.parameters(), lr=train_cfg["lr"])
 
     batch_size = train_cfg["batch_size"]
@@ -259,6 +260,12 @@ def main():
     parser.add_argument("--seed", type=int, default=None, help="Override training.seed (sweeps).")
     parser.add_argument("--lambda-ctrl", type=float, default=None, help="Override lambda_ctrl (sweeps).")
     parser.add_argument("--output-dir", type=Path, default=None, help="Override output_dir.")
+    parser.add_argument(
+        "--output-activation",
+        choices=["sigmoid", "clamp"],
+        default=None,
+        help="Override output_activation (decoder's final nonlinearity).",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -270,6 +277,8 @@ def main():
         config["lambda_ctrl"] = args.lambda_ctrl
     if args.output_dir is not None:
         config["output_dir"] = str(args.output_dir)
+    if args.output_activation is not None:
+        config["output_activation"] = args.output_activation
 
     set_seed(config["training"]["seed"])
     device = resolve_device(config.get("device", "auto"))

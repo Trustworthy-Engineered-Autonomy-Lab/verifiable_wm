@@ -25,6 +25,7 @@ ENV_DIMS = {
     "cartpole": (0, 2),
     "mountain_car": (0, 1),
     "pendulum": (0, 1),
+    "brake_system": (0, 1),
 }
 EPS = 1e-10
 

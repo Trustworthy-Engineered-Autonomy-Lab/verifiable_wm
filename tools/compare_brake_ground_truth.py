@@ -192,7 +192,8 @@ def main():
     }
     print(json.dumps(result, indent=2))
 
-    out_path = Path(args.safety).with_name("gt_comparison.json")
+    out_name = Path(args.safety).stem.replace("safety_result", "gt_comparison", 1) + ".json"
+    out_path = Path(args.safety).with_name(out_name)
     out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(f"saved -> {out_path}")
 
