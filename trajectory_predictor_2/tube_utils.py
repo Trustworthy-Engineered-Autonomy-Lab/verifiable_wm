@@ -14,6 +14,7 @@ import numpy as np
 import torch
 
 from predictor_model import TrajectoryTransformer, predict_trajectories
+from trajectory_io import add_predicted_splits, load_reference_trajectory_npz
 
 
 EPS = 1e-10
@@ -152,8 +153,10 @@ def build_raw_tubes(
     batch_size: int,
     device: torch.device,
     trajectory_output_path: Path,
+    reference_trajectory_path: Path,
+    environment: str,
 ) -> np.ndarray:
-    """Predict every cell, save one aggregate NPZ, and form min/max tubes."""
+    """Predict every cell, save one compatible NPZ, and form min/max tubes."""
     if horizon < 1 or horizon > model.horizon:
         raise ValueError(
             f"horizon must be in [1, {model.horizon}], got {horizon}"
@@ -204,17 +207,49 @@ def build_raw_tubes(
         if completed % progress_interval == 0 or completed == num_cells:
             print(f"built cells       : {completed}/{num_cells}")
 
-    np.savez_compressed(
-        trajectory_output_path,
-        cell_indices=np.arange(num_cells, dtype=np.int64),
-        initial_bounds=np.asarray(cell_bounds, dtype=np.float32),
-        initial_states=all_initial_states,
-        trajectories=all_trajectories,
-        lower=raw_tubes[..., 0],
-        upper=raw_tubes[..., 1],
-        horizon=np.asarray(horizon, dtype=np.int64),
-        samples_per_cell=np.asarray(samples_per_cell, dtype=np.int64),
+    reference_payload, split_initial_states = load_reference_trajectory_npz(
+        reference_trajectory_path,
+        horizon=horizon,
+        state_dim=model.state_dim,
     )
+    predicted_splits = {}
+    print("========== Reference-format trajectories ==========")
+    for split_key, initial_states in split_initial_states.items():
+        predicted_splits[split_key] = predict_trajectories(
+            model, initial_states, mean, std, batch_size, device
+        )[:, : horizon + 1, :]
+        print(f"{split_key:<18}: {predicted_splits[split_key].shape}")
+
+    output_payload = add_predicted_splits(
+        reference_payload,
+        predicted_splits,
+        horizon=horizon,
+        state_dim=model.state_dim,
+    )
+    output_payload.update(
+        {
+            # Predictor-specific cell layout used by predictor_tube.json.
+            "cell_indices": np.arange(num_cells, dtype=np.int64),
+            "initial_bounds": np.asarray(cell_bounds, dtype=np.float32),
+            "initial_states": all_initial_states,
+            "trajectories": all_trajectories,
+            "lower": raw_tubes[..., 0],
+            "upper": raw_tubes[..., 1],
+            "horizon": np.asarray(horizon, dtype=np.int64),
+            "samples_per_cell": np.asarray(samples_per_cell, dtype=np.int64),
+            "environment": np.asarray(environment),
+            "trajectory_format": np.asarray(
+                "real_trajectories_compatible_v1"
+            ),
+            "reference_real_trajectories": np.asarray(
+                str(reference_trajectory_path)
+            ),
+            "action_source": np.asarray(
+                "copied_from_reference_real_trajectories"
+            ),
+        }
+    )
+    np.savez_compressed(trajectory_output_path, **output_payload)
     return raw_tubes
 
 

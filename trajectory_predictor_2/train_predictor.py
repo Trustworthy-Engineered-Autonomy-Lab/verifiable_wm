@@ -14,12 +14,13 @@ from torch.utils.data import DataLoader
 
 from config import (
     DEFAULT_CHECKPOINT_PATH,
-    DEFAULT_HORIZON,
+    DEFAULT_ENVIRONMENT,
     DEFAULT_REAL_PATH,
     absolute_path,
     ensure_parent,
     resolve_device,
     set_seed,
+    validate_environment,
 )
 from data_utils import (
     TrajectoryDataset,
@@ -37,13 +38,49 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    parser.add_argument("--real", type=Path, default=DEFAULT_REAL_PATH)
-    parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT_PATH)
+    parser.add_argument(
+        "--env",
+        default=DEFAULT_ENVIRONMENT,
+        help=(
+            "Environment label stored in the checkpoint, for example "
+            "brake_system, cartpole, mountain_car, or pendulum."
+        ),
+    )
+    parser.add_argument(
+        "--real",
+        type=Path,
+        default=DEFAULT_REAL_PATH,
+        help="Input real_trajectories.npz path.",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        default=DEFAULT_CHECKPOINT_PATH,
+        help="Output predictor checkpoint path.",
+    )
     parser.add_argument(
         "--horizon",
         type=int,
-        default=DEFAULT_HORIZON,
-        help="Number of transition steps to train; states s_0...s_horizon are used.",
+        default=None,
+        help=(
+            "Number of transition steps to train. If omitted, use every "
+            "transition available in the selected real trajectory file."
+        ),
+    )
+    parser.add_argument(
+        "--missing-train-policy",
+        choices=("error", "split-val"),
+        default="error",
+        help=(
+            "How to handle a file without train_traj. Use split-val for the "
+            "legacy Brake System file; test_traj remains untouched."
+        ),
+    )
+    parser.add_argument(
+        "--derived-train-ratio",
+        type=float,
+        default=0.8,
+        help="Fraction of val_traj used as train_traj in split-val mode.",
     )
 
     parser.add_argument("--fit-ratio", type=float, default=0.9)
@@ -76,9 +113,12 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("epochs, batch-size, and patience must be positive")
     if args.learning_rate <= 0 or args.gradient_clip <= 0:
         raise ValueError("learning-rate and gradient-clip must be positive")
-    if args.horizon <= 0:
+    if args.horizon is not None and args.horizon <= 0:
         raise ValueError("--horizon must be positive")
+    if not 0.0 < args.derived_train_ratio < 1.0:
+        raise ValueError("--derived-train-ratio must be between 0 and 1")
 
+    args.env = validate_environment(args.env)
     args.real = absolute_path(args.real)
     args.checkpoint = absolute_path(args.checkpoint)
     if not args.real.exists():
@@ -125,10 +165,17 @@ def main() -> None:
     set_seed(args.seed)
     device = resolve_device(args.device)
 
-    splits = truncate_trajectory_splits(
-        load_real_trajectories(args.real),
-        args.horizon,
+    loaded_splits = load_real_trajectories(
+        args.real,
+        missing_train_policy=args.missing_train_policy,
+        derived_train_ratio=args.derived_train_ratio,
+        seed=args.split_seed,
     )
+    available_horizon = int(loaded_splits["train_traj"].shape[1] - 1)
+    requested_horizon = (
+        available_horizon if args.horizon is None else int(args.horizon)
+    )
+    splits = truncate_trajectory_splits(loaded_splits, requested_horizon)
     fit_traj, selection_traj = split_fit_selection(
         splits["train_traj"], args.fit_ratio, args.split_seed
     )
@@ -162,7 +209,10 @@ def main() -> None:
     print("========== Predictor training ==========")
     print(f"real file  : {args.real}")
     print(f"checkpoint : {args.checkpoint}")
+    print(f"environment: {args.env}")
     print(f"device     : {device}")
+    print(f"horizon    : {horizon}")
+    print(f"missing train policy: {args.missing_train_policy}")
     print(f"fit        : {fit_traj.shape}")
     print(f"selection  : {selection_traj.shape}")
     print(f"calibration: {splits['val_traj'].shape} (not used during training)")
@@ -221,6 +271,7 @@ def main() -> None:
                     "best_epoch": int(epoch),
                     "best_selection_loss": float(selection_loss),
                     "source_real_trajectories": str(args.real),
+                    "environment": args.env,
                     "training_protocol": {
                         "fit_source": "fit part of train_traj",
                         "selection_source": "held-out part of train_traj",
@@ -228,6 +279,9 @@ def main() -> None:
                         "evaluation_source": "test_traj",
                         "fit_ratio": float(args.fit_ratio),
                         "split_seed": int(args.split_seed),
+                        "missing_train_policy": args.missing_train_policy,
+                        "derived_train_ratio": float(args.derived_train_ratio),
+                        "test_used_for_training": False,
                     },
                 },
                 args.checkpoint,

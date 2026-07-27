@@ -51,8 +51,8 @@ from matplotlib.colors import Normalize
 PROJECT_ROOT = Path(__file__).resolve().parent
 
 DEFAULT_SAFETY_PATH = PROJECT_ROOT / "trajectory_predictor/models/pendulum/predictor_tube.json"
-DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "/home/tealab_shared/trajectories/pendulum/starv_state/real_trajectories.npz"
-DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "/home/tealab_shared/trajectories/pendulum/starv_state/dwm_trajectories.npz"
+DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "/home/tealab_shared/safety_results/pendulum/real_trajectories.npz"
+DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "/home/tealab_shared/safety_results/pendulum/dwm_trajectories_saliency.npz"
 DEFAULT_OUT_DIR = PROJECT_ROOT / "trajectory_predictor/predictor_results/pendulum"
 
 SAFETY_PATH: Path = DEFAULT_SAFETY_PATH
@@ -69,6 +69,7 @@ DWM_KEY = "test_traj"
 #DEFAULT_ENV = "mountain_car"
 #DEFAULT_ENV = "cartpole"
 DEFAULT_ENV = "pendulum"
+#DEFAULT_ENV = "brake_system"
 ENV_DEFAULT_DIMS = {
     "cartpole": {
         "plot_dims": (0, 2),
