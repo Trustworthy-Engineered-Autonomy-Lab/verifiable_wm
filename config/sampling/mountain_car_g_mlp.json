@@ -1,0 +1,28 @@
+{
+  "dataset_name": "dataset_v1_g_mlp",
+  "rollout_steps": 20,
+  "device": "auto",
+  "render_batch_size": 64,
+  "starv_config": "config/starv_verification/mountain_car_g_mlp.json",
+  "decoder": {
+    "name": "G_MLP",
+    "variant": "g_mlp",
+    "args": {
+      "z_range": 0.8
+    },
+    "weights": {
+      "g_mlp": "dwm_weight/mountain_car/g_mlp/G_mc.pth"
+    }
+  },
+  "controller": {
+    "name": "Controller",
+    "weights": "dwm_weight/mountain_car/controller.pth",
+    "args": {
+      "activation": "tanh"
+    }
+  },
+  "dynamic": {
+    "name": "MountainCar"
+  },
+  "output_dir": "datasets/mountain_car/data/dataset_v1_g_mlp"
+}

@@ -56,8 +56,52 @@ class Decoder(nn.Module):
             return torch.clamp(x, 0.0, 1.0)
         return torch.sigmoid(x)
 
-    
+
+class G_MLP(nn.Module):
+    """MLP cGAN generator baseline (state + latent -> flat 96x96 image).
+
+    Plain MLP on purpose: unlike a conv/BatchNorm generator, this shape is
+    directly reachable by StarV's FullyConnectedLayer/ReLULayer/SatLinLayer
+    stack. Matches aebs_carla/model_2.py's Generator, which is what
+    gan_brake_ckpts/G_brake.pth was trained against.
+
+    z_range defaults to 0.8, matching the cGAN_mlp/train_{cp,mc,pen}.ipynb
+    training recipe (pure adversarial loss, no reconstruction term -- a
+    wide latent range is what makes that worth anything). G_brake.pth was
+    trained with z_range=0.05 instead, so brake's config passes that value
+    explicitly rather than relying on this default.
+    """
+
+    def __init__(self, state_dim=2, latent_dim=2, output_dim=96 * 96, z_range=0.8):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(state_dim + latent_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 4096),
+            nn.ReLU(),
+            nn.Linear(4096, output_dim),
+        )
+        self.state_dim = state_dim
+        self.latent_dim = latent_dim
+        self.output_dim = output_dim
+        self.z_range = z_range
+
+    def forward(self, state, z=None):
+        if z is None:
+            # Fresh latent each call, matching the training-time distribution.
+            z = torch.empty(
+                state.size(0), self.latent_dim, device=state.device
+            ).uniform_(-self.z_range, self.z_range)
+        x = torch.cat([state, z], dim=1)
+        x = self.net(x)
+        x = torch.clamp(x, 0.0, 1.0)
+        return x.view(x.size(0), 1, 96, 96)
+
+
 __all__ = [
-    "Controller", 
-    "Decoder"
+    "Controller",
+    "Decoder",
+    "G_MLP",
 ]

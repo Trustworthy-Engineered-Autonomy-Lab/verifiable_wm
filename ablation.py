@@ -17,7 +17,7 @@ from utils import load_config, resolve_device, set_seed
 DEFAULT_ALPHAS = (0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0)
 DEFAULT_LAMBDAS = (0.0, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5)
 DEFAULT_SEED = 2025
-GRID_ROOT = Path("dwm_weight/now_weight")
+GRID_ROOT = Path("dwm_weight")
 
 
 def format_value(value: float) -> str:
@@ -33,6 +33,7 @@ class Experiment:
     weight_root: Path = GRID_ROOT
     condition: str = "default"
     base_config_path: Path | None = None
+    output_activation: str = "sigmoid"
 
     @property
     def output_dir(self) -> Path:
@@ -76,6 +77,7 @@ def build_experiments(
     weight_root: Path = GRID_ROOT,
     condition: str = "default",
     base_config_path: Path | None = None,
+    output_activation: str = "sigmoid",
 ) -> list[Experiment]:
     if env not in {"cartpole", "mountain_car", "pendulum"}:
         raise ValueError(f"Unsupported ablation environment: {env}")
@@ -88,6 +90,7 @@ def build_experiments(
             Path(weight_root),
             condition,
             Path(base_config_path) if base_config_path is not None else None,
+            output_activation,
         )
         for alpha, lambda_ctrl in product(alphas, lambdas)
     ]
@@ -116,6 +119,7 @@ def build_train_config(
     config["lambda_ctrl"] = experiment.lambda_ctrl
     config["training"]["seed"] = experiment.seed
     config["output_dir"] = experiment.output_dir.as_posix()
+    config["output_activation"] = experiment.output_activation
     return config
 
 
@@ -146,6 +150,7 @@ def validate_training_artifacts(experiment: Experiment) -> tuple[bool, str]:
             "training",
             "controller",
             "device",
+            "output_activation",
         )
         matches = (
             all(config[key] == expected[key] for key in scientific_keys)
@@ -204,6 +209,7 @@ def build_sampling_config(
         source = load_config(Path("config/sampling") / f"{experiment.env}.json")
     config = copy.deepcopy(dict(source))
     config["decoder"]["variant"] = "saliency"
+    config["decoder"]["args"] = {"output_activation": experiment.output_activation}
     config["decoder"]["weights"] = experiment.best_checkpoint.as_posix()
     config["output_dir"] = experiment.output_dir.as_posix()
     return config
@@ -795,7 +801,7 @@ def promote_mainline(
     canonical_config = copy.deepcopy(config)
     canonical_config["training"]["seed"] = experiment.seed
     canonical_config["output_dir"] = (
-        Path("dwm_weight/now_weight") / experiment.env / "saliency"
+        Path("dwm_weight") / experiment.env / "saliency"
     ).as_posix()
     set_seed(experiment.seed)
     train_fn = trainer or td.train

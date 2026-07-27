@@ -37,7 +37,7 @@ from utils import load_config, load_state_splits  # noqa: E402
 
 ENV_ID = "AdvancedEmergencyBrakingSystemWithRendering-v0"
 STARV_CONFIG = "config/starv_verification/brake_system.json"
-CONTROLLER_WEIGHTS = "dwm_weight/now_weight/brake_system/controller.pth"
+CONTROLLER_WEIGHTS = "dwm_weight/brake_system/controller.pth"
 ROLLOUT_STEPS = 10
 DT = 0.1
 V_LEAD = 0.0
@@ -168,11 +168,18 @@ def main():
     print(f"[Load] starv states={states_path}")
 
     env = make_env()
-    arrays = {
+    output_path = output_dir / "real_trajectories.npz"
+    if output_path.exists():
+        arrays = dict(np.load(output_path, allow_pickle=True))
+        print(f"[Load] existing {output_path} (splits: "
+              f"{[k[:-5] for k in arrays if k.endswith('_traj')]})")
+    else:
+        arrays = {}
+    arrays.update({
         "rollout_steps": np.array(ROLLOUT_STEPS),
         "starv_config": np.array(STARV_CONFIG),
         "controller_weights": np.array(CONTROLLER_WEIGHTS),
-    }
+    })
 
     try:
         for split in args.splits:
@@ -197,7 +204,6 @@ def main():
             arrays[f"{split}_actions"] = actions
 
             # Save after every finished split so partial progress survives
-            output_path = output_dir / "real_trajectories.npz"
             np.savez_compressed(output_path, **arrays)
             print(f"[Saved] {output_path} (splits: "
                   f"{[k[:-5] for k in arrays if k.endswith('_traj')]})")

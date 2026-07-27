@@ -87,7 +87,40 @@ trajectories.npz    tube.json
 pip install numpy torch
 ```
 
+<<<<<<< HEAD
 如果服务器已经进入项目使用的环境，例如：
+=======
+MountainCar 命令会生成 `saliency_occlusion_background_median.npz`。Pendulum 使用默认的
+white occlusion baseline，只需换成对应配置。
+
+`notebooks/train_decoder.ipynb` 也提供完整的 saliency `alpha × lambda_ctrl` 消融入口：
+
+```text
+alpha       = [0.5, 1, 2, 4, 8, 16, 32]
+lambda_ctrl = [0, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5]
+seed        = 2025
+```
+
+CartPole 和 Pendulum 各有 49 个训练点，不筛选 seed。网格实现位于 `ablation.py`，notebook
+只负责调用和显示表格。每个点使用独立目录：
+
+```text
+dwm_weight/<env>/alpha_lambda_grid/
+  alpha_<alpha>/lambda_<lambda>/seed_2025/
+    decoder_best_total.pth
+    decoder_last.pth
+    metrics.json
+    dwm_trajectories_saliency.npz
+```
+
+再次执行时，只有 checkpoint、metrics 和配置严格匹配的完整点才会跳过；部分产物、错误参数或
+错误 rollout 溯源都会重跑。旧的 CartPole 一维消融目录保留为历史结果。
+
+### 4. 生成 DWM trajectory
+
+在 `notebooks/generate_dataset.ipynb` 中运行
+`run_sampling("cartpole", decoder_variant="saliency")`。对应的命令行为：
+>>>>>>> origin/main
 
 ```bash
 conda activate /home/tealab_shared/starv/env/starv_shared

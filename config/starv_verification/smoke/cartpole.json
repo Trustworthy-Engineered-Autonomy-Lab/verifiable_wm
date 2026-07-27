@@ -3,7 +3,7 @@
     "Decoder": {
       "args": [],
       "kwargs": {
-        "weights": "dwm_weight/now_weight/cartpole/alpha_lambda_grid/alpha_8/lambda_0.1/seed_2025/decoder_best_total.pth"
+        "weights": "dwm_weight/cartpole/alpha_lambda_grid/t20_matched/alpha_8/lambda_0.1/seed_2025/decoder_best_total.pth"
       }
     },
     "Controller": {
@@ -19,7 +19,7 @@
     "args": [],
     "kwargs": {
       "goal_angle_threshold": 0.209,
-      "num_steps": 30,
+      "num_steps": 20,
       "early_stop": false,
       "save_history": true
     }

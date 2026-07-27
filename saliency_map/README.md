@@ -18,7 +18,6 @@ saliency_map/
 │   ├── precompute_saliency_maps.py        主线：产出训练用 .npz
 │   └── diagnostics/
 │       ├── compare_heatmap_methods.py     诊断：6 种方法并排看
-│       ├── compare_recon.py               诊断：多 checkpoint 重建对比
 │       ├── preview_cartpole_render.py     诊断：渲染健全性检查
 │       └── eval_decoder.py                诊断：任意 checkpoint 的指标读数
 └── output/
@@ -33,8 +32,7 @@ saliency_map/
 - 多个脚本会用到的 controller/权重加载、saliency 计算方法放 `methods.py`，不要在各脚本里各写一份。
 - 主线脚本放在 `scripts/`。
 - 临时检查、画图、方法/重建对比脚本放在 `scripts/diagnostics/`；如果两个诊断脚本除了参数（env 名、
-  checkpoint 路径）外逻辑一样，参数化合并成一个，不要复制粘贴出第二个文件（`compare_recon.py` 就是
-  这么从 `compare_alpha2_recon.py` + `compare_pendulum_recon.py` 合并来的）。
+  checkpoint 路径）外逻辑一样，参数化合并成一个，不要复制粘贴出第二个文件。
 - 生成给训练用的 `.npz` 不放在 `saliency_map/output/`，而是放回对应的 dataset 目录。
 - `saliency_map/output/previews/` 放临时图片。一般是一张图一个清楚的文件名，不再一张图开一个文件夹。
 
@@ -85,19 +83,6 @@ saliency_map/
 
 输出默认在 `saliency_map/output/previews/<study_case>_saliency_methods.png`。
 
-### `scripts/diagnostics/compare_recon.py`
-
-同一批 test state，多个 decoder checkpoint 重建出的图像跟真实图像并排对比。`run(env_name, dataset_dir,
-checkpoints, ...)` 里 `checkpoints` 是 `{标签: 权重路径}`，cartpole/pendulum 各自的默认组合在
-`DEFAULT_CHECKPOINTS` 里；要看别的 checkpoint 组合直接传自定义 dict，不用建新文件。
-
-```bash
-/home/tealab_shared/starv/env/starv_shared/bin/python \
-  saliency_map/scripts/diagnostics/compare_recon.py --env pendulum
-```
-
-输出默认在 `saliency_map/output/previews/<env>_recon_compare.png`。
-
 ### `scripts/diagnostics/preview_cartpole_render.py`
 
 看 CartPole dataset 里的图片是否正常，也可以和当前 `env.py`/`dynamic.py` 重新 render 的结果对比，防止
@@ -112,7 +97,7 @@ checkpoints, ...)` 里 `checkpoints` 是 `{标签: 权重路径}`，cartpole/pen
 
 ### `scripts/diagnostics/eval_decoder.py`
 
-对不是 `train_decoder.py` 直接训出来的 checkpoint（比如 raw/old decoder）算 test 指标，复用
+对不是 `train_decoder.py` 直接训出来的 checkpoint 算 test 指标，复用
 `train_decoder.py` 的 `load_split`/`compute_weight`/`evaluate`，数字算法跟 `metrics.json` 里的一致，
 可以放在同一张对比表里看。
 
@@ -120,8 +105,8 @@ checkpoints, ...)` 里 `checkpoints` 是 `{标签: 权重路径}`，cartpole/pen
 /home/tealab_shared/starv/env/starv_shared/bin/python \
   saliency_map/scripts/diagnostics/eval_decoder.py \
   --config config/train_decoder/pendulum/intensity.json \
-  --weights dwm_weight/raw_weight/pendulum/decoder_pen.pth \
-  --label "raw (old decoder)"
+  --weights dwm_weight/pendulum/intensity/decoder_best_total.pth \
+  --label "intensity"
 ```
 
 ## 当前研究判断

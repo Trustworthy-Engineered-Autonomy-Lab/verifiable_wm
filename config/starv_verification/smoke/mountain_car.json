@@ -3,7 +3,7 @@
     "Decoder": {
       "args": [],
       "kwargs": {
-        "weights": "dwm_weight/now_weight/mountain_car/alpha_lambda_grid/background/alpha_16/lambda_0.5/seed_2025/decoder_best_total.pth"
+        "weights": "dwm_weight/mountain_car/alpha_lambda_grid/background_v008_t20/alpha_8/lambda_0.5/seed_2025/decoder_best_total.pth"
       }
     },
     "Controller": {
@@ -18,7 +18,7 @@
     "args": [],
     "kwargs": {
       "goal_position_threshold": 0.6,
-      "num_steps": 30,
+      "num_steps": 20,
       "early_stop": false,
       "save_history": true
     }
