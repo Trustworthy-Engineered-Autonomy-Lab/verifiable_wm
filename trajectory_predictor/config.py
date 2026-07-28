@@ -1,113 +1,161 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Default paths and shared runtime helpers for the predictor project.
+"""Train-and-build Predictor configuration.
 
-The paths below are fixed defaults, not search locations.  Every value can
-still be overridden by the corresponding command-line argument.
+Edit this file, then run:
+
+    python train_predictor.py
+    python build_predictor.py
+
+No command-line arguments are required.
 """
 
-from __future__ import annotations
-
-import random
 from pathlib import Path
 
-import numpy as np
-import torch
 
+# =============================================================================
+# 1. Experiment
+# =============================================================================
 
-# Predictor runtime defaults.  The trajectory horizon is inferred from the
-# selected dataset/checkpoint unless the user explicitly supplies --horizon.
-DEFAULT_SAMPLES_PER_CELL = 3
+# Supported values: "pendulum", "mountain_car", "cartpole", "brake_system".
+# This package is preset for the existing Brake dataset.
+#ENVIRONMENT = "brake_system"
+#ENVIRONMENT = "mountain_car"
+ENVIRONMENT = "cartpole"
+#ENVIRONMENT = "pendulum"
+
+ENVIRONMENT_HORIZONS = {
+    "pendulum": 20,
+    "mountain_car": 20,
+    "cartpole": 20,
+    "brake_system": 10,
+}
+HORIZON = ENVIRONMENT_HORIZONS[ENVIRONMENT]
 
 
 # =============================================================================
-# Default experiment and paths
-#
-# These values form one internally consistent default experiment.  No file or
-# directory is searched automatically.  Edit these constants for another
-# permanent default, or override any of them from the command line.
+# 2. Input paths
 # =============================================================================
 
-#DEFAULT_ENVIRONMENT = "brake_system"
-#DEFAULT_ENVIRONMENT = "cartpole"
-#DEFAULT_ENVIRONMENT = "mountain_car"
-DEFAULT_ENVIRONMENT = "pendulum"
-
-DEFAULT_DATA_ROOT = Path("/home/tealab_shared/safety_results")
-DEFAULT_PROJECT_ROOT = Path(
-    "/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor"
+# The real NPZ is both:
+#   1) the initial-state source for Predictor trajectories; and
+#   2) the format/provenance template copied into predictor_trajectories.npz.
+REAL_TRAJECTORIES = Path(
+    f"/home/tealab_shared/safety_results/{ENVIRONMENT}/real_trajectories.npz"
 )
 
-DEFAULT_REAL_PATH = (
-    DEFAULT_DATA_ROOT / DEFAULT_ENVIRONMENT / "real_trajectories.npz"
+# JSON containing grid.dims.  Existing cells are used when their initial
+# bounds are valid; otherwise cells are reconstructed from grid.dims.
+GRID_RESULTS = {
+    "pendulum": Path(
+        "/home/tealab_shared/safety_results/pendulum/"
+        "safety_result_big_cell_a16_lambda05.json"
+    ),
+    "mountain_car": Path(
+        "/home/tealab_shared/safety_results/mountain_car/"
+        "safety_result_big_cell_best.json"
+    ),
+    "cartpole": Path(
+        "/home/tealab_shared/safety_results/cartpole/"
+        "safety_result_big_cell_a8_lamda01.json"
+    ),
+    "brake_system": Path(
+        "/home/tealab_shared/safety_results/brake_system/"
+        "safety_result.json"
+    ),
+}
+GRID_RESULT = GRID_RESULTS[ENVIRONMENT]
+
+# The training program creates this checkpoint.  The build program then reads
+# the same file.
+CHECKPOINT = Path(
+    f"/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/{ENVIRONMENT}/predictor_transformer.pth"
 )
-DEFAULT_GRID_RESULT_PATH = (
-#    "/home/tealab_shared/safety_results/brake_system/safety_result.json"
-#    "/home/tealab_shared/safety_results/cartpole/safety_result_big_cell_a8_lamda01.json"
-#   "/home/tealab_shared/safety_results/mountain_car/safety_result_big_cell_best.json" 
-    "/home/tealab_shared/safety_results/pendulum/safety_result_big_cell_a16_lambda05.json"   
+
+
+# =============================================================================
+# 3. Output paths
+# =============================================================================
+
+OUTPUT_DIRECTORY = Path(
+    f"/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/{ENVIRONMENT}"
 )
 
-DEFAULT_MODEL_DIR = (
-    DEFAULT_PROJECT_ROOT / "models" / DEFAULT_ENVIRONMENT
-)
-DEFAULT_CHECKPOINT_PATH = (
-    DEFAULT_MODEL_DIR / "predictor_transformer.pth"
-)
-DEFAULT_TRAJECTORY_OUTPUT_PATH = (
-    DEFAULT_MODEL_DIR / "predictor_trajectories.npz"
-)
-DEFAULT_TUBE_OUTPUT_PATH = (
-    DEFAULT_MODEL_DIR / "predictor_tube.json"
+TRAJECTORY_OUTPUT = OUTPUT_DIRECTORY / "predictor_trajectories.npz"
+TUBE_OUTPUT = OUTPUT_DIRECTORY / "predictor_tube.json"
+
+# When a legacy NPZ has no train_traj, build_predictor.py writes the held-out
+# calibration view here.  The original REAL_TRAJECTORIES file is never
+# modified.  Pass this file to --calibration-real.
+CONFORMAL_REAL_OUTPUT = (
+    OUTPUT_DIRECTORY / "conformal_real_trajectories.npz"
 )
 
 
-def validate_environment(name: str) -> str:
-    """Validate and return a user-supplied environment label."""
+# =============================================================================
+# 4. Training parameters
+# =============================================================================
 
-    environment = name.strip()
-    if not environment:
-        raise ValueError("--env must not be empty")
-    return environment
+# train_traj is used when present.  If it is absent and split_val is enabled,
+# a deterministic part of val_traj becomes the training source and the rest
+# remains disjoint for calibration.  test_traj is always untouched.
+TRAIN_FIT_RATIO = 0.9
+TRAIN_EPOCHS = 300
+TRAIN_BATCH_SIZE = 64
+LEARNING_RATE = 1e-4
+WEIGHT_DECAY = 1e-5
+TERMINAL_LOSS_WEIGHT = 0.2
+GRADIENT_CLIP = 1.0
+EARLY_STOPPING_PATIENCE = 30
+EARLY_STOPPING_MIN_DELTA = 1e-8
+NUM_WORKERS = 0
 
+# If train_traj exists, it is always used and this policy has no effect.
+# For the existing Brake archive, split_val deterministically uses part of
+# val_traj for training and reserves the rest for calibration.
+MISSING_TRAIN_POLICY = "split_val"
+DERIVED_TRAIN_RATIO = 0.8
 
-def set_seed(seed: int) -> None:
-    """Fix random seeds for reproducible experiments."""
+# Transformer architecture.  These values are stored in the checkpoint.
+D_MODEL = 128
+NHEAD = 4
+NUM_LAYERS = 3
+DIM_FEEDFORWARD = 256
+DROPOUT = 0.1
 
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-
-
-def resolve_device(name: str) -> torch.device:
-    """
-    Resolve the requested computation device.
-
-    auto:
-        Use CUDA when available, otherwise use CPU.
-    """
-
-    if name == "auto":
-        return torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
-
-    return torch.device(name)
-
-
-def absolute_path(path: Path) -> Path:
-    """Expand ``~`` and resolve a user-supplied path."""
-
-    return path.expanduser().resolve()
+# Reproducible train/selection split and parameter initialization.
+TRAIN_SEED = 2025
 
 
-def ensure_parent(path: Path) -> None:
-    """Create the parent directory for a user-supplied output file."""
+# =============================================================================
+# 5. Build parameters
+# =============================================================================
 
-    path.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+# Every cell is sampled at exactly:
+#   1) lower corner, 2) center, 3) upper corner.
+SAMPLES_PER_CELL = 3
+
+# Inference batch size.  Lower this if GPU/CPU memory is insufficient.
+BATCH_SIZE = 1024
+
+# "auto" selects CUDA when available, otherwise CPU.
+DEVICE = "auto"
+
+# Reproducibility seed used during construction/inference.
+BUILD_SEED = 0
+
+
+# =============================================================================
+# 6. Compatibility policy
+# =============================================================================
+
+# Applied when the source has an independent train_traj.  For split_val,
+# build_predictor.py derives the expected count from the checkpoint indices.
+EXPECTED_CALIBRATION_COUNT = 400
+
+# Refuse a derived split that leaves too little independent calibration data.
+MIN_DERIVED_CALIBRATION_COUNT = 20
+
+# Pendulum must use a checkpoint trained with continuous unwrapped theta.
+# Keeping this True prevents silently using an incompatible legacy checkpoint.
+REQUIRE_UNWRAPPED_PENDULUM_CHECKPOINT = True

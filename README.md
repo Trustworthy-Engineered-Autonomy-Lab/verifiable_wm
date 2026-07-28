@@ -1,517 +1,492 @@
 # Trajectory Predictor
 
-本分支主要是为了在main分支的基础上添加trajectoriy_predictor, 本文档将说明 predictor 的目标、模型、训练流程、tube 构建流程、输入输出格式、运行方法和当前限制。
-
-## 1. Predictor 的作用
-
-Trajectory Predictor 学习一个从初始状态到整条未来状态轨迹的映射：
+本分支主要在main分支的基础上实现一个基于 Transformer 的闭环轨迹预测器。它从真实闭环轨迹中学习：
 
 ```text
-初始状态 s0
-    ↓
-Transformer Predictor
-    ↓
-[s0, s1, s2, ..., sH]
+初始状态 s0  ->  完整未来轨迹 [s0, s1, ..., sH]
 ```
 
-训练完成后，程序会在 verification grid 的每个 cell 中选取若干初始状态，预测这些状态对应的未来轨迹，再对同一 cell 内的预测结果逐时间步、逐状态维度取最小值和最大值，得到该 cell 的 predictor tube。
+训练完成后，程序可以：
 
-当前默认设置为：
+1. 根据真实轨迹的初始状态生成 Predictor 预测轨迹；
+2. 在 verification grid 的每个 cell 中采样初始状态；
+3. 将采样点的预测轨迹合并成 Predictor tube；
+4. 使用独立真实轨迹进行 Conformal 校准；
+5. 比较 Raw、CP-D、CP-R 三种 tube 的 coverage、signed margin 和面积。
 
-```text
-每个 cell 采样点数：3
-预测 transition 数：20
-输出状态点数：21，即 s0 到 s20
-```
+Predictor 只学习初始状态到闭环轨迹的映射，不读取或预测 action，也不会修改原始
+`real_trajectories.npz`、`safety_result.json`、DWM 或 StarV 程序。
 
-需要注意：当前 tube 是有限采样轨迹的 min/max 包络，不是形式化可达集，也没有理论覆盖保证。
+---
 
-## 2. 项目文件
-
-```text
-trajectory_predictor/
-├── config.py
-├── data_utils.py
-├── predictor_model.py
-├── train_predictor.py
-├── tube_utils.py
-├── build_tube.py
-├── safety_results/
-├── models/
-└── predictor_results/
-```
-
-各文件的作用如下。
-
-| 文件 | 作用 |
-|---|---|
-| `config.py` | 设置默认路径、默认 horizon、每个 cell 的采样数、随机种子和计算设备 |
-| `data_utils.py` | 加载并检查真实轨迹，截断轨迹，划分训练数据，计算 normalization |
-| `predictor_model.py` | 定义 Transformer、loss、checkpoint 加载和批量预测 |
-| `train_predictor.py` | 训练 predictor，并保存最佳 checkpoint |
-| `tube_utils.py` | 读取 grid、在 cell 中采样、预测轨迹、构建 min/max tube、保存结果 |
-| `build_tube.py` | 加载 checkpoint，调用 `tube_utils.py` 生成 NPZ 和 JSON |
-
-## 3. 完整工作流程
+## 1. 整体逻辑
 
 ```text
 real_trajectories.npz
         │
-        ▼
-train_predictor.py
+        ├── 训练数据 ──────────────> train_predictor.py
+        │                                  │
+        │                                  └──> predictor_transformer.pth
         │
-        ▼
-predictor_transformer.pth
+        ├── 独立校准真实轨迹 ──────> 校准输入
+        │                                  │
+        └── 各 split 初始状态 ─────> predictor_trajectories.npz
+                                           │
+safety_result.json                         │
+        │                                  │
+        └──> build_predictor.py <── checkpoint
+                    │
+                    └──> predictor_tube.json
+
+真实测试轨迹 + Predictor 测试轨迹 + Predictor tube
         │
-        ├──────────────┐
-        │              │
-safety_result.json     │
-        │              │
-        └──────┬───────┘
-               ▼
-         build_tube.py
-               │
-      ┌────────┴────────┐
-      ▼                 ▼
-predictor_          predictor_
-trajectories.npz    tube.json
+        └──> predictor_signed_tube_margin.py
+                    │
+                    ├── Raw tube 指标
+                    ├── CP-D tube 指标
+                    ├── CP-R tube 指标
+                    └── JSON、CSV 和比较图片
 ```
 
-第一步用真实轨迹训练 predictor。第二步读取 verification grid，在每个 cell 内采样三个初始状态，通过 predictor 生成轨迹并构建 tube。
+完整流程分为三个阶段。
 
-## 4. 安装依赖
+### 阶段一：训练轨迹 Predictor
 
-推荐使用 Python 3.9 或更高版本。
+`train_predictor.py` 使用真实闭环轨迹训练 Transformer。模型输入一条轨迹的初始
+状态，直接输出从第 0 步到第 \(H\) 步的完整状态序列。
 
-```bash
-pip install numpy torch
-```
+### 阶段二：生成预测轨迹和 Predictor tube
 
-如果服务器已经进入项目使用的环境，例如：
+`build_predictor.py` 使用训练好的 checkpoint 完成两类预测：
 
-```bash
-conda activate /home/tealab_shared/starv/env/starv_shared
-```
+- 对真实数据中的初始状态进行预测，得到 `predictor_trajectories.npz`；
+- 对 verification grid 中每个 cell 的 3 个采样点进行预测，并取逐时刻 min/max，
+  得到 `predictor_tube.json`。
 
-可以先检查依赖：
+如果源 NPZ 没有 `train_traj`，程序需要从 `val_traj` 中拆出一部分用于训练。此时
+它还会把剩余的独立校准样本另存为
+`conformal_real_trajectories.npz`。如果源 NPZ 已有独立 `train_traj`，原始
+`val_traj` 本身就是校准集，不需要额外复制。
 
-```bash
-python -c "import numpy, torch; print(numpy.__version__, torch.__version__)"
-```
+### 阶段三：校准和评估
 
-## 5. 输入一：`real_trajectories.npz`
+`predictor_signed_tube_margin.py` 使用未参与模型训练的独立真实轨迹进行
+Conformal 校准，然后在测试轨迹上比较原始 tube 和两种校准 tube。
 
-当前训练代码要求 NPZ 中同时存在以下三个字段：
+---
+
+## 2. 目录中的程序
+
+| 文件 | 是否直接运行 | 作用 |
+|---|---:|---|
+| `config.py` | 否 | 设置环境、输入输出路径、训练参数和 tube 构建参数 |
+| `predictor_model.py` | 否 | 定义 Transformer、loss、checkpoint 加载和批量推理 |
+| `train_predictor.py` | 是 | 训练 Predictor 并保存最佳 checkpoint |
+| `build_predictor.py` | 是 | 生成预测轨迹、真实校准集和 Predictor tube |
+| `predictor_conformal.py` | 可选 | 单独计算 Predictor 的 CP-D 校准半径 |
+| `predictor_signed_tube_margin.py` | 是 | 综合评估 Raw、CP-D 和 CP-R 三种 tube |
+
+### 2.1 `config.py`
+
+`config.py` 是训练和构建阶段的配置中心，主要控制：
 
 ```text
-train_traj
-val_traj
-test_traj
+ENVIRONMENT              环境名称
+REAL_TRAJECTORIES         真实轨迹 NPZ
+GRID_RESULT               verification grid / safety result JSON
+CHECKPOINT                模型 checkpoint 输出位置
+TRAJECTORY_OUTPUT         Predictor 轨迹输出位置
+TUBE_OUTPUT               Predictor tube 输出位置
+CONFORMAL_REAL_OUTPUT     独立真实校准集输出位置
+HORIZON                   预测步数
+SAMPLES_PER_CELL          每个 cell 的采样数量
+MISSING_TRAIN_POLICY      缺少 train split 时的处理方式
+DEVICE                    CPU 或 CUDA
 ```
 
-轨迹数组统一使用：
+`train_predictor.py` 和 `build_predictor.py` 直接读取该文件，不接收命令行参数。
+运行前应先确认环境名称、数据路径、horizon 和输出目录。
 
-```text
-(trajectory_number, horizon + 1, state_dim)
-```
+### 2.2 `predictor_model.py`
 
-例如二维、20-step 环境：
-
-```text
-train_traj : (1600, 21, 2)
-val_traj   : (400, 21, 2)
-test_traj  : (400, 21, 2)
-```
-
-CartPole 的状态维度是 4，因此可使用：
-
-```text
-train_traj : (1600, 21, 4)
-val_traj   : (400, 21, 4)
-test_traj  : (400, 21, 4)
-```
-
-真实数据中通常还包含：
-
-```text
-train_actions
-val_actions
-test_actions
-```
-
-当前 predictor 是 state-only 模型，训练时不会读取 action。
-
-### 数据用途
-
-训练代码会再次把 `train_traj` 随机划分为：
-
-```text
-fit set       ：用于更新模型参数，默认占 train_traj 的 90%
-selection set ：用于选择最佳 checkpoint，默认占 train_traj 的 10%
-```
-
-`val_traj` 和 `test_traj` 不参与模型参数训练：
-
-```text
-val_traj  ：预留作 calibration，但当前代码没有实现 conformal calibration
-test_traj ：预留作最终 evaluation
-```
-
-Normalization 的 mean 和 standard deviation 只根据 fit set 计算，避免使用 validation 或 test 信息。
-
-### 输入检查
-
-`data_utils.py` 会检查：
-
-- 三个 split 是否都存在；
-- 每个轨迹数组是否为三维；
-- 三个 split 的 `(horizon + 1, state_dim)` 是否一致；
-- 数据是否为空；
-- 是否包含 NaN 或 Inf；
-- 数据是否至少包含命令行要求的 horizon。
-
-## 6. Predictor 模型
-
-模型实现位于 `predictor_model.py`：
+该文件定义核心模型：
 
 ```python
 TrajectoryTransformer
 ```
 
-它直接学习：
+模型执行：
+
+\[
+s_0 \longrightarrow [\hat{s}_0,\hat{s}_1,\ldots,\hat{s}_H]
+\]
+
+输入 shape：
 
 ```text
-Fθ(s0) → [s0, s1, ..., sH]
+(batch_size, state_dim)
 ```
 
-它不是一步一步递归预测，而是由一个初始状态直接生成所有时间步。
-
-主要结构：
-
-1. `state_encoder` 把初始状态编码到 `d_model` 维特征空间；
-2. 每个时间步有一个可训练的 `time_query`；
-3. 初始状态特征与时间 query 相加；
-4. Transformer Encoder 同时处理全部时间步；
-5. `output_head` 把特征转换回状态空间；
-6. 使用 residual connection，把初始状态加到预测结果上；
-7. 第 0 步被强制设置为输入的真实初始状态。
-
-默认模型参数：
-
-| 参数 | 默认值 |
-|---|---:|
-| `d_model` | 128 |
-| `nhead` | 4 |
-| `num_layers` | 3 |
-| `dim_feedforward` | 256 |
-| `dropout` | 0.1 |
-
-### Loss
-
-Loss 由未来状态均方误差和末端状态均方误差组成：
+输出 shape：
 
 ```text
-loss = future_MSE + terminal_weight × terminal_MSE
+(batch_size, horizon + 1, state_dim)
 ```
 
-默认：
+模型结构可以概括为：
 
 ```text
-terminal_weight = 0.2
+初始状态
+-> state encoder
+-> 加入各时间步的可学习 time query
+-> Transformer Encoder
+-> output head
+-> 完整预测轨迹
 ```
 
-因为 `s0` 是已知值，future MSE 只计算 `s1` 到 `sH`。
-
-## 7. 配置默认路径
-
-`config.py` 中定义了：
+程序会强制：
 
 ```python
-DEFAULT_REAL_PATH
-DEFAULT_GRID_RESULT_PATH
-DEFAULT_CHECKPOINT_PATH
-DEFAULT_TUBE_OUTPUT_PATH
-DEFAULT_HORIZON
-DEFAULT_SAMPLES_PER_CELL
+prediction[:, 0, :] = initial_state
 ```
 
-当前附件中实际启用的是 CartPole 默认路径。被注释掉的 Brake System、Mountain Car 和 Pendulum 路径不会自动生效。
+因此预测轨迹的第 0 步与输入初始状态完全相同。
 
-如果不希望修改源码，可以直接在命令行覆盖所有路径。优先级是：
+训练 loss 为完整轨迹误差与终点误差之和：
+
+\[
+L =
+\operatorname{MSE}(\hat{s}_{1:H},s_{1:H})
++ \lambda_{\mathrm{terminal}}
+\operatorname{MSE}(\hat{s}_H,s_H)
+\]
+
+该文件还负责：
+
+- 使用训练集统计量对状态归一化；
+- 从 `.pth` 恢复模型结构和权重；
+- 分 batch 运行预测；
+- 将预测结果反归一化。
+
+### 2.3 `train_predictor.py`
+
+这是第一个主要运行入口。
+
+处理流程：
 
 ```text
-命令行参数 > config.py 默认值
+读取 real_trajectories.npz
+-> 检查 split、shape、horizon、NaN 和 Inf
+-> 准备 Predictor 训练数据
+-> 划分 fit set 与 selection set
+-> 使用 fit set 计算 normalization
+-> 训练 Transformer
+-> 根据 selection loss 保存最佳模型
+-> early stopping
+-> 写入 predictor_transformer.pth
 ```
-
-当前代码不会根据环境名称自动寻找文件，也不会因为修改 `--env-name` 而自动更换路径。
-
-## 8. 训练 Predictor
-
-### 使用 `config.py` 默认路径
-
-```bash
-cd trajectory_predictor
-python train_predictor.py
-```
-
-### 显式指定输入和输出
-
-```bash
-python train_predictor.py \
-  --real /path/to/real_trajectories.npz \
-  --checkpoint /path/to/predictor_transformer.pth \
-  --horizon 20
-```
-
-常用训练参数：
-
-```bash
-python train_predictor.py \
-  --real /path/to/real_trajectories.npz \
-  --checkpoint /path/to/predictor_transformer.pth \
-  --horizon 20 \
-  --fit-ratio 0.9 \
-  --epochs 300 \
-  --batch-size 64 \
-  --learning-rate 1e-4 \
-  --weight-decay 1e-5 \
-  --terminal-loss-weight 0.2 \
-  --gradient-clip 1.0 \
-  --patience 30 \
-  --device auto \
-  --seed 2025
-```
-
-`--device auto` 会优先使用 CUDA；没有 CUDA 时使用 CPU。
-
-### Early stopping
-
-每个 epoch 后，程序会在 selection set 上计算 loss。只有当 selection loss 变好时才覆盖 checkpoint。
-
-如果连续 `--patience` 个 epoch 没有改进，训练提前终止。默认 patience 为 30。
-
-## 9. Checkpoint 格式
-
-训练完成后会生成：
-
-```text
-predictor_transformer.pth
-```
-
-其中包括：
-
-```text
-model_state_dict
-state_mean
-state_std
-state_dim
-horizon
-model_config
-best_epoch
-best_selection_loss
-source_real_trajectories
-training_protocol
-```
-
-`build_tube.py` 依靠 checkpoint 中的 `state_dim`、`horizon`、normalization 参数和模型结构重新加载 predictor。
-
-## 10. 输入二：`safety_result.json`
-
-构建 tube 时需要一个 verification grid JSON。至少需要：
-
-```json
-{
-  "grid": {
-    "dims": [
-      {
-        "name": "state_0",
-        "start": 0.0,
-        "stop": 1.0,
-        "num": 10,
-        "step": 0.1
-      }
-    ]
-  },
-  "cells": []
-}
-```
-
-程序主要使用：
-
-```text
-grid.dims
-cells[i].bounds[0]
-```
-
-如果 JSON 中：
-
-- `cells` 数量等于 grid 的 cell 总数；
-- 每个 cell 都存在 `bounds[0]`；
-- 初始 bounds 的 shape 为 `(state_dim, 2)`；
-
-程序就直接使用 JSON 中的第 0 步 bounds。
-
-否则，程序会根据 `grid.dims` 中的 `start`、`stop`、`num` 和 `step` 重建每个 cell 的初始 bounds。
-
-模型的 `state_dim` 必须与 grid 维度一致。
-
-## 11. 每个 Cell 如何采样
-
-当前默认每个 cell 只选取三个确定性点：
-
-```text
-lower corner
-cell center
-upper corner
-```
-
-数学上，采样点位于 cell 从 lower corner 到 upper corner 的主对角线上：
-
-```text
-x(w) = lower + w × (upper - lower)
-```
-
-默认三个权重：
-
-```text
-w = 0.0, 0.5, 1.0
-```
-
-这表示每个 cell 总共采样 3 个点，而不是每个维度采样 3 个点。因此无论状态维度是 2 还是 4，每个 cell 都只运行 3 条预测轨迹。
-
-需要注意：对于多维 cell，这三个点只覆盖一条对角线，不会覆盖其他角点和 cell 内部的所有方向。
-
-## 12. 构建 Predictor Tube
-
-### 使用默认路径
-
-```bash
-python build_tube.py
-```
-
-但是当前 `build_tube.py` 的 `--env-name` 默认值是 `pendulum`，而 `config.py` 实际启用的是 CartPole 路径。使用默认 CartPole 路径时，应显式传入：
-
-```bash
-python build_tube.py --env-name cartpole
-```
-
-否则模型和 grid 仍可能正常运行，但 JSON 中的 environment 会被错误标记为 `pendulum`。
-
-### 推荐：显式指定全部参数
-
-```bash
-python build_tube.py \
-  --grid-result /path/to/safety_result.json \
-  --checkpoint /path/to/predictor_transformer.pth \
-  --trajectory-output /path/to/predictor_trajectories.npz \
-  --tube-output /path/to/predictor_tube.json \
-  --env-name cartpole \
-  --samples-per-cell 3 \
-  --horizon 20 \
-  --cell-batch-size 1024 \
-  --device auto \
-  --seed 2025
-```
-
-如果没有指定 `--trajectory-output`，程序会把它保存为：
-
-```text
-<tube-output 所在目录>/predictor_trajectories.npz
-```
-
-### Min/max tube
-
-对于 cell `c`、时间步 `t` 和状态维度 `d`：
-
-```text
-lower[c,t,d] = min(该 cell 三条预测轨迹在 t,d 的值)
-upper[c,t,d] = max(该 cell 三条预测轨迹在 t,d 的值)
-```
-
-最终 bounds 的排列是：
-
-```text
-(num_cells, horizon + 1, state_dim, 2)
-```
-
-最后一维：
-
-```text
-[..., 0] = lower
-[..., 1] = upper
-```
-
-## 13. `predictor_trajectories.npz` 格式
-
-当前附件源码生成的是 cell 级格式：
-
-| 字段 | Shape | 含义 |
-|---|---|---|
-| `cell_indices` | `(C,)` | cell 编号 |
-| `initial_bounds` | `(C,D,2)` | 每个 cell 的初始上下界 |
-| `initial_states` | `(C,S,D)` | 每个 cell 的采样初始状态 |
-| `trajectories` | `(C,S,H+1,D)` | 所有 cell 的预测轨迹 |
-| `lower` | `(C,H+1,D)` | 每个 cell 的预测下界 |
-| `upper` | `(C,H+1,D)` | 每个 cell 的预测上界 |
-| `horizon` | scalar | transition 数 |
-| `samples_per_cell` | scalar | 每个 cell 的轨迹数 |
 
 其中：
 
-```text
-C = num_cells
-S = samples_per_cell，默认 3
-H = horizon，默认 20
-D = state_dim
-```
+- fit set 用于更新模型参数；
+- selection set 用于选择最佳 epoch；
+- calibration set 不参与训练和 checkpoint 选择；
+- test set 只用于最终评估。
 
-核心数组是：
+checkpoint 不仅保存模型权重，还保存：
 
 ```text
-trajectories[cell, sample, time, state]
+model_state_dict
+state_mean / state_std
+state_dim / horizon
+model_config
+best_epoch / best_selection_loss
+environment
+训练和校准数据索引
+源数据数量和指纹
+training_protocol
 ```
 
-例如：
+数据索引和指纹用于确保构建阶段使用的仍是训练时的同一份数据及同一套划分。
+如果旧 checkpoint 不包含这些信息，需要重新训练。
+
+### 2.4 `build_predictor.py`
+
+这是第二个主要运行入口，必须在训练完成后运行。它完成三项工作。
+
+#### A. 生成 Predictor 轨迹
+
+程序从真实轨迹中提取初始状态：
+
+```python
+initial_states = real_trajectories[:, 0, :]
+```
+
+然后调用 Transformer 预测完整未来轨迹，保存为：
 
 ```text
-CartPole    : (3600, 3, 21, 4)
-Mountain Car: (6400, 3, 21, 2)
-Pendulum    : (5000, 3, 21, 2)
+predictor_trajectories.npz
 ```
 
-### 与 `real_trajectories.npz` 的区别
+校准 split 中保存独立校准初始状态对应的 Predictor 预测；测试 split 中保存测试
+初始状态对应的 Predictor 预测。
 
-`real_trajectories.npz` 按数据集 split 组织：
+NPZ 中的 actions 来自真实数据，只用于保持格式和样本对应关系。Predictor 本身
+既不读取 action，也不预测 action。
+
+#### B. 生成独立真实校准集
+
+当训练阶段使用 `split_val` 策略时，程序根据 checkpoint 中保存的 calibration
+indices，从原始真实 NPZ 中提取对应的真实轨迹和 actions，保存为：
 
 ```text
-train_traj[trajectory, time, state]
-val_traj[trajectory, time, state]
-test_traj[trajectory, time, state]
+conformal_real_trajectories.npz
 ```
 
-而当前 predictor 输出按 verification cell 组织：
+该文件中的校准轨迹与 `predictor_trajectories.npz` 中的预测校准轨迹一一对应：
 
 ```text
-trajectories[cell, sample, time, state]
+conformal_real_trajectories.npz / val_traj
+              真实轨迹
+                  ↕
+predictor_trajectories.npz / val_traj
+              预测轨迹
 ```
 
-因此两者当前并不是相同格式：
+它不是 `predictor_trajectories.npz` 的重复副本，而是计算 Predictor 预测误差所需
+的真实答案。
 
-| 对比项 | `real_trajectories.npz` | 当前 `predictor_trajectories.npz` |
-|---|---|---|
-| 数据组织 | train/val/test split | grid cell |
-| 核心字段 | `train_traj`、`val_traj`、`test_traj` | `trajectories` |
-| 轨迹维度 | 3D | 4D |
-| action | 通常存在 | 不存在 |
-| cell 信息 | 不存在 | 存在 |
+如果源 NPZ 已有独立 `train_traj`，该文件不会生成。此时原始
+`real_trajectories.npz` 的 `val_traj` 从未参与训练，可以直接作为真实校准数据。
 
-即使把四维 `trajectories` 展平为三维，也不能保证与真实 `test_traj` 一一对应，因为二者的轨迹数量和初始状态来源不同。
+#### C. 构建 Predictor tube
 
-如果要让 predictor NPZ 可直接替代真实轨迹 NPZ，必须另外从真实的 `train_traj`、`val_traj` 和 `test_traj` 的初始状态开始预测，并保存对应的同名三维数组。当前附件源码尚未实现这一功能。
+程序从 `safety_result.json` 读取 verification grid。在每个 cell 中使用：
 
-## 14. `predictor_tube.json` 格式
+```text
+lower corner
+center
+upper corner
+```
 
-JSON 顶层主要字段：
+作为 3 个初始状态。对三点分别预测完整轨迹后，在每个时间步、每个状态维度取：
+
+```python
+lower = predictions.min(axis=0)
+upper = predictions.max(axis=0)
+```
+
+最终把每个 cell 的时序 min/max 包络保存到：
+
+```text
+predictor_tube.json
+```
+
+cell 的三条采样轨迹只在构建过程中存在，不写入
+`predictor_trajectories.npz`。
+
+### 2.5 `predictor_conformal.py`
+
+该文件计算 CP-D（Conformal Prediction based on trajectory Distance）。
+
+对第 \(i\) 对真实/预测校准轨迹，先计算 nonconformity score：
+
+\[
+\delta_i =
+\max_t
+\left\|s_{i,t}^{\mathrm{real}}-s_{i,t}^{\mathrm{pred}}\right\|_2
+\]
+
+再使用 finite-sample conformal rank：
+
+\[
+k=\left\lceil(n+1)(1-\alpha)\right\rceil
+\]
+
+从排序后的误差中取得膨胀半径 \(\Gamma_D\)。
+
+该程序可以单独运行，也会被最终评估入口调用。命令行参数 `--dwm` 沿用了原项目
+接口名称；在本目录中应传入 `predictor_trajectories.npz`。
+
+### 2.6 `predictor_signed_tube_margin.py`
+
+这是最终综合评估入口，用于比较：
+
+| 方法 | 含义 |
+|---|---|
+| Raw | 每个 cell 三点预测得到的原始 min/max 包络 |
+| CP-D | 根据真实轨迹与 Predictor 轨迹的 L2 误差膨胀 Raw tube |
+| CP-R | 根据真实轨迹相对 Raw tube 的越界程度膨胀 Raw tube |
+
+Signed margin 表示状态相对 tube 边界的位置：
+
+```text
+margin > 0  状态位于 tube 内部
+margin = 0  状态位于 tube 边界
+margin < 0  状态位于 tube 外部
+```
+
+一条轨迹的 signed margin 是所有时间步和检查维度中的最小边界距离。只要其中
+一个状态在任一检查维度越界，该轨迹的最终 margin 就会小于 0。
+
+程序最终统计：
+
+- trajectory coverage rate；
+- signed margin 的 mean、min 和 max；
+- 平均 tube area；
+- CP-D 半径；
+- CP-R 半径；
+- 有效轨迹和有效 cell 数量。
+
+它会只读调用项目根目录 `compare.py` 中的匹配和绘图函数，不会修改
+`compare.py`。目录结构应为：
+
+```text
+verifiable_wm/
+├── compare.py
+└── trajectory_predictor/
+    ├── predictor_signed_tube_margin.py
+    └── ...
+```
+
+---
+
+## 3. 数据划分与防止数据泄漏
+
+推荐的数据角色为：
+
+```text
+训练来源
+├── fit set          更新模型参数
+└── selection set    选择最佳 checkpoint
+
+calibration set      计算 CP-D 和 CP-R
+test set             最终评价
+```
+
+这四个角色应严格分离。尤其不能使用参与 Predictor 训练的轨迹进行 Conformal
+校准，否则得到的误差半径和 coverage 会过于乐观。
+
+如果输入 NPZ 已包含独立训练、验证和测试 split：
+
+```text
+train_traj  -> Predictor 训练来源，再拆成 fit/selection
+val_traj    -> 独立 calibration set
+test_traj   -> 最终评价
+```
+
+这种情况下不会另外生成 `conformal_real_trajectories.npz`，因为原始
+`val_traj` 已经是独立校准集。
+
+如果输入数据缺少 `train_traj` 且：
+
+```python
+MISSING_TRAIN_POLICY = "split_val"
+```
+
+程序会确定性地将原始 `val_traj` 拆为 Predictor 训练来源和独立 calibration set，
+再把训练来源拆成 fit/selection。实际数量由 `DERIVED_TRAIN_RATIO` 和
+`TRAIN_FIT_RATIO` 决定。
+
+例如原始 `val_traj` 有 400 条、两级比例分别为 0.8 和 0.9 时：
+
+```text
+原始 val：400
+├── Predictor 训练来源：320
+│   ├── fit：288
+│   └── selection：32
+└── 独立 calibration：80
+
+原始 test：400，只用于最终测试
+```
+
+原始 NPZ 始终只读。拆分索引与源数据指纹保存在 checkpoint 中，构建阶段会重新
+验证并复用同一组 calibration indices。
+
+---
+
+## 4. 输入文件
+
+### 4.1 `real_trajectories.npz`
+
+典型字段：
+
+```text
+train_traj / val_traj / test_traj
+train_actions / val_actions / test_actions
+```
+
+并非每个数据集都必须同时存在三个 trajectory split；具体处理方式由
+`MISSING_TRAIN_POLICY` 决定。
+
+基本要求：
+
+- trajectory shape 为 `(N, H+1, state_dim)`；
+- action shape 为 `(N, H, action_dim)`；
+- 同一 split 的 trajectory 与 action 样本数量一致；
+- 数据 horizon 与 `config.py` 一致；
+- 不包含 NaN 或 Inf。
+
+### 4.2 `safety_result.json`
+
+必须提供 verification grid 和 cells，主要字段为：
+
+```text
+grid.dims
+cells
+```
+
+`grid.dims` 的维数必须与 checkpoint 中的 `state_dim` 一致。该文件仅提供 cell
+初始范围；Predictor 不使用其中的 StarV reachable tube 作为训练标签。
+
+---
+
+## 5. 输出文件
+
+### 5.1 `predictor_transformer.pth`
+
+训练好的 PyTorch checkpoint，包含模型权重、normalization、网络结构、训练信息、
+数据划分索引和源数据指纹。
+
+它不是轨迹文件，不能直接传给 `compare.py` 或 signed-margin 程序。
+
+### 5.2 `predictor_trajectories.npz`
+
+保存 Predictor 对真实数据初始状态的预测结果。主要包括：
+
+```text
+val_traj / val_actions
+test_traj / test_actions
+环境、checkpoint、源索引等元数据
+```
+
+具体包含哪些 split 取决于输入数据和构建策略。
+
+其中：
+
+- `*_traj` 是 Predictor 生成的状态轨迹；
+- `*_actions` 是从真实 NPZ 中复制的对应 actions；
+- calibration split 用于与真实校准轨迹配对；
+- test split 用于最终评价。
+
+### 5.3 `conformal_real_trajectories.npz`（按需生成）
+
+保存独立 calibration set 的真实轨迹及对应 actions。它只用于 Conformal 校准，
+不用于模型训练，也不替代最终测试数据。
+
+该文件只在 `MISSING_TRAIN_POLICY="split_val"` 实际生效时生成。源数据已有
+`train_traj` 时，应直接使用原始 NPZ 中未参与训练的 `val_traj` 进行校准。
+
+两个 NPZ 的核心区别：
+
+| 文件 | `val_traj` 的含义 |
+|---|---|
+| `conformal_real_trajectories.npz` | 独立校准样本的真实轨迹 |
+| `predictor_trajectories.npz` | 同一批初始状态对应的 Predictor 预测轨迹 |
+
+### 5.4 `predictor_tube.json`
+
+保存每个 cell 的时序 min/max 包络，主要字段包括：
 
 ```text
 method
@@ -521,317 +496,384 @@ sampling_strategy
 samples_per_cell
 horizon
 state_dim
-source_grid_result
-checkpoint
-trajectory_file
-best_epoch
-best_selection_loss
-training_protocol
 grid
-cells
+cells[].bounds
 ```
 
-每个 cell 的结构：
-
-```json
-{
-  "bounds": [],
-  "raw_bounds": [],
-  "initial_bounds": [],
-  "trajectory_file": "predictor_trajectories.npz",
-  "trajectory_index": 0
-}
-```
-
-其中：
+Raw Predictor tube 是有限采样包络，不是形式化 reachable set。JSON 会明确记录：
 
 ```text
-bounds shape = (horizon + 1, state_dim, 2)
+sampled envelope; no formal coverage guarantee
 ```
 
-`trajectory_index` 对应 NPZ 中：
+### 5.5 最终评估结果
+
+`predictor_signed_tube_margin.py` 会生成：
 
 ```text
-trajectories[trajectory_index]
+tube_table_metrics.csv
+tube_table_metrics_raw.csv
+tube_calibrations.json
+signed_tube_margin_summary.json
+
+real_vs_raw_tube.png
+model_vs_raw_tube.png
+real_vs_cp_d_tube.png
+model_vs_cp_d_tube.png
+real_vs_cp_r_tube.png
+model_vs_cp_r_tube.png
 ```
 
-JSON 会明确记录：
+这些文件分别保存汇总指标、校准半径和可视化结果。当前 `main()` 不生成逐轨迹的
+`*_signed_tube_margins.csv`。
+
+---
+
+## 6. 配置与运行
+
+### 6.1 放入项目
+
+推荐目录结构：
 
 ```text
-guarantee_type = sampled envelope; no formal coverage guarantee
+verifiable_wm/
+├── compare.py
+└── trajectory_predictor/
+    ├── README.md
+    ├── config.py
+    ├── predictor_model.py
+    ├── train_predictor.py
+    ├── build_predictor.py
+    ├── predictor_conformal.py
+    └── predictor_signed_tube_margin.py
 ```
 
-## 15. 与 `compare.py` 配合
-
-`predictor_tube.json` 使用 `grid` 和 `cells[*].bounds` 结构，可以作为 tube JSON 传给相应版本的 `compare.py`：
+进入项目根目录：
 
 ```bash
-python compare.py \
-  --env cartpole \
-  --safety /path/to/predictor_tube.json \
+cd /home/UFAD/xinyangwang/projects/verifiable_wm
+```
+
+核心依赖：
+
+```text
+Python 3.9+
+NumPy
+PyTorch
+Matplotlib
+```
+
+### 6.2 修改配置
+
+打开：
+
+```text
+trajectory_predictor/config.py
+```
+
+至少检查：
+
+```python
+ENVIRONMENT
+REAL_TRAJECTORIES
+GRID_RESULT
+HORIZON
+OUTPUT_DIRECTORY
+MISSING_TRAIN_POLICY
+```
+
+确保 `HORIZON` 与真实 NPZ 的轨迹长度以及 checkpoint 一致。
+
+### 6.3 训练
+
+```bash
+python trajectory_predictor/train_predictor.py
+```
+
+输出：
+
+```text
+trajectory_predictor/models/<environment>/
+└── predictor_transformer.pth
+```
+
+### 6.4 构建 Predictor 输出
+
+```bash
+python trajectory_predictor/build_predictor.py
+```
+
+输出：
+
+```text
+trajectory_predictor/models/<environment>/
+├── predictor_transformer.pth
+├── predictor_trajectories.npz
+├── predictor_tube.json
+└── conformal_real_trajectories.npz  # 仅 split_val 时生成
+```
+
+构建程序会检查：
+
+- checkpoint 与源数据是否一致；
+- state dimension 与 horizon 是否一致；
+- calibration indices 是否有效；
+- 真实/预测校准轨迹是否一一对应；
+- 初始状态和 actions 是否对齐；
+- grid 维数是否正确；
+- 输出是否包含 NaN 或 Inf。
+
+验证通过后才写入最终文件。
+
+### 6.5 可选：单独计算 CP-D
+
+```bash
+python trajectory_predictor/predictor_conformal.py \
+  --env <environment> \
+  --real trajectory_predictor/models/<environment>/conformal_real_trajectories.npz \
+  --dwm trajectory_predictor/models/<environment>/predictor_trajectories.npz \
+  --split val \
+  --alpha 0.05 \
+  --output trajectory_predictor/models/<environment>/conformal_result.json
+```
+
+这一步不是必须的；最终评估程序会自动计算 CP-D。
+
+### 6.6 最终评估
+
+```bash
+python trajectory_predictor/predictor_signed_tube_margin.py \
+  --env <environment> \
+  --safety trajectory_predictor/models/<environment>/predictor_tube.json \
   --real /path/to/real_trajectories.npz \
-  --dwm /path/to/dwm_trajectories.npz \
-  --outdir /path/to/predictor_results/cartpole
+  --model trajectory_predictor/models/<environment>/predictor_trajectories.npz \
+  --calibration-real /path/to/independent_calibration_real.npz \
+  --outdir trajectory_predictor/predictor_results/<environment>/signed_margin
 ```
 
-这里：
+`--calibration-real` 应指向独立真实校准集。不要把参与 Predictor 训练的数据用于
+Conformal 校准：
 
-```text
---safety = predictor_tube.json
---real   = 真实轨迹
---dwm    = compare.py 要求的另一组轨迹数据
-```
+- 源 NPZ 有 `train_traj`：可将原始 `real_trajectories.npz` 传给该参数，程序使用
+  其中未参与训练的 `val_traj`；
+- 使用 `split_val`：传入构建阶段生成的
+  `conformal_real_trajectories.npz`。
 
-当前附件源码生成的 `predictor_trajectories.npz` 没有 `test_traj`，不能直接作为要求 `test_traj` 的 `compare.py --dwm` 输入。若直接传入，通常会出现：
-
-```text
-KeyError: test_traj
-```
-
-如果目标是让 predictor 轨迹直接与真实轨迹逐条对比，需要先实现上一节所述的 split-compatible 输出格式。
-
-## 16. 环境兼容性
-
-模型本身不硬编码 Pendulum、Mountain Car 或 CartPole 的动力学。只要：
-
-- 真实轨迹的 `state_dim` 正确；
-- checkpoint 的 `state_dim` 与 grid 维度一致；
-- 真实轨迹长度不少于要求的 horizon；
-- `real_trajectories.npz` 包含三个必需 split；
-
-同一套代码就可以训练不同环境。
-
-环境名称在当前 `build_tube.py` 中主要是写入 JSON 的元数据，不负责选择数据路径，也不会改变模型结构。
-
-### Brake System
-
-当前附件中的 Brake System 数据只有：
-
-```text
-val_traj
-test_traj
-```
-
-并且是 10 个 transition：
-
-```text
-(N, 11, 2)
-```
-
-而当前训练代码：
-
-- 强制要求 `train_traj`；
-- 默认要求 horizon 20；
-- 没有 `--missing-train-policy` 参数。
-
-因此它不能直接训练当前 Brake System 数据。运行：
+默认情况下，程序会保护已有结果并拒绝覆盖非空输出目录。如需明确覆盖：
 
 ```bash
-python train_predictor.py --missing-train-policy split-val
+... --overwrite
 ```
 
-会得到：
+---
+
+## 7. CP-D 与 CP-R 的区别
+
+### CP-D：校准轨迹预测误差
+
+CP-D 直接比较真实轨迹与 Predictor 轨迹：
 
 ```text
-error: unrecognized arguments: --missing-train-policy split-val
+真实校准轨迹
+      ↕ L2 trajectory distance
+Predictor 校准轨迹
+      ↓
+Gamma_D
+      ↓
+膨胀 Raw tube
 ```
 
-要正式支持 Brake System，推荐重新生成独立的：
+它回答的是：
+
+> Predictor 的完整轨迹预测误差通常需要多大的半径覆盖？
+
+### CP-R：校准 Raw tube 的越界程度
+
+CP-R 直接计算真实校准轨迹相对于 Raw Predictor tube 的 signed margin：
 
 ```text
-train_traj
-val_traj
-test_traj
+真实校准轨迹
+      ↕ Raw tube boundary
+越界分数
+      ↓
+Gamma_R
+      ↓
+膨胀 Raw tube
 ```
 
-并使用：
+它回答的是：
 
-```bash
-python train_predictor.py \
-  --real /path/to/brake_system/real_trajectories.npz \
-  --checkpoint /path/to/brake_system/predictor_transformer.pth \
-  --horizon 10
-```
+> Raw tube 还需要向外扩大多少，才能达到目标校准覆盖水平？
 
-如果暂时从 `val_traj` 中划分训练数据，需要先修改 `data_utils.py` 和 `train_predictor.py`；当前源码不会自动执行该策略。
+因此：
 
-## 17. 常见错误
+| 方法 | 校准对象 | 反映的问题 |
+|---|---|---|
+| CP-D | 真实轨迹与 Predictor 轨迹 | 模型轨迹预测误差 |
+| CP-R | 真实轨迹与 Raw Predictor tube | 原始 tube 的覆盖缺口 |
 
-### 缺少 `train_traj`
+---
 
-```text
-KeyError: missing keys ['train_traj']
-```
+## 8. 检查 `split_val` 生成的校准 NPZ
 
-原因：当前 loader 要求 `train_traj`、`val_traj` 和 `test_traj` 同时存在。
-
-### `--missing-train-policy` 无法识别
-
-```text
-error: unrecognized arguments: --missing-train-policy split-val
-```
-
-原因：该参数不在当前附件版本的 `train_predictor.py` 中。
-
-### 数据只有 10 步，但要求 20 步
-
-```text
-only contains 10 transition steps, but horizon=20 was requested
-```
-
-解决方法：
-
-```bash
---horizon 10
-```
-
-### Checkpoint horizon 不够
-
-```text
-checkpoint only predicts 10 steps, but --horizon=20 was requested
-```
-
-`build_tube.py` 的 horizon 不能大于训练 checkpoint 的 horizon。
-
-### Grid 维度和模型不一致
-
-```text
-grid_dim=... does not match model state_dim=...
-```
-
-检查 `--grid-result` 和 `--checkpoint` 是否来自同一环境。
-
-### JSON 环境名称错误
-
-如果没有显式设置 `--env-name`，当前默认值是 `pendulum`。即使模型和 grid 来自其他环境，JSON 仍会写成 Pendulum。
-
-推荐始终显式传入：
-
-```bash
---env-name cartpole
-```
-
-### `compare.py` 找不到 `test_traj`
-
-原因：当前 `predictor_trajectories.npz` 是 cell 格式，不是 train/val/test split 格式。
-
-## 18. 检查 NPZ
-
-查看字段、shape 和 dtype：
+以下检查适用于构建阶段生成了
+`conformal_real_trajectories.npz` 的情况。查看字段、shape 和 dtype：
 
 ```bash
 python - <<'PY'
 import numpy as np
 
-path = "/path/to/predictor_trajectories.npz"
-with np.load(path, allow_pickle=False) as data:
-    for key in data.files:
-        value = data[key]
-        print(f"{key:20s} shape={value.shape} dtype={value.dtype}")
+root = "trajectory_predictor/models/<environment>"
+paths = [
+    f"{root}/conformal_real_trajectories.npz",
+    f"{root}/predictor_trajectories.npz",
+]
+
+for path in paths:
+    print(f"\n=== {path} ===")
+    with np.load(path, allow_pickle=False) as data:
+        for key in data.files:
+            value = data[key]
+            print(f"{key:32s} shape={str(value.shape):18s} dtype={value.dtype}")
 PY
 ```
 
-检查是否存在 NaN 或 Inf：
+检查校准数据是否正确配对：
 
 ```bash
 python - <<'PY'
 import numpy as np
 
-path = "/path/to/predictor_trajectories.npz"
-with np.load(path, allow_pickle=False) as data:
-    for key in ("initial_bounds", "initial_states", "trajectories", "lower", "upper"):
-        value = data[key]
-        print(key, np.isfinite(value).all())
+root = "trajectory_predictor/models/<environment>"
+with np.load(
+    f"{root}/conformal_real_trajectories.npz",
+    allow_pickle=False,
+) as real, np.load(
+    f"{root}/predictor_trajectories.npz",
+    allow_pickle=False,
+) as pred:
+    print("real val:", real["val_traj"].shape)
+    print("pred val:", pred["val_traj"].shape)
+    print(
+        "initial states equal:",
+        np.array_equal(
+            real["val_traj"][:, 0, :],
+            pred["val_traj"][:, 0, :],
+        ),
+    )
+    print(
+        "actions equal:",
+        np.array_equal(real["val_actions"], pred["val_actions"]),
+    )
 PY
 ```
 
-## 19. 检查 Tube JSON
-
-```bash
-python - <<'PY'
-import json
-import numpy as np
-
-path = "/path/to/predictor_tube.json"
-with open(path, "r", encoding="utf-8") as f:
-    data = json.load(f)
-
-bounds = np.asarray([cell["bounds"] for cell in data["cells"]], dtype=float)
-
-print("environment :", data["environment"])
-print("cells       :", len(data["cells"]))
-print("bounds shape:", bounds.shape)
-print("finite      :", np.isfinite(bounds).all())
-print("lower<=upper:", np.all(bounds[..., 0] <= bounds[..., 1]))
-PY
-```
-
-## 20. 推荐运行顺序
-
-```bash
-# 1. 检查真实轨迹格式
-python -c "import numpy as np; d=np.load('/path/to/real_trajectories.npz'); print(d.files); [print(k, d[k].shape) for k in d.files]"
-
-# 2. 训练 predictor
-python train_predictor.py \
-  --real /path/to/real_trajectories.npz \
-  --checkpoint /path/to/predictor_transformer.pth \
-  --horizon 20
-
-# 3. 构建 predictor tube
-python build_tube.py \
-  --grid-result /path/to/safety_result.json \
-  --checkpoint /path/to/predictor_transformer.pth \
-  --trajectory-output /path/to/predictor_trajectories.npz \
-  --tube-output /path/to/predictor_tube.json \
-  --env-name cartpole \
-  --samples-per-cell 3 \
-  --horizon 20
-
-# 4. 检查 NPZ 和 JSON
-# 使用第 18、19 节中的检查命令
-
-# 5. 运行 compare.py
-python compare.py \
-  --env cartpole \
-  --safety /path/to/predictor_tube.json \
-  --real /path/to/real_trajectories.npz \
-  --dwm /path/to/dwm_trajectories.npz \
-  --outdir /path/to/predictor_results/cartpole
-```
-
-## 21. 当前版本总结
-
-当前附件版本已经实现：
-
-- Transformer 从初始状态直接预测完整轨迹；
-- 每个 cell 总共采样 3 个点；
-- 默认预测 20 个 transition；
-- 所有 cell 轨迹统一保存到一个 NPZ；
-- 根据 3 条轨迹的逐维最小值和最大值构建 tube；
-- 输出包含 grid 和 cell bounds 的 JSON；
-- checkpoint early stopping 和训练数据 normalization。
-
-当前附件版本尚未实现：
-
-- Brake System 缺少 `train_traj` 时的自动划分；
-- `--missing-train-policy split-val`；
-- 根据环境名称自动切换路径；
-- `--env` 统一环境参数；
-- 与 `real_trajectories.npz` 相同的 train/val/test predictor 输出格式；
-- conformal calibration；
-- predictor tube 的形式化覆盖保证。
-
-实验中应始终区分：
+正确结果应满足：
 
 ```text
-高 containment
+真实和预测 val_traj 的 shape 相同
+initial states equal: True
+actions equal: True
 ```
 
-和：
+---
+
+## 9. 常见问题
+
+### checkpoint 缺少数据划分信息
+
+旧 checkpoint 可能没有保存 calibration indices 或源数据指纹。重新训练并构建：
+
+```bash
+python trajectory_predictor/train_predictor.py
+python trajectory_predictor/build_predictor.py
+```
+
+### 数据指纹不一致
+
+当前 `real_trajectories.npz` 与训练 checkpoint 使用的数据不同，或相关轨迹的内容、
+顺序发生了变化。确认 `config.py` 中的数据路径；如果数据已经更新，需要重新训练。
+
+### horizon 不一致
+
+真实轨迹的时间长度应为：
 
 ```text
-小而精确、具有实际对比意义的 tube
+HORIZON + 1
 ```
 
-简单扩大 tube 可以提高 containment，但不一定代表 predictor 更准确。当前三点 min/max 方法的 tube 大小主要由模型预测误差、cell 尺寸、采样位置和系统非线性共同决定。
+actions 的时间长度应为：
+
+```text
+HORIZON
+```
+
+修改 `config.py` 后必须重新训练，不能直接用不同 horizon 的旧 checkpoint。
+
+### 输出目录非空
+
+最终评估默认不覆盖旧结果。可改用新的 `--outdir`，或确认后添加：
+
+```bash
+--overwrite
+```
+
+### 找不到 `compare.py`
+
+从项目根目录运行，并确保：
+
+```text
+verifiable_wm/compare.py
+verifiable_wm/trajectory_predictor/
+```
+
+### CUDA 或内存不足
+
+在 `config.py` 中减小训练或推理 batch size，也可以设置：
+
+```python
+DEVICE = "cpu"
+```
+
+---
+
+## 10. 当前方法的边界
+
+1. Predictor 只根据初始状态预测完整轨迹，不把 actions 作为输入。
+2. 该模型预测的是训练数据中闭环控制策略对应的轨迹，不是任意 action 下的动力学。
+3. 每个 cell 仅采样 lower corner、center 和 upper corner。
+4. 三点位于 cell 的一条对角线上，不能代表 cell 内所有可能初始状态。
+5. Raw Predictor tube 是采样轨迹的 min/max 包络，不是形式化 reachable set。
+6. CP-D 和 CP-R 的有效性依赖独立、可交换的校准数据和正确的数据划分。
+7. 如果环境、控制器、轨迹 horizon 或数据分布改变，应重新训练和校准。
+
+---
+
+## 11. 最短运行流程
+
+```bash
+cd /home/UFAD/xinyangwang/projects/verifiable_wm
+
+# 1. 在 config.py 中确认环境、输入路径和输出路径
+
+# 2. 训练 Predictor
+python trajectory_predictor/train_predictor.py
+
+# 3. 生成预测轨迹、真实校准集和 Predictor tube
+python trajectory_predictor/build_predictor.py
+
+# 4. 校准并评估 Raw、CP-D 和 CP-R tube
+python trajectory_predictor/predictor_signed_tube_margin.py \
+  --env <environment> \
+  --safety trajectory_predictor/models/<environment>/predictor_tube.json \
+  --real /path/to/real_trajectories.npz \
+  --model trajectory_predictor/models/<environment>/predictor_trajectories.npz \
+  --calibration-real /path/to/independent_calibration_real.npz \
+  --outdir trajectory_predictor/predictor_results/<environment>/signed_margin
+```
+
+如果训练时使用 `split_val`，最后一个命令中的校准路径应为：
+
+```text
+trajectory_predictor/models/<environment>/conformal_real_trajectories.npz
+```
