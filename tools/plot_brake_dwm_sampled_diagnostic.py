@@ -12,6 +12,8 @@ from typing import Any, Sequence
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colormaps
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize
 from matplotlib.patches import Rectangle
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -36,13 +38,10 @@ DEFAULT_OUTPUT = PROJECT_ROOT / (
 )
 
 
-def build_diagnostic(
+def _validated_trajectories(
     real_trajectories: np.ndarray,
     model_trajectories: np.ndarray,
-    grid: stm.GridInfo,
-    cells: Sequence[dict[str, Any]],
-    dims: Sequence[int] = (0, 1),
-) -> dict[str, Any]:
+) -> tuple[np.ndarray, np.ndarray]:
     real_trajectories = np.asarray(real_trajectories)
     model_trajectories = np.asarray(model_trajectories)
     if real_trajectories.ndim != 3:
@@ -51,19 +50,18 @@ def build_diagnostic(
         )
     if model_trajectories.shape != real_trajectories.shape:
         raise ValueError("real and DWM trajectories must have equal shapes")
+    return real_trajectories, model_trajectories
 
-    valid = [
-        row
-        for row in stm.evaluate_set(
-            real_trajectories, grid, cells, dims
-        )
-        if row["status"] == "valid"
-    ]
-    if not valid:
-        raise ValueError("no real trajectory matches a valid tube cell")
-    worst = min(valid, key=lambda row: float(row["signed_margin"]))
-    trajectory_index = int(worst["traj_index"])
-    cell_index = int(worst["cell_index"])
+
+def _build_case(
+    real_trajectories: np.ndarray,
+    model_trajectories: np.ndarray,
+    cells: Sequence[dict[str, Any]],
+    row: dict[str, Any],
+    dims: Sequence[int],
+) -> dict[str, Any]:
+    trajectory_index = int(row["traj_index"])
+    cell_index = int(row["cell_index"])
     bounds = cells[cell_index]["bounds"]
     real = np.asarray(real_trajectories[trajectory_index], dtype=float)
     model = np.asarray(model_trajectories[trajectory_index], dtype=float)
@@ -108,6 +106,72 @@ def build_diagnostic(
     }
 
 
+def build_diagnostic(
+    real_trajectories: np.ndarray,
+    model_trajectories: np.ndarray,
+    grid: stm.GridInfo,
+    cells: Sequence[dict[str, Any]],
+    dims: Sequence[int] = (0, 1),
+) -> dict[str, Any]:
+    real_trajectories, model_trajectories = _validated_trajectories(
+        real_trajectories, model_trajectories
+    )
+    valid = [
+        row
+        for row in stm.evaluate_set(
+            real_trajectories, grid, cells, dims
+        )
+        if row["status"] == "valid"
+    ]
+    if not valid:
+        raise ValueError("no real trajectory matches a valid tube cell")
+    worst = min(valid, key=lambda row: float(row["signed_margin"]))
+    return _build_case(
+        real_trajectories, model_trajectories, cells, worst, dims
+    )
+
+
+def build_random_diagnostics(
+    real_trajectories: np.ndarray,
+    model_trajectories: np.ndarray,
+    grid: stm.GridInfo,
+    cells: Sequence[dict[str, Any]],
+    *,
+    count: int = 6,
+    seed: int = 728,
+    dims: Sequence[int] = (0, 1),
+) -> list[dict[str, Any]]:
+    real_trajectories, model_trajectories = _validated_trajectories(
+        real_trajectories, model_trajectories
+    )
+    valid = [
+        row
+        for row in stm.evaluate_set(
+            real_trajectories, grid, cells, dims
+        )
+        if row["status"] == "valid"
+    ]
+    if int(count) <= 0:
+        raise ValueError("random trajectory count must be positive")
+    if int(count) > len(valid):
+        raise ValueError(
+            "requested more trajectories than valid tube matches"
+        )
+    selected = np.random.default_rng(int(seed)).choice(
+        np.arange(len(valid)), int(count), replace=False
+    )
+    return [
+        _build_case(
+            real_trajectories,
+            model_trajectories,
+            cells,
+            valid[int(index)],
+            dims,
+        )
+        for index in selected
+    ]
+
+
 def _interval(bounds: Sequence[float]) -> tuple[float, float]:
     pairs = stm.interval_pairs(bounds)
     if len(pairs) != 1:
@@ -125,6 +189,16 @@ def _json_ready(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [_json_ready(item) for item in value]
     return value
+
+
+def random_figure_layout() -> dict[str, Any]:
+    return {
+        "title_y": 0.975,
+        "legend_y": 0.925,
+        "subplot_top": 0.86,
+        "subplot_right": 0.88,
+        "colorbar_rect": (0.91, 0.15, 0.015, 0.67),
+    }
 
 
 def write_diagnostic(
@@ -295,6 +369,139 @@ def write_diagnostic(
     return png_path, json_path
 
 
+def write_random_diagnostics(
+    payloads: Sequence[dict[str, Any]],
+    *,
+    seed: int,
+    safety_path: Path,
+    real_path: Path,
+    model_path: Path,
+    output_dir: Path,
+) -> tuple[Path, Path]:
+    if len(payloads) != 6:
+        raise ValueError("random diagnostic requires exactly six trajectories")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    png_path = (
+        output_dir
+        / "brake_dwm_sampled_tube_random6_complete_trajectories.png"
+    )
+    json_path = (
+        output_dir
+        / "brake_dwm_sampled_tube_random6_complete_trajectories.json"
+    )
+
+    max_step = max(len(payload["tube_bounds"]) - 1 for payload in payloads)
+    norm = Normalize(vmin=0, vmax=max(max_step, 1))
+    cmap = colormaps["Oranges"]
+    layout = random_figure_layout()
+    fig, axes = plt.subplots(2, 3, figsize=(19, 11), sharex=True, sharey=True)
+    for axis, payload in zip(axes.flat, payloads):
+        bounds = payload["tube_bounds"]
+        for step, step_bounds in enumerate(bounds):
+            low_dis, high_dis = _interval(step_bounds[0])
+            low_vel, high_vel = _interval(step_bounds[1])
+            color = cmap(norm(step))
+            axis.add_patch(
+                Rectangle(
+                    (low_dis, low_vel),
+                    high_dis - low_dis,
+                    high_vel - low_vel,
+                    facecolor=color,
+                    edgecolor=color,
+                    alpha=0.18,
+                    linewidth=1.3,
+                )
+            )
+        real = np.asarray(payload["real_states"], dtype=float)
+        model = np.asarray(payload["model_states"], dtype=float)
+        axis.plot(
+            real[:, 0], real[:, 1], "o-", color="tab:red", label="Real"
+        )
+        axis.plot(
+            model[:, 0],
+            model[:, 1],
+            "s--",
+            color="tab:blue",
+            label="DWM",
+        )
+        axis.scatter(
+            real[0, 0],
+            real[0, 1],
+            s=75,
+            color="green",
+            zorder=5,
+            label="Initial state",
+        )
+        first_out = payload["first_violating_step"]
+        if first_out is not None:
+            axis.scatter(
+                real[first_out, 0],
+                real[first_out, 1],
+                s=110,
+                facecolors="none",
+                edgecolors="black",
+                linewidths=1.8,
+                zorder=6,
+                label="First real violation",
+            )
+        axis.set_title(
+            f"traj {payload['trajectory_index']} | "
+            f"cell {payload['cell_index']} | "
+            f"first out {first_out}\n"
+            f"margin {payload['worst_real_margin']:.6g}"
+        )
+        axis.grid(alpha=0.25)
+    for axis in axes[-1, :]:
+        axis.set_xlabel("distance")
+    for axis in axes[:, 0]:
+        axis.set_ylabel("velocity")
+    handles, labels = axes.flat[0].get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, layout["legend_y"]),
+        ncol=4,
+    )
+    colorbar_axis = fig.add_axes(layout["colorbar_rect"])
+    fig.colorbar(
+        ScalarMappable(norm=norm, cmap=cmap),
+        cax=colorbar_axis,
+        label="tube time step",
+    )
+    fig.suptitle(
+        f"Brake complete Real/DWM trajectories with sampled tubes "
+        f"(random seed {seed})",
+        fontsize=15,
+        y=layout["title_y"],
+    )
+    fig.subplots_adjust(
+        top=layout["subplot_top"],
+        right=layout["subplot_right"],
+        hspace=0.28,
+        wspace=0.14,
+    )
+    fig.savefig(png_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+    saved = {
+        "seed": int(seed),
+        "selected_trajectory_indices": [
+            int(payload["trajectory_index"]) for payload in payloads
+        ],
+        "sources": {
+            "safety": str(safety_path),
+            "real": str(real_path),
+            "model": str(model_path),
+        },
+        "trajectories": payloads,
+    }
+    json_path.write_text(
+        json.dumps(_json_ready(saved), indent=2), encoding="utf-8"
+    )
+    return png_path, json_path
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--safety", type=Path, default=DEFAULT_SAFETY)
@@ -319,8 +526,21 @@ def main() -> None:
         model_path=args.model,
         output_dir=args.output_dir,
     )
+    random_payloads = build_random_diagnostics(
+        real, model, grid, cells, count=6, seed=728
+    )
+    random_png_path, random_json_path = write_random_diagnostics(
+        random_payloads,
+        seed=728,
+        safety_path=args.safety,
+        real_path=args.real,
+        model_path=args.model,
+        output_dir=args.output_dir,
+    )
     print(f"diagnostic plot: {png_path}")
     print(f"diagnostic values: {json_path}")
+    print(f"random-six plot: {random_png_path}")
+    print(f"random-six values: {random_json_path}")
 
 
 if __name__ == "__main__":
