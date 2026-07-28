@@ -17,9 +17,7 @@ import torch
 
 # Predictor runtime defaults.  The trajectory horizon is inferred from the
 # selected dataset/checkpoint unless the user explicitly supplies --horizon.
-# For the current verification grids, two state dimensions have non-zero
-# width.  Five samples therefore mean all four corners plus the cell center.
-DEFAULT_SAMPLES_PER_CELL = 5
+DEFAULT_SAMPLES_PER_CELL = 3
 
 
 # =============================================================================
@@ -32,12 +30,12 @@ DEFAULT_SAMPLES_PER_CELL = 5
 
 #DEFAULT_ENVIRONMENT = "brake_system"
 #DEFAULT_ENVIRONMENT = "cartpole"
-DEFAULT_ENVIRONMENT = "mountain_car"
-#DEFAULT_ENVIRONMENT = "pendulum"
+#DEFAULT_ENVIRONMENT = "mountain_car"
+DEFAULT_ENVIRONMENT = "pendulum"
 
 DEFAULT_DATA_ROOT = Path("/home/tealab_shared/safety_results")
 DEFAULT_PROJECT_ROOT = Path(
-    "/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor_2"
+    "/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor"
 )
 
 DEFAULT_REAL_PATH = (
@@ -46,8 +44,8 @@ DEFAULT_REAL_PATH = (
 DEFAULT_GRID_RESULT_PATH = (
 #    "/home/tealab_shared/safety_results/brake_system/safety_result.json"
 #    "/home/tealab_shared/safety_results/cartpole/safety_result_big_cell_a8_lamda01.json"
-   "/home/tealab_shared/safety_results/mountain_car/safety_result_big_cell_best.json" 
-#    "/home/tealab_shared/safety_results/pendulum/safety_result_big_cell_a16_lambda05.json"   
+#   "/home/tealab_shared/safety_results/mountain_car/safety_result_big_cell_best.json" 
+    "/home/tealab_shared/safety_results/pendulum/safety_result_big_cell_a16_lambda05.json"   
 )
 
 DEFAULT_MODEL_DIR = (

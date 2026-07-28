@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Grid handling, trajectory prediction, periodic angles, and tube saving."""
+"""Grid handling, three-point trajectory prediction, and tube saving."""
 
 from __future__ import annotations
 
@@ -13,13 +13,7 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 import torch
 
-from angle_utils import (
-    periodic_interval_to_json,
-    uses_periodic_angle,
-    wrap_angle_trajectories,
-)
 from predictor_model import TrajectoryTransformer, predict_trajectories
-from sampling_utils import sample_cell
 from trajectory_io import add_predicted_splits, load_reference_trajectory_npz
 
 
@@ -127,6 +121,28 @@ def load_grid(path: Path) -> Tuple[Dict[str, Any], Grid, np.ndarray]:
     return source, grid, np.stack(cell_bounds, axis=0)
 
 
+def sample_cell(bounds: np.ndarray, samples_per_cell: int = 3) -> np.ndarray:
+    """Return exactly ``samples_per_cell`` deterministic points in a cell.
+
+    Points are evenly spaced on the diagonal from the lower corner to the
+    upper corner.  With the required default of three this gives the lower
+    corner, cell center, and upper corner.  Including both corners also makes
+    the min/max envelope at step zero equal to the full initial cell.
+    """
+    bounds = np.asarray(bounds, dtype=np.float32)
+    if bounds.ndim != 2 or bounds.shape[1] != 2:
+        raise ValueError(f"bounds must have shape (state_dim, 2), got {bounds.shape}")
+    if samples_per_cell < 2:
+        raise ValueError("samples_per_cell must be at least 2")
+    if np.any(bounds[:, 0] > bounds[:, 1]):
+        raise ValueError("cell lower bounds must not exceed upper bounds")
+
+    weights = np.linspace(0.0, 1.0, samples_per_cell, dtype=np.float32)[:, None]
+    lower = bounds[:, 0][None, :]
+    upper = bounds[:, 1][None, :]
+    return lower + weights * (upper - lower)
+
+
 def build_raw_tubes(
     model: TrajectoryTransformer,
     mean: np.ndarray,
@@ -176,19 +192,14 @@ def build_raw_tubes(
     progress_interval = max(1, num_cells // 10)
     for cell_index, bounds in enumerate(cell_bounds):
         initial_states = sample_cell(bounds, samples_per_cell)
-        predictions_unwrapped = predict_trajectories(
+        predictions = predict_trajectories(
             model, initial_states, mean, std, batch_size, device
         )[:, : horizon + 1, :]
-        lower = predictions_unwrapped.min(axis=0)
-        upper = predictions_unwrapped.max(axis=0)
-        predictions_saved = (
-            wrap_angle_trajectories(predictions_unwrapped)
-            if uses_periodic_angle(environment)
-            else predictions_unwrapped
-        )
+        lower = predictions.min(axis=0)
+        upper = predictions.max(axis=0)
 
         all_initial_states[cell_index] = initial_states
-        all_trajectories[cell_index] = predictions_saved
+        all_trajectories[cell_index] = predictions
         raw_tubes[cell_index, :, :, 0] = lower
         raw_tubes[cell_index, :, :, 1] = upper
 
@@ -204,14 +215,9 @@ def build_raw_tubes(
     predicted_splits = {}
     print("========== Reference-format trajectories ==========")
     for split_key, initial_states in split_initial_states.items():
-        split_predictions = predict_trajectories(
+        predicted_splits[split_key] = predict_trajectories(
             model, initial_states, mean, std, batch_size, device
         )[:, : horizon + 1, :]
-        predicted_splits[split_key] = (
-            wrap_angle_trajectories(split_predictions)
-            if uses_periodic_angle(environment)
-            else split_predictions
-        )
         print(f"{split_key:<18}: {predicted_splits[split_key].shape}")
 
     output_payload = add_predicted_splits(
@@ -229,9 +235,6 @@ def build_raw_tubes(
             "trajectories": all_trajectories,
             "lower": raw_tubes[..., 0],
             "upper": raw_tubes[..., 1],
-            "tube_internal_representation": np.asarray(
-                "unwrapped_theta" if uses_periodic_angle(environment) else "linear"
-            ),
             "horizon": np.asarray(horizon, dtype=np.int64),
             "samples_per_cell": np.asarray(samples_per_cell, dtype=np.int64),
             "environment": np.asarray(environment),
@@ -288,25 +291,10 @@ def save_tube_json(
 
     cells = []
     for i in range(grid.total_cells):
-        raw_bounds = raw_tubes[i].astype(float).tolist()
-        if uses_periodic_angle(environment):
-            bounds = []
-            for time_bounds in raw_tubes[i]:
-                dimensions = []
-                for dim, (lower, upper) in enumerate(time_bounds):
-                    if dim == 0:
-                        dimensions.append(
-                            periodic_interval_to_json(float(lower), float(upper))
-                        )
-                    else:
-                        dimensions.append([float(lower), float(upper)])
-                bounds.append(dimensions)
-        else:
-            bounds = raw_bounds
         cells.append(
             {
-                "bounds": bounds,
-                "raw_bounds": raw_bounds,
+                "bounds": raw_tubes[i].astype(float).tolist(),
+                "raw_bounds": raw_tubes[i].astype(float).tolist(),
                 "initial_bounds": cell_bounds[i].astype(float).tolist(),
                 "trajectory_file": trajectory_file,
                 "trajectory_index": i,
@@ -315,15 +303,10 @@ def save_tube_json(
 
     best_selection_loss = checkpoint.get("best_selection_loss")
     payload = {
-        "method": "transformer_corner_center_minmax_envelope",
+        "method": "transformer_three_sample_minmax_envelope",
         "environment": environment,
         "guarantee_type": "sampled envelope; no formal coverage guarantee",
-        "sampling_strategy": "all_active_corners_center_then_halton",
-        "angle_representation": (
-            "unwrapped_internal_wrapped_union_json"
-            if uses_periodic_angle(environment)
-            else "linear"
-        ),
+        "sampling_strategy": "lower_corner_center_upper_corner",
         "samples_per_cell": int(samples_per_cell),
         "horizon": int(raw_tubes.shape[1] - 1),
         "state_dim": int(raw_tubes.shape[2]),

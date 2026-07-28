@@ -12,7 +12,6 @@ from typing import Dict
 import torch
 from torch.utils.data import DataLoader
 
-from angle_utils import unwrap_angle_trajectories, uses_periodic_angle
 from config import (
     DEFAULT_CHECKPOINT_PATH,
     DEFAULT_ENVIRONMENT,
@@ -177,16 +176,6 @@ def main() -> None:
         available_horizon if args.horizon is None else int(args.horizon)
     )
     splits = truncate_trajectory_splits(loaded_splits, requested_horizon)
-    angle_representation = "linear"
-    angle_dim = None
-    if uses_periodic_angle(args.env):
-        splits = {
-            key: unwrap_angle_trajectories(trajectories)
-            for key, trajectories in splits.items()
-        }
-        angle_representation = "unwrapped_theta"
-        angle_dim = 0
-
     fit_traj, selection_traj = split_fit_selection(
         splits["train_traj"], args.fit_ratio, args.split_seed
     )
@@ -223,7 +212,6 @@ def main() -> None:
     print(f"environment: {args.env}")
     print(f"device     : {device}")
     print(f"horizon    : {horizon}")
-    print(f"angle repr : {angle_representation}")
     print(f"missing train policy: {args.missing_train_policy}")
     print(f"fit        : {fit_traj.shape}")
     print(f"selection  : {selection_traj.shape}")
@@ -284,8 +272,6 @@ def main() -> None:
                     "best_selection_loss": float(selection_loss),
                     "source_real_trajectories": str(args.real),
                     "environment": args.env,
-                    "angle_representation": angle_representation,
-                    "angle_dim": angle_dim,
                     "training_protocol": {
                         "fit_source": "fit part of train_traj",
                         "selection_source": "held-out part of train_traj",
@@ -296,9 +282,6 @@ def main() -> None:
                         "missing_train_policy": args.missing_train_policy,
                         "derived_train_ratio": float(args.derived_train_ratio),
                         "test_used_for_training": False,
-                        "pendulum_theta_unwrapped_before_training": (
-                            angle_representation == "unwrapped_theta"
-                        ),
                     },
                 },
                 args.checkpoint,

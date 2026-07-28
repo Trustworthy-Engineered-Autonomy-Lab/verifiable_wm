@@ -10,6 +10,7 @@ outside.  Each trajectory is assigned its smallest state margin.
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import json
 import math
@@ -18,6 +19,9 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import numpy as np
+
+import compare
+import conformal
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -29,25 +33,98 @@ ENV_DIMS = {
 }
 EPS = 1e-10
 
-# Edit these paths directly when running this script without terminal options.
-# DEFAULT_ENV = "cartpole"
-# DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/cartpole/safety_result_cell_100_a8_lamda01.json"
-# DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/data_cell_100/real_trajectories.npz"
-# DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/data_cell_100/dwm_trajectories_saliency.npz"
-# DEFAULT_OUT_DIR = PROJECT_ROOT / "results/cartpole/signed_tube_margin"
+# Edit these three values when running this script directly without arguments.
+DEFAULT_ENV = "cartpole"
+DEFAULT_DECODER = "dwm"
+DEFAULT_CONSTRUCTION = "symbolic"
 
-DEFAULT_ENV = "mountain_car"
-DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/mountain_car/safety_result_cell_100_a16_lambda05.json"
-DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/real_trajectories.npz"
-DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/mountain_car/data_cell_100/dwm_trajectories_saliency.npz"
-DEFAULT_OUT_DIR = PROJECT_ROOT / "results/mountain_car/signed_tube_margin"
+CASE_DIRS = {
+    ("dwm", "symbolic"): "a_dwm_symbolic",
+    ("cgan", "symbolic"): "a_cgan_symbolic",
+    ("dwm", "sampled"): "b_dwm_sampled",
+    ("cgan", "sampled"): "b_cgan_sampled",
+}
 
-# DEFAULT_ENV = "pendulum"
-# DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/pendulum/safety_result_cell_100_a16_lambda05.json"
-# DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/data_cell_100/real_trajectories.npz"
-# DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/pendulum/data_cell_100/dwm_trajectories_saliency.npz"
-# DEFAULT_OUT_DIR = PROJECT_ROOT / "results/pendulum/signed_tube_margin"
+DWM_INPUTS = {
+    "cartpole": (
+        "results/cartpole/safety_result_big_cell_a8_lamda01.json",
+        "datasets/cartpole/big_cell/real_trajectories.npz",
+        "datasets/cartpole/big_cell/dwm_trajectories_saliency.npz",
+    ),
+    "mountain_car": (
+        "results/mountain_car/safety_result_big_cell_best.json",
+        "datasets/mountain_car/big_cell_best/real_trajectories.npz",
+        "datasets/mountain_car/big_cell_best/dwm_trajectories_saliency.npz",
+    ),
+    "pendulum": (
+        "results/pendulum/safety_result_big_cell_a16_lambda05.json",
+        "datasets/pendulum/big_cell/real_trajectories.npz",
+        "datasets/pendulum/big_cell/dwm_trajectories_saliency.npz",
+    ),
+    "brake_system": (
+        "safety_results/brake_system/safety_result.json",
+        "safety_results/brake_system/real_trajectories.npz",
+        "safety_results/brake_system/dwm_trajectories_saliency.npz",
+    ),
+}
 
+SAMPLED_TUBES = {
+    ("cartpole", "dwm"): "results/cartpole/sampled_tube/sampled_reachable_tube_saliency_seed_2025.json",
+    ("mountain_car", "dwm"): "results/mountain_car/sampled_tube/sampled_reachable_tube_saliency_seed_2025.json",
+    ("pendulum", "dwm"): "results/pendulum/sampled_tube/sampled_reachable_tube_saliency_seed_2025.json",
+    ("brake_system", "dwm"): "results/brake_system/sampled_tube/sampled_reachable_tube_old_seed_2025.json",
+    ("cartpole", "cgan"): "results/cartpole/sampled_tube/sampled_reachable_tube_g_mlp_seed_2025.json",
+    ("mountain_car", "cgan"): "results/mountain_car/sampled_tube/sampled_reachable_tube_g_mlp_seed_2025.json",
+    ("pendulum", "cgan"): "results/pendulum/sampled_tube/sampled_reachable_tube_g_mlp_seed_2025.json",
+    ("brake_system", "cgan"): "results/brake_system/sampled_tube/sampled_reachable_tube_g_mlp_seed_2025.json",
+}
+
+
+@dataclass(frozen=True)
+class Experiment:
+    env: str
+    decoder: str
+    construction: str
+    safety: Path
+    real: Path
+    model: Path
+    outdir: Path
+
+
+def resolve_experiment(
+    env: str,
+    decoder: str,
+    construction: str,
+    project_root: Path = PROJECT_ROOT,
+) -> Experiment:
+    if env not in ENV_DIMS:
+        raise ValueError(f"unknown environment: {env}")
+    if (decoder, construction) not in CASE_DIRS:
+        raise ValueError(
+            f"unknown Table III case: decoder={decoder}, construction={construction}"
+        )
+
+    if decoder == "dwm":
+        symbolic_safety, real, model = DWM_INPUTS[env]
+    else:
+        symbolic_safety = f"safety_results/{env}/safety_result_g_mlp.json"
+        real = f"safety_results/{env}/real_trajectories.npz"
+        model = f"safety_results/{env}/dwm_trajectories_g_mlp.npz"
+
+    safety = (
+        symbolic_safety
+        if construction == "symbolic"
+        else SAMPLED_TUBES[(env, decoder)]
+    )
+    return Experiment(
+        env=env,
+        decoder=decoder,
+        construction=construction,
+        safety=project_root / safety,
+        real=project_root / real,
+        model=project_root / model,
+        outdir=project_root / "results" / env / CASE_DIRS[(decoder, construction)],
+    )
 
 @dataclass
 class GridInfo:
@@ -208,6 +285,97 @@ def evaluate_set(
     return rows
 
 
+def calibration_gamma(
+    calibration_trajectories: np.ndarray,
+    grid: GridInfo,
+    cells: Sequence[dict[str, Any]],
+    dims: Sequence[int],
+) -> tuple[float, float]:
+    """Calibrate one scalar inflation from the rank-380 signed margin."""
+    if calibration_trajectories.ndim != 3:
+        raise ValueError(
+            "calibration trajectories must have shape (N, T+1, state_dim), "
+            f"got {calibration_trajectories.shape}"
+        )
+    rows = evaluate_set(calibration_trajectories, grid, cells, dims)
+    scores = [float(row["signed_margin"]) for row in rows if row["status"] == "valid"]
+    if len(rows) != 400 or len(scores) != 400:
+        raise ValueError(
+            "rank-380 calibration requires exactly 400 valid trajectories, "
+            f"got valid={len(scores)}, total={len(rows)}"
+        )
+    rank_margin = descending_p95(scores)
+    return max(0.0, -rank_margin), rank_margin
+
+
+def inflate_cells(
+    cells: Sequence[dict[str, Any]], dims: Sequence[int], epsilons: Sequence[float]
+) -> list[dict[str, Any]]:
+    """Return copied cells with selected bounds symmetrically expanded."""
+    if len(dims) != len(epsilons):
+        raise ValueError("each selected dimension needs one inflation epsilon")
+    inflated = copy.deepcopy(cells)
+    for cell in inflated:
+        for state_bounds in cell.get("bounds", []):
+            for dim, epsilon in zip(dims, epsilons):
+                if dim < 0 or dim >= len(state_bounds):
+                    raise ValueError(f"tube bounds do not contain selected dimension {dim}")
+                values = np.asarray(state_bounds[dim], dtype=float).reshape(-1)
+                if values.size < 2 or values.size % 2:
+                    raise ValueError("tube bounds must contain low/high pairs")
+                values[0::2] -= float(epsilon)
+                values[1::2] += float(epsilon)
+                state_bounds[dim] = values.tolist()
+    return inflated
+
+
+def build_tube_variants(
+    *,
+    cells: Sequence[dict[str, Any]],
+    grid: GridInfo,
+    dims: Sequence[int],
+    calibration_trajectories: np.ndarray,
+    real_path: Path,
+    model_path: Path,
+    env: str,
+    alpha: float,
+    require_matching_starv_config: bool = True,
+) -> tuple[dict[str, Sequence[dict[str, Any]]], dict[str, dict[str, Any]]]:
+    """Build the raw tube and its CP-D and CP-R scalar inflations."""
+    cp_d = conformal.calibrate_gamma(
+        real_path=real_path,
+        dwm_path=model_path,
+        dims=dims,
+        alpha=alpha,
+        split="val",
+        circular_dims=conformal.ENV_CIRCULAR_DIMS.get(env, ()),
+        horizon=conformal.ENV_HORIZON[env],
+        require_matching_starv_config=require_matching_starv_config,
+    )
+    cp_r_gamma, cp_r_rank_margin = calibration_gamma(
+        calibration_trajectories, grid, cells, dims
+    )
+    variants = {
+        "Raw tube": cells,
+        "CP-D (inflated)": inflate_cells(
+            cells, dims, [float(cp_d["gamma"])] * len(dims)
+        ),
+        "CP-R (inflated)": inflate_cells(
+            cells, dims, [cp_r_gamma] * len(dims)
+        ),
+    }
+    cp_r = {
+        "method": "descending rank-380 signed trajectory margin",
+        "n": 400,
+        "sort": "descending",
+        "rank": 380,
+        "signed_margin_at_rank": cp_r_rank_margin,
+        "gamma": cp_r_gamma,
+        "check_dims": [int(dim) for dim in dims],
+    }
+    return variants, {"cp_d": cp_d, "cp_r": cp_r}
+
+
 def interval_union_length(bounds: Sequence[float], delta: float = 0.0) -> float:
     """Return the length of an interval union after symmetric inflation."""
     if delta < 0.0:
@@ -221,15 +389,12 @@ def interval_union_length(bounds: Sequence[float], delta: float = 0.0) -> float:
     return float(sum(high - low for low, high in merged))
 
 
-def normalized_cell_tube_areas(
-    cells: Sequence[dict[str, Any]], grid: GridInfo, dims: Sequence[int], delta: float = 0.0
+def cell_tube_areas(
+    cells: Sequence[dict[str, Any]], dims: Sequence[int], delta: float = 0.0
 ) -> list[float]:
-    """Return one time-averaged normalized 2-D tube area for every valid cell."""
-    if len(dims) != 2 or any(dim < 0 or dim >= grid.ndim for dim in dims):
-        raise ValueError("exactly two valid check dimensions are required")
-    grid_area = float(np.prod(grid.stops[list(dims)] - grid.starts[list(dims)]))
-    if not np.isfinite(grid_area) or grid_area <= 0.0:
-        raise ValueError("verification grid area must be positive and finite")
+    """Return one time-averaged absolute 2-D tube area for every valid cell."""
+    if len(dims) != 2 or any(dim < 0 for dim in dims):
+        raise ValueError("exactly two nonnegative check dimensions are required")
 
     values = []
     for cell in cells:
@@ -243,7 +408,7 @@ def normalized_cell_tube_areas(
             if any(dim >= len(bounds) for dim in dims):
                 raise ValueError("tube bounds do not contain selected dimensions")
             time_areas.append(float(np.prod([interval_union_length(bounds[dim], delta) for dim in dims])))
-        values.append(float(np.mean(time_areas) / grid_area))
+        values.append(float(np.mean(time_areas)))
     return values
 
 
@@ -254,12 +419,14 @@ def table_metrics(
     dims: Sequence[int],
     delta: float = 0.0,
 ) -> dict[str, Any]:
-    """Summarize Table II robustness and normalized tube-area metrics."""
+    """Summarize Table II robustness and absolute tube-area metrics."""
     rows = evaluate_set(trajectories, grid, cells, dims, delta)
     scores = [float(row["signed_margin"]) for row in rows if row["status"] == "valid"]
-    areas = normalized_cell_tube_areas(cells, grid, dims, delta)
+    areas = cell_tube_areas(cells, dims, delta)
+    covered = sum(score >= -EPS for score in scores)
     return {
-        "delta": float(delta),
+        "coverage_rate": float(covered / len(scores)) if scores else None,
+        "covered_trajectories": covered,
         "robustness": {
             "mean": float(np.mean(scores)) if scores else None,
             "minimum": float(min(scores)) if scores else None,
@@ -277,33 +444,71 @@ def table_metrics(
 
 
 def write_table_metrics(metrics_by_method: dict[str, dict[str, Any]], output_dir: Path) -> Path:
-    """Write the Table II metric fields in one row per tube construction method."""
+    """Write a readable paper-style CSV plus a full-precision companion CSV."""
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / "tube_table_metrics.csv"
-    fields = [
-        "method", "delta", "robustness_mean", "robustness_minimum", "robustness_maximum",
+    readable_fields = [
+        "Method", "CP score", "CP bound",
+        "Coverage rate", "Robustness γ mean", "Robustness γ min",
+        "Robustness γ max", "Avg. tube area (mean ± std)",
+        "Valid real trajectories", "Valid tube cells",
+    ]
+    raw_fields = [
+        "method", "cp_score", "cp_bound",
+        "coverage_rate", "covered_trajectories",
+        "robustness_mean", "robustness_minimum", "robustness_maximum",
         "robustness_valid_trajectories", "robustness_total_trajectories",
         "tube_area_mean", "tube_area_std", "tube_area_valid_cells", "tube_area_total_cells",
     ]
+    raw_path = output_dir / "tube_table_metrics_raw.csv"
+    raw_rows = []
+    for method, metrics in metrics_by_method.items():
+        robustness = metrics["robustness"]
+        tube_area = metrics["tube_area"]
+        raw_rows.append({
+            "method": method,
+            "cp_score": metrics.get("cp_score", "-"),
+            "cp_bound": metrics.get("cp_bound"),
+            "coverage_rate": metrics["coverage_rate"],
+            "covered_trajectories": metrics["covered_trajectories"],
+            "robustness_mean": robustness["mean"],
+            "robustness_minimum": robustness["minimum"],
+            "robustness_maximum": robustness["maximum"],
+            "robustness_valid_trajectories": metrics["robustness_valid_trajectories"],
+            "robustness_total_trajectories": metrics["robustness_total_trajectories"],
+            "tube_area_mean": tube_area["mean"],
+            "tube_area_std": tube_area["std"],
+            "tube_area_valid_cells": metrics["tube_area_valid_cells"],
+            "tube_area_total_cells": metrics["tube_area_total_cells"],
+        })
     with path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=fields)
+        writer = csv.DictWriter(file, fieldnames=readable_fields)
         writer.writeheader()
-        for method, metrics in metrics_by_method.items():
-            robustness = metrics["robustness"]
-            tube_area = metrics["tube_area"]
+        for row in raw_rows:
             writer.writerow({
-                "method": method,
-                "delta": metrics["delta"],
-                "robustness_mean": robustness["mean"],
-                "robustness_minimum": robustness["minimum"],
-                "robustness_maximum": robustness["maximum"],
-                "robustness_valid_trajectories": metrics["robustness_valid_trajectories"],
-                "robustness_total_trajectories": metrics["robustness_total_trajectories"],
-                "tube_area_mean": tube_area["mean"],
-                "tube_area_std": tube_area["std"],
-                "tube_area_valid_cells": metrics["tube_area_valid_cells"],
-                "tube_area_total_cells": metrics["tube_area_total_cells"],
+                "Method": row["method"],
+                "CP score": row["cp_score"],
+                "CP bound": (
+                    "-"
+                    if row["cp_bound"] is None
+                    else f"{float(row['cp_bound']):.12g}"
+                ),
+                "Coverage rate": f"{100.0 * row['coverage_rate']:.2f}%",
+                "Robustness γ mean": f"{row['robustness_mean']:.6f}",
+                "Robustness γ min": f"{row['robustness_minimum']:.6f}",
+                "Robustness γ max": f"{row['robustness_maximum']:.6f}",
+                "Avg. tube area (mean ± std)": (
+                    f"{row['tube_area_mean']:.6f} ± {row['tube_area_std']:.6f}"
+                ),
+                "Valid real trajectories": (
+                    f"{row['robustness_valid_trajectories']}/{row['robustness_total_trajectories']}"
+                ),
+                "Valid tube cells": f"{row['tube_area_valid_cells']}/{row['tube_area_total_cells']}",
             })
+    with raw_path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=raw_fields)
+        writer.writeheader()
+        writer.writerows(raw_rows)
     return path
 
 
@@ -335,57 +540,175 @@ def load_trajectory(path: Path, key: str) -> np.ndarray:
         return np.asarray(data[key], dtype=float)
 
 
+def write_comparison_plots(
+    output_dir: Path,
+    safety: dict[str, Any],
+    grid: GridInfo,
+    tube_variants: dict[str, Sequence[dict[str, Any]]],
+    real_trajectories: np.ndarray,
+    model_trajectories: np.ndarray,
+    dims: Sequence[int],
+) -> dict[str, list[str]]:
+    """Write real and model comparisons for raw, CP-D, and CP-R tubes."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    compare.PLOT_DIMS = tuple(dims)
+    compare.CHECK_DIMS = tuple(dims)
+    compare.DELTA = 0.0
+    compare.MAX_STEPS = None
+    suffixes = {
+        "Raw tube": "raw",
+        "CP-D (inflated)": "cp_d",
+        "CP-R (inflated)": "cp_r",
+        "raw": "raw",
+        "cp_d": "cp_d",
+        "cp_r": "cp_r",
+    }
+    plots: dict[str, list[str]] = {}
+    for label, tube_cells in tube_variants.items():
+        suffix = suffixes[label]
+        plots[suffix] = []
+        for title, trajectories, cmap, prefix in (
+            ("Real trajectory", real_trajectories, "Oranges", "real"),
+            ("Model trajectory", model_trajectories, "Blues", "model"),
+        ):
+            rows = compare.compare_set(trajectories, grid, tube_cells)
+            path = output_dir / f"{prefix}_vs_{suffix}_tube.png"
+            compare.plot_set(path, title, trajectories, rows, grid, tube_cells, safety, cmap)
+            plots[suffix].append(str(path))
+    return plots
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env", choices=ENV_DIMS, default=DEFAULT_ENV)
-    parser.add_argument("--safety", type=Path, default=DEFAULT_SAFETY_PATH, help="StarV safety_result JSON")
-    parser.add_argument("--real", type=Path, default=DEFAULT_REAL_TRAJ_PATH, help="real trajectory NPZ")
-    parser.add_argument("--dwm", type=Path, default=DEFAULT_DWM_TRAJ_PATH, help="DWM trajectory NPZ")
-    parser.add_argument("--outdir", type=Path, default=DEFAULT_OUT_DIR, help="directory for CSV and JSON results")
-    parser.add_argument("--real-key", default="test_traj")
-    parser.add_argument("--dwm-key", default="test_traj")
-    parser.add_argument("--check-dims", type=int, nargs=2, default=None)
+    parser.add_argument("--decoder", choices=("dwm", "cgan"), default=DEFAULT_DECODER)
     parser.add_argument(
-        "--delta", type=float, default=None,
-        help="B1 symmetric tube inflation Gamma_(1-alpha); omit to report A1 only",
+        "--construction",
+        choices=("symbolic", "sampled"),
+        default=DEFAULT_CONSTRUCTION,
+    )
+    parser.add_argument("--safety", type=Path, default=None, help="override tube JSON")
+    parser.add_argument("--real", type=Path, default=None, help="override real trajectory NPZ")
+    parser.add_argument(
+        "--model", "--dwm", dest="model", type=Path, default=None,
+        help="override paired DWM/cGAN trajectory NPZ",
+    )
+    parser.add_argument(
+        "--calibration-real", type=Path, default=None,
+        help="override real trajectory NPZ used for both calibrations",
+    )
+    parser.add_argument(
+        "--outdir", type=Path, default=None,
+        help="override the new Table III case directory",
+    )
+    parser.add_argument("--real-key", default="test_traj")
+    parser.add_argument("--model-key", "--dwm-key", dest="model_key", default="test_traj")
+    parser.add_argument("--calibration-key", default="val_traj")
+    parser.add_argument("--check-dims", type=int, nargs=2, default=None)
+    parser.add_argument("--alpha", type=float, default=0.05)
+    parser.add_argument(
+        "--overwrite", action="store_true",
+        help="allow replacing files in an existing standard result directory",
     )
     return parser.parse_args()
 
 
+def _require_inputs(paths: Sequence[Path]) -> None:
+    missing = [str(path) for path in paths if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "missing required input file(s):\n  " + "\n  ".join(missing)
+        )
+
+
+def _require_fresh_output_dir(path: Path, *, overwrite: bool = False) -> None:
+    if not overwrite and path.exists() and any(path.iterdir()):
+        raise FileExistsError(
+            f"output directory is not empty; refusing to overwrite existing results: {path}"
+        )
+
+
 def main() -> None:
     args = parse_args()
+    profile = resolve_experiment(args.env, args.decoder, args.construction)
+    safety_path = args.safety or profile.safety
+    real_path = args.real or profile.real
+    model_path = args.model or profile.model
+    calibration_path = args.calibration_real or real_path
+    outdir = args.outdir or profile.outdir
+    _require_inputs([safety_path, real_path, model_path, calibration_path])
+    _require_fresh_output_dir(outdir, overwrite=args.overwrite)
+
     dims = tuple(args.check_dims) if args.check_dims is not None else ENV_DIMS[args.env]
-    grid, cells = load_safety_result(args.safety)
-    real_trajectories = load_trajectory(args.real, args.real_key)
-    summaries = {}
-    for label, trajectories in (("real", real_trajectories), ("dwm", load_trajectory(args.dwm, args.dwm_key))):
-        rows = evaluate_set(trajectories, grid, cells, dims)
-        summary = write_results(rows, label, args.outdir)
-        summaries[label] = summary
-        print(
-            f"{label}: valid={summary['valid_trajectories']}/{summary['total_trajectories']}, "
-            f"min={summary['minimum']}, max={summary['maximum']}, p95_desc={summary['p95_desc']}"
-        )
-    metrics_by_method = {"A1 (ours)": table_metrics(real_trajectories, grid, cells, dims)}
-    if args.delta is not None:
-        metrics_by_method["B1 (inflated)"] = table_metrics(
-            real_trajectories, grid, cells, dims, args.delta
-        )
-    table_path = write_table_metrics(metrics_by_method, args.outdir)
-    for method, metrics in metrics_by_method.items():
-        robustness = metrics["robustness"]
-        tube_area = metrics["tube_area"]
-        print(
-            f"{method}: gamma mean/min/max={robustness['mean']}/{robustness['minimum']}/{robustness['maximum']}; "
-            f"normalized tube area mean+std={tube_area['mean']}+{tube_area['std']}"
-        )
-    summary_path = args.outdir / "signed_tube_margin_summary.json"
+    grid, cells = load_safety_result(safety_path)
+    real_trajectories = load_trajectory(real_path, args.real_key)
+    model_trajectories = load_trajectory(model_path, args.model_key)
+    calibration_trajectories = load_trajectory(calibration_path, args.calibration_key)
+    variants, calibrations = build_tube_variants(
+        cells=cells,
+        grid=grid,
+        dims=dims,
+        calibration_trajectories=calibration_trajectories,
+        real_path=calibration_path,
+        model_path=model_path,
+        env=args.env,
+        alpha=args.alpha,
+        require_matching_starv_config=args.decoder != "cgan",
+    )
+    metrics_by_method = {
+        method: table_metrics(real_trajectories, grid, tube_cells, dims)
+        for method, tube_cells in variants.items()
+    }
+    method_cp = {
+        "Raw tube": ("-", None),
+        "CP-D (inflated)": ("CP-D", float(calibrations["cp_d"]["gamma"])),
+        "CP-R (inflated)": ("CP-R", float(calibrations["cp_r"]["gamma"])),
+    }
+    for method, (cp_score, cp_bound) in method_cp.items():
+        metrics_by_method[method]["cp_score"] = cp_score
+        metrics_by_method[method]["cp_bound"] = cp_bound
+    table_path = write_table_metrics(metrics_by_method, outdir)
+    safety = json.loads(safety_path.read_text(encoding="utf-8"))
+    plots = write_comparison_plots(
+        outdir, safety, grid, variants,
+        real_trajectories, model_trajectories, dims,
+    )
+    calibrations["cp_r"].update({
+        "calibration_path": str(calibration_path),
+        "calibration_key": args.calibration_key,
+        "evaluation_path": str(real_path),
+        "evaluation_key": args.real_key,
+        "inflates_both_dimensions_equally": True,
+        "inflates_initial_cell": True,
+    })
+    calibration_path_out = outdir / "tube_calibrations.json"
+    outdir.mkdir(parents=True, exist_ok=True)
+    calibration_path_out.write_text(
+        json.dumps(calibrations, indent=2), encoding="utf-8"
+    )
+    summary_path = outdir / "signed_tube_margin_summary.json"
     with summary_path.open("w", encoding="utf-8") as file:
         json.dump(
-            {"env": args.env, "check_dims": dims, "datasets": summaries, "table_metrics": metrics_by_method},
+            {
+                "env": args.env,
+                "decoder": args.decoder,
+                "construction": args.construction,
+                "check_dims": dims,
+                "inputs": {
+                    "safety": str(safety_path),
+                    "real": str(real_path),
+                    "model": str(model_path),
+                },
+                "calibrations": calibrations,
+                "table_metrics": metrics_by_method,
+                "plots": plots,
+            },
             file, indent=2,
         )
+    print("CP-D gamma:", calibrations["cp_d"]["gamma"])
+    print("CP-R gamma:", calibrations["cp_r"]["gamma"])
     print(f"table metrics: {table_path}")
+    print(f"calibrations: {calibration_path_out}")
     print(f"summary: {summary_path}")
 
 

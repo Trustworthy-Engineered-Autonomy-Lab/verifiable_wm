@@ -97,30 +97,6 @@ def main() -> None:
                     f"{key} shape mismatch: got {predictor[key].shape}, "
                     f"expected {expected}"
                 )
-        if np.any(lower > upper):
-            raise ValueError("internal unwrapped tube has lower > upper")
-
-        environment = (
-            str(np.asarray(predictor["environment"]).item())
-            if "environment" in predictor.files
-            else ""
-        )
-        if environment == "pendulum":
-            for key in (*expected_splits, "trajectories"):
-                theta = np.asarray(predictor[key])[..., 0]
-                if np.any(theta < -np.pi - 1e-6) or np.any(theta >= np.pi + 1e-6):
-                    raise ValueError(
-                        f"{key} theta is not wrapped to [-pi, pi)"
-                    )
-            representation = (
-                str(np.asarray(predictor["tube_internal_representation"]).item())
-                if "tube_internal_representation" in predictor.files
-                else ""
-            )
-            if representation != "unwrapped_theta":
-                raise ValueError(
-                    "Pendulum output must mark its internal tube as unwrapped_theta"
-                )
 
         print("NPZ format check passed")
         print(f"reference splits : {expected_splits}")

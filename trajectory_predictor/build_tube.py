@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Build a predictor tube from corner, center, and optional interior samples."""
+"""Build a predictor tube from three trajectories in every cell."""
 
 from __future__ import annotations
 
@@ -32,9 +32,9 @@ from tube_utils import (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Sample all active cell corners plus the center, predict the "
-            "checkpoint horizon, save all cells' trajectories in one NPZ "
-            "file, and build their min/max envelope."
+            "Sample exactly three points per cell, predict the checkpoint "
+            "horizon, save all cells' trajectories in one NPZ file, and build "
+            "their min/max envelope."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
@@ -87,11 +87,7 @@ def parse_args() -> argparse.Namespace:
         "--samples-per-cell",
         type=int,
         default=DEFAULT_SAMPLES_PER_CELL,
-        help=(
-            "Total sampled states per cell. Must fit all corners of non-zero "
-            "width dimensions plus the center; extra points use a deterministic "
-            "Halton sequence."
-        ),
+        help="Total sampled initial states in each cell (not per dimension).",
     )
     parser.add_argument(
         "--horizon",
@@ -161,15 +157,6 @@ def main() -> None:
         raise ValueError(
             f"checkpoint environment={checkpoint_environment!r} does not match "
             f"--env={args.env!r}"
-        )
-    if (
-        args.env == "pendulum"
-        and checkpoint.get("angle_representation") != "unwrapped_theta"
-    ):
-        raise ValueError(
-            "This Pendulum checkpoint was trained with the old wrapped-theta "
-            "pipeline. Retrain it with the updated train_predictor.py before "
-            "building a periodic-angle tube."
         )
     horizon = model.horizon if args.horizon is None else int(args.horizon)
     if model.horizon < horizon:
