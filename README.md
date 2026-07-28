@@ -1,6 +1,6 @@
 # Trajectory Predictor
 
-本分支主要在main分支的基础上实现一个基于 Transformer 的闭环轨迹预测器。它从真实闭环轨迹中学习：
+本目录实现一个基于 Transformer 的闭环轨迹预测器。它从真实闭环轨迹中学习：
 
 ```text
 初始状态 s0  ->  完整未来轨迹 [s0, s1, ..., sH]
@@ -53,7 +53,7 @@ safety_result.json                         │
 ### 阶段一：训练轨迹 Predictor
 
 `train_predictor.py` 使用真实闭环轨迹训练 Transformer。模型输入一条轨迹的初始
-状态，直接输出从第 0 步到第 \(H\) 步的完整状态序列。
+状态，直接输出从第 0 步到第 $H$ 步的完整状态序列。
 
 ### 阶段二：生成预测轨迹和 Predictor tube
 
@@ -117,9 +117,9 @@ TrajectoryTransformer
 
 模型执行：
 
-\[
+$$
 s_0 \longrightarrow [\hat{s}_0,\hat{s}_1,\ldots,\hat{s}_H]
-\]
+$$
 
 输入 shape：
 
@@ -154,12 +154,12 @@ prediction[:, 0, :] = initial_state
 
 训练 loss 为完整轨迹误差与终点误差之和：
 
-\[
+$$
 L =
 \operatorname{MSE}(\hat{s}_{1:H},s_{1:H})
 + \lambda_{\mathrm{terminal}}
 \operatorname{MSE}(\hat{s}_H,s_H)
-\]
+$$
 
 该文件还负责：
 
@@ -289,21 +289,21 @@ cell 的三条采样轨迹只在构建过程中存在，不写入
 
 该文件计算 CP-D（Conformal Prediction based on trajectory Distance）。
 
-对第 \(i\) 对真实/预测校准轨迹，先计算 nonconformity score：
+对第 $i$ 对真实/预测校准轨迹，先计算 nonconformity score：
 
-\[
+$$
 \delta_i =
 \max_t
 \left\|s_{i,t}^{\mathrm{real}}-s_{i,t}^{\mathrm{pred}}\right\|_2
-\]
+$$
 
 再使用 finite-sample conformal rank：
 
-\[
+$$
 k=\left\lceil(n+1)(1-\alpha)\right\rceil
-\]
+$$
 
-从排序后的误差中取得膨胀半径 \(\Gamma_D\)。
+从排序后的误差中取得膨胀半径 $\Gamma_D$。
 
 该程序可以单独运行，也会被最终评估入口调用。命令行参数 `--dwm` 沿用了原项目
 接口名称；在本目录中应传入 `predictor_trajectories.npz`。
