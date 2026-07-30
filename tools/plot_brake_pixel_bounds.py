@@ -30,6 +30,8 @@ import numpy as np
 import torch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Checkpoints live in the lab-shared tree, not in the repo.
+SHARED_WEIGHTS = Path("/home/tealab_shared/dwm_weight")
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -37,8 +39,8 @@ if str(PROJECT_ROOT) not in sys.path:
 STATE_LB = np.array([6.20, 6.20])
 STATE_UB = np.array([6.21, 6.21])
 
-DWM_WEIGHTS = PROJECT_ROOT / "dwm_weight/brake_system/decoder.pth"
-CGAN_WEIGHTS = PROJECT_ROOT / "dwm_weight/brake_system/g_mlp/G_brake.pth"
+DWM_WEIGHTS = SHARED_WEIGHTS / "brake_system/decoder.pth"
+CGAN_WEIGHTS = SHARED_WEIGHTS / "brake_system/g_mlp/G_brake.pth"
 Z_RANGE = 0.05
 NUM_SAMPLES = 4000
 OUTPUT_PATH = PROJECT_ROOT / "results/brake_system/brake_pixel_bounds.png"

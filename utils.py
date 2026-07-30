@@ -110,3 +110,35 @@ def render_images(dynamic, states, device, render_batch_size):
 
 def to_numpy(tensor):
     return tensor.detach().cpu().numpy().astype(np.float32)
+
+
+# config/sampling/*.json 只写 {"name": "Pendulum"}，不带 args，所以 dt 之类的
+# 参数全取 dynamic.py 的默认值。默认值一改（fd3f5d2 把 Pendulum dt 从 0.05
+# 改成 0.02），此前生成的轨迹就变成了另一个系统的数据，而 npz 里没有任何字段
+# 能分辨——pendulum dataset_v1(dt=0.05) 和 dataset_v1_clamp_100(dt=0.02) 混用
+# 曾产生过 7.97 的假偏差。这里把实际生效的参数快照进 npz，让 vintage 可判定。
+DYNAMICS_PARAM_NAMES = (
+    "dt",
+    "g",
+    "m",
+    "l",
+    "max_speed",
+    "max_torque",
+    "min_pos",
+    "max_pos",
+    "min_speed",
+    "min_action",
+    "max_action",
+    "power",
+    "v_lead",
+)
+
+
+def dynamics_provenance(dynamic):
+    """实际生效的动力学标量参数，用于写进轨迹 npz 做 vintage 标记。"""
+    provenance = {"dynamics_name": np.array(type(dynamic).__name__)}
+    for name in DYNAMICS_PARAM_NAMES:
+        value = getattr(dynamic, name, None)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            provenance[f"dynamics_{name}"] = np.array(float(value))
+    return provenance
