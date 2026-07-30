@@ -13,10 +13,12 @@ import numpy as np
 
 import compare
 import signed_tube_margin as stm
+from conformal import conformal_quantile_with_rank
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 ENV_DIMS = stm.ENV_DIMS
+DEFAULT_ALPHA = 0.05
 
 # Edit these paths directly when running this script without terminal options.
 # DEFAULT_ENV = "mountain_car"
@@ -59,17 +61,24 @@ def trajectory_dimension_margins(
     ], dtype=float)
 
 
-def calibration_epsilons(
+def tube_robustness_scores(
     real_trajectories: np.ndarray,
     grid: stm.GridInfo,
     cells: Sequence[dict[str, Any]],
     dims: Sequence[int],
 ) -> np.ndarray:
-    """Compute one mean-plus-std violation inflation amount per selected dimension."""
+    """Per-dimension tube-robustness scores gamma (positive = outside the tube).
+
+    Eq.~\\eqref{eq:score-r}: gamma = max_t sd(s_t, R_t), keeping the sign so that
+    a trajectory comfortably inside the tube contributes a negative score.  The
+    sign has to survive into the quantile - clamping to zero first would pile a
+    spike of zeros at the bottom of the distribution and bias any statistic
+    computed from it.
+    """
     if real_trajectories.ndim != 3:
         raise ValueError(f"real trajectories must have shape (N, T+1, state_dim), got {real_trajectories.shape}")
 
-    violations = []
+    scores = []
     for trajectory_index, trajectory in enumerate(real_trajectories):
         _, cell = stm.find_cell(trajectory[0], grid, cells)
         if cell is None:
@@ -77,12 +86,54 @@ def calibration_epsilons(
         if "error_msg" in cell:
             raise ValueError(f"real trajectory {trajectory_index} has StarV cell error: {cell['error_msg']}")
         margins = trajectory_dimension_margins(trajectory, cell.get("bounds", []), dims)
-        violations.append(np.maximum(0.0, -margins))
-    if not violations:
+        scores.append(-margins)
+    if not scores:
         raise ValueError("no real trajectories were supplied")
+    return np.asarray(scores, dtype=float)
 
-    values = np.asarray(violations, dtype=float)
-    return np.mean(values, axis=0) + np.std(values, axis=0)
+
+def calibration_epsilons(
+    real_trajectories: np.ndarray,
+    grid: stm.GridInfo,
+    cells: Sequence[dict[str, Any]],
+    dims: Sequence[int],
+    *,
+    alpha: float = DEFAULT_ALPHA,
+    per_dim: bool = False,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Split-conformal inflation Gamma_{1-alpha}, one value per selected dimension.
+
+    Same estimator as ``conformal.py``: the rank-``ceil((n+1)(1-alpha))`` order
+    statistic of the calibration scores, which is what gives the finite-sample
+    coverage guarantee.  ``per_dim`` calibrates each dimension separately; the
+    default matches the paper's scalar Gamma applied to every dimension.
+    """
+    scores = tube_robustness_scores(real_trajectories, grid, cells, dims)
+
+    if per_dim:
+        quantiles, ranks = zip(*(
+            conformal_quantile_with_rank(scores[:, index], alpha=alpha)
+            for index in range(scores.shape[1])
+        ))
+        gammas = np.asarray(quantiles, dtype=float)
+        rank = int(ranks[0])
+    else:
+        gamma, rank = conformal_quantile_with_rank(scores.max(axis=1), alpha=alpha)
+        gammas = np.full(len(dims), float(gamma))
+
+    if not np.all(np.isfinite(gammas)):
+        raise ValueError(
+            f"calibration set of {scores.shape[0]} trajectories is too small for alpha={alpha}"
+        )
+    # Eq.~\eqref{eq:inflate-r}: Gamma <= 0 means the raw tube already contains
+    # the calibration trajectories, so no inflation is needed.
+    return np.maximum(0.0, gammas), {
+        "alpha": float(alpha),
+        "per_dim": bool(per_dim),
+        "n_calibration": int(scores.shape[0]),
+        "rank": rank,
+        "gamma_raw": [float(value) for value in gammas],
+    }
 
 
 def inflate_cells(
@@ -106,10 +157,18 @@ def inflate_cells(
     return inflated
 
 
-def make_summary(epsilons: Sequence[float], dims: Sequence[int], names: Sequence[str]) -> dict[str, Any]:
+def make_summary(
+    epsilons: Sequence[float],
+    dims: Sequence[int],
+    names: Sequence[str],
+    calibration: dict[str, Any],
+    calibration_key: str,
+) -> dict[str, Any]:
     return {
-        "method": "per-dimension mean(max(0, -trajectory_min_signed_margin)) + std",
+        "method": "split-conformal quantile of gamma = max_t sd(s_t, R_t)",
         "calibration_dataset": "real",
+        "calibration_key": calibration_key,
+        "calibration": calibration,
         "check_dims": [int(dim) for dim in dims],
         "epsilons": {
             str(names[dim] if dim < len(names) else f"state_{dim}"): float(epsilon)
@@ -133,21 +192,42 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--outdir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--real-key", default="test_traj")
     parser.add_argument("--dwm-key", default="test_traj")
+    parser.add_argument(
+        "--cal-key", default="val_traj",
+        help="real-trajectory split used to calibrate Gamma; must differ from --real-key "
+             "so the plotted containment is measured on held-out data",
+    )
+    parser.add_argument("--alpha", type=float, default=DEFAULT_ALPHA)
+    parser.add_argument(
+        "--per-dim", action="store_true",
+        help="calibrate one Gamma per dimension instead of the paper's single scalar. "
+             "Each dimension then only gets a marginal (1-alpha) guarantee, so joint "
+             "containment across dimensions falls short of 1-alpha - diagnostics only",
+    )
     parser.add_argument("--check-dims", type=int, nargs=2, default=None)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.cal_key == args.real_key:
+        raise SystemExit(
+            f"--cal-key and --real-key are both {args.real_key!r}; calibrating and "
+            "evaluating on the same trajectories invalidates the coverage guarantee"
+        )
+
     dims = tuple(args.check_dims) if args.check_dims is not None else ENV_DIMS[args.env]
     safety = load_safety_payload(args.safety)
     grid, cells = stm.load_safety_result(args.safety)
     real_trajectories = stm.load_trajectory(args.real, args.real_key)
     dwm_trajectories = stm.load_trajectory(args.dwm, args.dwm_key)
+    calibration_trajectories = stm.load_trajectory(args.real, args.cal_key)
 
-    epsilons = calibration_epsilons(real_trajectories, grid, cells, dims)
+    epsilons, calibration = calibration_epsilons(
+        calibration_trajectories, grid, cells, dims, alpha=args.alpha, per_dim=args.per_dim
+    )
     inflated_cells = inflate_cells(cells, dims, epsilons)
-    summary = make_summary(epsilons, dims, grid.names)
+    summary = make_summary(epsilons, dims, grid.names, calibration, args.cal_key)
 
     args.outdir.mkdir(parents=True, exist_ok=True)
     summary_path = args.outdir / "inflated_tube_calibration.json"
@@ -165,6 +245,11 @@ def main() -> None:
         rows = compare.compare_set(trajectories, grid, inflated_cells)
         compare.plot_set(args.outdir / output_name, title, trajectories, rows, grid, inflated_cells, safety, cmap_name)
 
+    print(
+        f"calibrated on {args.cal_key} (n={calibration['n_calibration']}, "
+        f"alpha={calibration['alpha']}, rank={calibration['rank']}, "
+        f"per_dim={calibration['per_dim']}), evaluated on {args.real_key}"
+    )
     print("inflation epsilons:", summary["epsilons"])
     print(f"summary: {summary_path}")
     print(f"plots: {args.outdir / 'real_vs_inflated_reachable_tube.png'}")

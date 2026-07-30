@@ -26,6 +26,22 @@ dwm_weight/cartpole/saliency/metrics.json
 /tests
 *.json
 !/config/**/*.json
+# Local experiment configurations (do not commit)
+/config/make_decoder_dataset/cartpole_g_mlp_100.json
+/config/make_decoder_dataset/mountain_car_g_mlp_100.json
+/config/make_decoder_dataset/pendulum_clamp_100.json
+/config/sampling/cartpole_g_mlp_100.json
+/config/sampling/mountain_car_g_mlp_100.json
+/config/sampling/pendulum_clamp_100.json
+/config/sampling/pendulum_g_mlp.json
+/config/sampling/pendulum_sigmoid_100.json
+/config/starv_verification/cartpole_g_mlp_100.json
+/config/starv_verification/mountain_car_g_mlp_100.json
+/config/starv_verification/pendulum_clamp.json
+/config/starv_verification/pendulum_clamp_100.json
+/config/starv_verification/pendulum_g_mlp.json
+/config/starv_verification/pendulum_sigmoid_100.json
+/config/train_gan/brake_system.json
 /aebs_carla.zip
 /aebs_carla/
 /paper/

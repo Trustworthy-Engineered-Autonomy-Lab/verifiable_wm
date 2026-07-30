@@ -8,6 +8,8 @@ the three rows of the paper's "(a) Symbolic reachability" block:
   Sym  --             raw tube, no inflation
   Sym (inflate) CP-D  inflated by Delta_{1-alpha}, the conformal quantile of the
                       trajectory-discrepancy score  delta_i = max_t ||s_t - s^_t||_p
+                      (p=2 by default: the paper's appendix Delta values only
+                      reproduce under L2, matching conformal.py)
   Sym (inflate) CP-R  inflated by Gamma_{1-alpha}, the conformal quantile of the
                       tube-robustness score        gamma_i = max_t sd(s_t, R_t)
 
@@ -183,7 +185,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--cal-split", default="val", choices=["train", "val", "test"])
     parser.add_argument("--eval-split", default="test", choices=["train", "val", "test"])
     parser.add_argument("--check-dims", type=int, nargs=2, default=None)
-    parser.add_argument("--norm", default="l1", choices=["l1", "l2"], help="CP-D score norm")
+    parser.add_argument("--norm", default="l2", choices=["l1", "l2"], help="CP-D score norm")
     parser.add_argument("--no-wrap", action="store_true", help="disable angle wrapping in the CP-D score")
     parser.add_argument("--output", type=Path, default=None, help="write the full summary JSON here")
     return parser.parse_args(argv)

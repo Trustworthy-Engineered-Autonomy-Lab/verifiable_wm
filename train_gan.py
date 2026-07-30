@@ -51,6 +51,7 @@ def evaluate(generator, discriminator, states, images, z_range, device, batch_si
     discriminator.eval()
     n = states.shape[0]
     d_loss_sum = 0.0
+    l1_sum = 0.0
 
     for i in range(0, n, batch_size):
         s = states[i : i + batch_size].to(device)
@@ -67,14 +68,16 @@ def evaluate(generator, discriminator, states, images, z_range, device, batch_si
         loss_fake = F.binary_cross_entropy(discriminator(fake, s), fake_lbl)
 
         d_loss_sum += (0.5 * (loss_real + loss_fake)).item() * b
+        l1_sum += F.l1_loss(fake, target_flat).item() * b
 
-    return {"val_d_loss": d_loss_sum / n}
+    return {"val_d_loss": d_loss_sum / n, "val_l1": l1_sum / n}
 
 
 def train(config, device):
     dataset_dir = Path(config["dataset_dir"])
     train_cfg = config["training"]
     z_range = config["z_range"]
+    clamp_straight_through = bool(config.get("clamp_straight_through", False))
 
     train_states, train_images = load_split(dataset_dir, "train")
     val_states, val_images = load_split(dataset_dir, "val")
@@ -130,7 +133,16 @@ def train(config, device):
 
             # Generator: non-saturating loss, encourage D(fake) -> 1
             z = sample_latent(b, generator.latent_dim, z_range, device)
-            fake_flat = generator(s, z).view(b, -1)
+            raw_flat = generator.net(torch.cat([s, z], dim=1))
+            fake_flat = torch.clamp(raw_flat, 0.0, 1.0)
+            if clamp_straight_through:
+                # Straight-through clamp: identical forward values, identity
+                # gradient. Purely a gradient-plumbing fix for the fact that
+                # clamp is flat outside [0,1] -- a pixel the early adversarial
+                # updates push below 0 otherwise receives no gradient ever
+                # again and stays black for every state. Does not change the
+                # objective, so the baseline stays pure-adversarial.
+                fake_flat = raw_flat + (fake_flat - raw_flat).detach()
             loss_g = F.binary_cross_entropy(discriminator(fake_flat, s), real_lbl)
 
             opt_g.zero_grad(set_to_none=True)
@@ -161,7 +173,8 @@ def train(config, device):
             print(
                 f"[epoch {epoch:3d}] d_loss={record['train_d_loss']:.4f} "
                 f"g_loss={record['train_g_loss']:.4f} "
-                f"val_d_loss={record['val_d_loss']:.4f} best@{best['epoch']}"
+                f"val_d_loss={record['val_d_loss']:.4f} "
+                f"val_l1={record['val_l1']:.4f} best@{best['epoch']}"
             )
 
     generator.load_state_dict(torch.load(g_path, map_location=device, weights_only=True))
