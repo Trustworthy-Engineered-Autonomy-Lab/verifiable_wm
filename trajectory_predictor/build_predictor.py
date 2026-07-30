@@ -19,8 +19,10 @@ Outputs:
         Created only for split_val checkpoints.  This is a non-destructive
         held-out view of the original real NPZ for conformal calibration.
 
-    predictor_tube.json
-        grid + cells[].bounds, with one min/max tube per verification cell.
+    predictor_tube_seed_<seed>.json
+        With multiple BUILD_SEEDS, one independently sampled min/max tube is
+        written per seed.  A single seed keeps the legacy predictor_tube.json
+        filename.
 
 Cell sample trajectories exist only during inference and are never saved.
 """
@@ -87,21 +89,96 @@ def set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
+def configured_build_seeds() -> Tuple[int, ...]:
+    """Return validated, unique build seeds with legacy-config fallback."""
+
+    raw_seeds = getattr(
+        config,
+        "BUILD_SEEDS",
+        (getattr(config, "BUILD_SEED", 0),),
+    )
+    if isinstance(raw_seeds, (int, np.integer)):
+        raw_seeds = (int(raw_seeds),)
+    try:
+        seeds = tuple(int(seed) for seed in raw_seeds)
+    except TypeError as error:
+        raise ValueError(
+            "BUILD_SEEDS must be an integer or a non-empty sequence "
+            "of integers"
+        ) from error
+    if not seeds:
+        raise ValueError("BUILD_SEEDS must contain at least one seed")
+    if len(set(seeds)) != len(seeds):
+        raise ValueError("BUILD_SEEDS must not contain duplicate seeds")
+    if any(seed < 0 or seed > np.iinfo(np.uint32).max for seed in seeds):
+        raise ValueError(
+            "every BUILD_SEEDS value must be between 0 and 2**32 - 1"
+        )
+    return seeds
+
+
+def tube_output_paths(
+    base_path: Path,
+    build_seeds: Sequence[int],
+) -> Tuple[Path, ...]:
+    """Keep the legacy name for one run and add seed suffixes for many."""
+
+    base = absolute(base_path)
+    if len(build_seeds) == 1:
+        return (base,)
+    return tuple(
+        base.with_name(f"{base.stem}_seed_{seed}{base.suffix}")
+        for seed in build_seeds
+    )
+
+
 def validate_config() -> Dict[str, Any]:
     environment = str(config.ENVIRONMENT).strip().lower()
-    if environment not in {
+
+    supported_environments = {
         "pendulum",
         "mountain_car",
         "cartpole",
         "brake_system",
-    }:
-        raise ValueError(f"unsupported ENVIRONMENT={environment!r}")
+    }
+
+    if environment not in supported_environments:
+        raise ValueError(
+            f"unsupported ENVIRONMENT={environment!r}"
+        )
+
     if int(config.HORIZON) < 1:
         raise ValueError("HORIZON must be positive")
+
     if int(config.SAMPLES_PER_CELL) < 2:
-        raise ValueError("SAMPLES_PER_CELL must be at least 2")
+        raise ValueError(
+            "SAMPLES_PER_CELL must be at least 2"
+        )
+
     if int(config.BATCH_SIZE) < 1:
         raise ValueError("BATCH_SIZE must be positive")
+
+    sampling_strategy = str(
+        getattr(
+            config,
+            "CELL_SAMPLING_STRATEGY",
+            "diagonal",
+        )
+    ).strip().lower()
+
+    supported_sampling_strategies = {
+        "diagonal",
+        "random_uniform",
+        "latin_hypercube",
+    }
+
+    if sampling_strategy not in supported_sampling_strategies:
+        raise ValueError(
+            "CELL_SAMPLING_STRATEGY must be 'diagonal', "
+            "'random_uniform', or 'latin_hypercube'"
+        )
+
+    build_seeds = configured_build_seeds()
 
     paths = {
         "real": absolute(config.REAL_TRAJECTORIES),
@@ -109,38 +186,56 @@ def validate_config() -> Dict[str, Any]:
         "checkpoint": absolute(config.CHECKPOINT),
         "trajectories": absolute(config.TRAJECTORY_OUTPUT),
         "tube": absolute(config.TUBE_OUTPUT),
-        "conformal_real": absolute(config.CONFORMAL_REAL_OUTPUT),
     }
+
+    tube_paths = tube_output_paths(
+        paths["tube"],
+        build_seeds,
+    )
+
     for label in ("real", "grid"):
         if not paths[label].is_file():
             raise FileNotFoundError(
-                f"{label} input does not exist: {paths[label]}"
+                f"{label} input does not exist: "
+                f"{paths[label]}"
             )
+
     if not paths["checkpoint"].is_file():
         raise FileNotFoundError(
             "checkpoint input does not exist: "
             f"{paths['checkpoint']}\n"
-            "Run `python train_predictor.py` first to create it."
+            "Run `python train_predictor.py` first "
+            "to create it."
         )
-    if paths["trajectories"].suffix.lower() != ".npz":
-        raise ValueError("TRAJECTORY_OUTPUT must end with .npz")
-    if paths["tube"].suffix.lower() != ".json":
-        raise ValueError("TUBE_OUTPUT must end with .json")
-    if paths["conformal_real"].suffix.lower() != ".npz":
-        raise ValueError("CONFORMAL_REAL_OUTPUT must end with .npz")
-    if paths["conformal_real"] in {
-        paths["real"],
-        paths["trajectories"],
-    }:
-        raise ValueError(
-            "CONFORMAL_REAL_OUTPUT must not overwrite the source real NPZ "
-            "or predictor output"
-        )
-    paths["trajectories"].parent.mkdir(parents=True, exist_ok=True)
-    paths["tube"].parent.mkdir(parents=True, exist_ok=True)
-    paths["conformal_real"].parent.mkdir(parents=True, exist_ok=True)
 
-    return {"environment": environment, **paths}
+    if paths["trajectories"].suffix.lower() != ".npz":
+        raise ValueError(
+            "TRAJECTORY_OUTPUT must end with .npz"
+        )
+
+    if paths["tube"].suffix.lower() != ".json":
+        raise ValueError(
+            "TUBE_OUTPUT must end with .json"
+        )
+
+    paths["trajectories"].parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    for tube_path in tube_paths:
+        tube_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+    return {
+        "environment": environment,
+        "sampling_strategy": sampling_strategy,
+        "build_seeds": build_seeds,
+        "tube_paths": tube_paths,
+        **paths,
+    }
 
 
 # =============================================================================
@@ -307,8 +402,10 @@ def load_grid(
 def sample_cell(
     bounds: np.ndarray,
     samples_per_cell: int,
+    sampling_strategy: str = "diagonal",
+    rng: Optional[np.random.Generator] = None,
 ) -> np.ndarray:
-    """Sample lower-to-upper diagonal points inside one cell."""
+    """Sample points inside one cell using a deterministic or seeded mode."""
 
     box = np.asarray(bounds, dtype=np.float32)
     if box.ndim != 2 or box.shape[1] != 2:
@@ -318,16 +415,42 @@ def sample_cell(
     if samples_per_cell < 2:
         raise ValueError("samples_per_cell must be at least 2")
 
-    lower = box[:, 0]
-    upper = box[:, 1]
-    weights = np.linspace(
-        0.0,
-        1.0,
-        samples_per_cell,
-        dtype=np.float32,
-    )[:, None]
+    lower = box[:, 0].astype(np.float64)
+    upper = box[:, 1].astype(np.float64)
+    strategy = sampling_strategy.strip().lower()
+    if strategy == "diagonal":
+        unit_points = np.linspace(
+            0.0,
+            1.0,
+            samples_per_cell,
+            dtype=np.float64,
+        )[:, None]
+    else:
+        if rng is None:
+            raise ValueError(
+                f"sampling strategy {strategy!r} requires a random generator"
+            )
+        if strategy == "random_uniform":
+            unit_points = rng.random(
+                (samples_per_cell, box.shape[0]),
+                dtype=np.float64,
+            )
+        elif strategy == "latin_hypercube":
+            unit_points = np.empty(
+                (samples_per_cell, box.shape[0]),
+                dtype=np.float64,
+            )
+            for dim in range(box.shape[0]):
+                strata = rng.permutation(samples_per_cell)
+                unit_points[:, dim] = (
+                    strata + rng.random(samples_per_cell)
+                ) / samples_per_cell
+        else:
+            raise ValueError(
+                f"unsupported sampling strategy {sampling_strategy!r}"
+            )
     return np.asarray(
-        lower[None, :] + weights * (upper - lower)[None, :],
+        lower[None, :] + unit_points * (upper - lower)[None, :],
         dtype=np.float32,
     )
 
@@ -572,66 +695,22 @@ def build_reference_predictions(
     std: np.ndarray,
     reference_path: Path,
     checkpoint_path: Path,
-    conformal_reference_path: Path,
-    checkpoint: Dict[str, Any],
     environment: str,
     horizon: int,
     batch_size: int,
     device,
-) -> Tuple[Dict[str, np.ndarray], Optional[Dict[str, np.ndarray]]]:
+) -> Dict[str, np.ndarray]:
+    # 读取完整的 real_trajectories.npz
     payload, initial_states, references = load_reference_npz(
         reference_path,
         horizon,
         model.state_dim,
     )
-    source_val = np.asarray(references["val_traj"])
-    calibration_indices = checkpoint_calibration_indices(
-        checkpoint,
-        source_val,
-    )
-    calibration_payload: Optional[Dict[str, np.ndarray]] = None
-    compatible_reference_path = reference_path
-    if calibration_indices is not None:
-        payload = calibration_payload_view(
-            payload,
-            calibration_indices,
-            len(source_val),
-            reference_path,
-        )
-        protocol = checkpoint["data_split"]
-        payload["derived_training_val_indices"] = np.asarray(
-            protocol["derived_train_indices"],
-            dtype=np.int64,
-        )
-        references["val_traj"] = np.asarray(
-            payload["val_traj"]
-        ).copy()
-        initial_states["val_traj"] = np.asarray(
-            references["val_traj"][:, 0, :],
-            dtype=np.float32,
-        )
-        calibration_payload = {
-            key: np.asarray(value).copy()
-            for key, value in payload.items()
-        }
-        compatible_reference_path = conformal_reference_path
-        print(
-            "\n========== Legacy split adaptation =========="
-        )
-        print(
-            f"source val          : {len(source_val)}"
-        )
-        print(
-            "used for training   : "
-            f"{len(protocol['derived_train_indices'])}"
-        )
-        print(
-            f"held for calibration: {len(calibration_indices)}"
-        )
-        print("source NPZ modified : no")
+
     predictions: Dict[str, np.ndarray] = {}
 
     print("\n========== Predictor trajectory NPZ ==========")
+
     for split_key, states in initial_states.items():
         values = predict_function(
             model,
@@ -641,17 +720,25 @@ def build_reference_predictions(
             batch_size,
             device,
         )
+
+        # Pendulum 的角度需要限制到周期范围
         if uses_periodic_angle(environment):
             values = wrap_angle_trajectories(values)
+
         predictions[split_key] = values
         print(f"{split_key:<18}: {values.shape}")
 
+    # 保持与 real_trajectories.npz 相同的键、shape 和 dtype
     result = make_compatible_predictions(
         payload,
         predictions,
         references,
     )
-    result["decoder_weights"] = np.asarray(str(checkpoint_path))
+
+    # 添加 Predictor 输出说明
+    result["decoder_weights"] = np.asarray(
+        str(checkpoint_path)
+    )
     result["environment"] = np.asarray(environment)
     result["trajectory_format"] = np.asarray(
         "real_trajectories_compatible_v3"
@@ -660,12 +747,13 @@ def build_reference_predictions(
         str(checkpoint_path)
     )
     result["reference_real_trajectories"] = np.asarray(
-        str(compatible_reference_path)
+        str(reference_path)
     )
     result["action_source"] = np.asarray(
         "copied_from_reference_real_trajectories"
     )
-    return result, calibration_payload
+
+    return result
 
 
 # =============================================================================
@@ -683,9 +771,12 @@ def build_cell_tubes(
     horizon: int,
     batch_size: int,
     device,
+    sampling_strategy: str,
+    build_seed: int,
 ) -> np.ndarray:
     """Return cell min/max bounds; never retain or save sample trajectories."""
 
+    rng = np.random.default_rng(build_seed)
     tubes = np.empty(
         (
             len(cell_bounds),
@@ -698,12 +789,19 @@ def build_cell_tubes(
     print("\n========== In-memory cell tube ==========")
     print(f"cells              : {len(cell_bounds)}")
     print(f"samples per cell   : {samples_per_cell}")
+    print(f"sampling strategy  : {sampling_strategy}")
+    print(f"build seed         : {build_seed}")
     print(f"transition steps   : {horizon}")
     print("cell trajectories  : not saved")
 
     progress_interval = max(1, len(cell_bounds) // 10)
     for cell_index, bounds in enumerate(cell_bounds):
-        initial_states = sample_cell(bounds, samples_per_cell)
+        initial_states = sample_cell(
+            bounds,
+            samples_per_cell,
+            sampling_strategy,
+            rng,
+        )
         predictions = predict_function(
             model,
             initial_states,
@@ -735,6 +833,10 @@ def save_tube_json(
     checkpoint_path: Path,
     samples_per_cell: int,
     environment: str,
+    sampling_strategy: str,
+    build_seed: int,
+    run_index: int,
+    total_runs: int,
 ) -> None:
     grid_json = dict(source_grid["grid"])
     grid_json["dims"] = [
@@ -775,10 +877,13 @@ def save_tube_json(
 
     best_loss = checkpoint.get("best_selection_loss")
     payload = {
-        "method": "transformer_three_point_minmax_envelope",
+        "method": "transformer_sampled_minmax_envelope",
         "environment": environment,
         "guarantee_type": "sampled envelope; no formal coverage guarantee",
-        "sampling_strategy": "lower_corner_center_upper_corner",
+        "sampling_strategy": sampling_strategy,
+        "build_seed": int(build_seed),
+        "run_index": int(run_index),
+        "total_runs": int(total_runs),
         "cell_trajectories_saved": False,
         "samples_per_cell": int(samples_per_cell),
         "horizon": int(tubes.shape[1] - 1),
@@ -1052,48 +1157,67 @@ def validate_outputs(
 def main() -> None:
     settings = validate_config()
 
-    # Torch-dependent code stays in predictor_model.py.  Delaying this import
-    # also makes the format/grid helpers inspectable without importing Torch.
+    # 延迟导入 Torch 相关代码
     from predictor_model import (
         load_predictor_checkpoint,
         predict_trajectories,
     )
 
-    set_seed(int(config.BUILD_SEED))
+    build_seeds = settings["build_seeds"]
+    sampling_strategy = settings["sampling_strategy"]
+
+    set_seed(build_seeds[0])
+
     device = resolve_device(str(config.DEVICE))
+
     model, mean, std, checkpoint = load_predictor_checkpoint(
         settings["checkpoint"],
         device,
     )
 
     environment = settings["environment"]
+
+    # 检查 checkpoint 对应的环境
     checkpoint_environment = checkpoint.get("environment")
+
     if (
         checkpoint_environment is not None
-        and str(checkpoint_environment).strip().lower() != environment
+        and str(checkpoint_environment).strip().lower()
+        != environment
     ):
         raise ValueError(
             f"checkpoint environment={checkpoint_environment!r}, "
             f"config ENVIRONMENT={environment!r}"
         )
+
+    # 检查预测步数
     if int(model.horizon) != int(config.HORIZON):
         raise ValueError(
             f"checkpoint horizon={model.horizon}, "
             f"config HORIZON={config.HORIZON}"
         )
+
+    # Pendulum checkpoint 检查
     if (
         uses_periodic_angle(environment)
-        and bool(config.REQUIRE_UNWRAPPED_PENDULUM_CHECKPOINT)
+        and bool(
+            config.REQUIRE_UNWRAPPED_PENDULUM_CHECKPOINT
+        )
         and checkpoint.get("angle_representation")
         != "unwrapped_theta"
     ):
         raise ValueError(
-            "Pendulum checkpoint is not marked as unwrapped_theta. "
-            "Use a checkpoint trained with continuous unwrapped theta, "
-            "or explicitly disable the policy in config.py."
+            "Pendulum checkpoint is not marked as "
+            "unwrapped_theta. Use a checkpoint trained "
+            "with continuous unwrapped theta, or explicitly "
+            "disable the policy in config.py."
         )
 
-    source_grid, grid, cell_bounds = load_grid(settings["grid"])
+    # 读取 grid 和 cell 边界
+    source_grid, grid, cell_bounds = load_grid(
+        settings["grid"]
+    )
+
     if grid.ndim != model.state_dim:
         raise ValueError(
             f"grid state_dim={grid.ndim}, "
@@ -1107,105 +1231,151 @@ def main() -> None:
     print(f"real trajectories  : {settings['real']}")
     print(f"grid result        : {settings['grid']}")
     print(f"checkpoint         : {settings['checkpoint']}")
-    print(f"trajectory output  : {settings['trajectories']}")
-    print(f"tube output        : {settings['tube']}")
+    print(
+        f"trajectory output  : "
+        f"{settings['trajectories']}"
+    )
+    print(f"sampling strategy  : {sampling_strategy}")
+    print(f"build seeds        : {build_seeds}")
 
-    # Validate the reference NPZ and build its predictions before the
-    # potentially expensive all-cell tube pass.  Input-format errors now fail
-    # before thousands of cells are evaluated.
-    trajectory_payload, calibration_payload = build_reference_predictions(
+    for tube_path in settings["tube_paths"]:
+        print(f"tube output        : {tube_path}")
+
+    # 使用完整 real_trajectories.npz 生成预测轨迹。
+    # 不再进行 calibration split。
+    trajectory_payload = build_reference_predictions(
         predict_trajectories,
         model,
         mean,
         std,
         settings["real"],
         settings["checkpoint"],
-        settings["conformal_real"],
-        checkpoint,
         environment,
         int(config.HORIZON),
         int(config.BATCH_SIZE),
         device,
     )
-    tubes = build_cell_tubes(
-        predict_trajectories,
-        model,
-        mean,
-        std,
-        cell_bounds,
-        int(config.SAMPLES_PER_CELL),
-        int(config.HORIZON),
-        int(config.BATCH_SIZE),
-        device,
+
+    # 临时 predictor trajectory 文件
+    trajectory_temp = settings["trajectories"].with_name(
+        settings["trajectories"].stem
+        + ".building.npz"
     )
 
-    # Write temporary files, validate them, then atomically replace outputs.
-    trajectory_temp = settings["trajectories"].with_name(
-        settings["trajectories"].stem + ".building.npz"
-    )
-    tube_temp = settings["tube"].with_name(
-        settings["tube"].stem + ".building.json"
-    )
-    conformal_real_temp = settings["conformal_real"].with_name(
-        settings["conformal_real"].stem + ".building.npz"
-    )
+    # 保存所有临时 tube 路径
+    tube_temps: List[Path] = []
+
+    # 保存每个 tube 的验证报告
+    reports: List[Dict[str, Any]] = []
+
     try:
-        np.savez_compressed(trajectory_temp, **trajectory_payload)
-        if calibration_payload is not None:
-            np.savez_compressed(
-                conformal_real_temp,
-                **calibration_payload,
-            )
-        save_tube_json(
-            tube_temp,
-            source_grid,
-            grid,
-            cell_bounds,
-            tubes,
-            checkpoint,
-            settings["grid"],
-            settings["checkpoint"],
-            int(config.SAMPLES_PER_CELL),
-            environment,
-        )
-        validation_real = (
-            conformal_real_temp
-            if calibration_payload is not None
-            else settings["real"]
-        )
-        expected_calibration_count = (
-            len(calibration_payload["val_traj"])
-            if calibration_payload is not None
-            else config.EXPECTED_CALIBRATION_COUNT
-        )
-        report = validate_outputs(
-            validation_real,
+        # Predictor trajectory 只生成一次
+        np.savez_compressed(
             trajectory_temp,
-            tube_temp,
-            expected_calibration_count,
+            **trajectory_payload,
         )
-        os.replace(trajectory_temp, settings["trajectories"])
-        os.replace(tube_temp, settings["tube"])
-        if calibration_payload is not None:
-            os.replace(
-                conformal_real_temp,
-                settings["conformal_real"],
+
+        # 分别为每个 seed 构建 raw predictor tube
+        for run_index, (build_seed, tube_path) in enumerate(
+            zip(
+                build_seeds,
+                settings["tube_paths"],
+            ),
+            start=1,
+        ):
+            print(
+                "\n========== Seeded tube "
+                f"{run_index}/{len(build_seeds)} =========="
             )
+
+            # 设置当前 tube 的随机种子
+            set_seed(build_seed)
+
+            # 构建 raw predictor tube
+            tubes = build_cell_tubes(
+                predict_trajectories,
+                model,
+                mean,
+                std,
+                cell_bounds,
+                int(config.SAMPLES_PER_CELL),
+                int(config.HORIZON),
+                int(config.BATCH_SIZE),
+                device,
+                sampling_strategy,
+                build_seed,
+            )
+
+            # 当前 tube 的临时 JSON 路径
+            tube_temp = tube_path.with_name(
+                tube_path.stem + ".building.json"
+            )
+
+            tube_temps.append(tube_temp)
+
+            # 保存 raw predictor tube
+            save_tube_json(
+                tube_temp,
+                source_grid,
+                grid,
+                cell_bounds,
+                tubes,
+                checkpoint,
+                settings["grid"],
+                settings["checkpoint"],
+                int(config.SAMPLES_PER_CELL),
+                environment,
+                sampling_strategy,
+                build_seed,
+                run_index,
+                len(build_seeds),
+            )
+
+            # 直接使用完整 real_trajectories.npz 验证。
+            # None 表示不检查 conformal calibration 数量。
+            reports.append(
+                validate_outputs(
+                    settings["real"],
+                    trajectory_temp,
+                    tube_temp,
+                    None,
+                )
+            )
+
+        # 所有 tube 均通过验证后，再替换正式输出
+        os.replace(
+            trajectory_temp,
+            settings["trajectories"],
+        )
+
+        for tube_temp, tube_path in zip(
+            tube_temps,
+            settings["tube_paths"],
+        ):
+            os.replace(
+                tube_temp,
+                tube_path,
+            )
+
     finally:
+        # 发生异常时清理临时文件
         trajectory_temp.unlink(missing_ok=True)
-        tube_temp.unlink(missing_ok=True)
-        conformal_real_temp.unlink(missing_ok=True)
+
+        for tube_temp in tube_temps:
+            tube_temp.unlink(missing_ok=True)
 
     print("\n========== Completed ==========")
     print(f"[Saved] {settings['trajectories']}")
-    print(f"[Saved] {settings['tube']}")
-    if calibration_payload is not None:
-        print(f"[Saved] {settings['conformal_real']}")
+
+    for tube_path in settings["tube_paths"]:
+        print(f"[Saved] {tube_path}")
+
     print(
-        "[Passed] signed_tube_margin compatibility: "
-        f"{report['cells']} cells, "
-        f"horizon={report['horizon']}, "
-        f"state_dim={report['state_dim']}"
+        "[Passed] raw predictor output validation: "
+        f"{len(reports)} tubes, "
+        f"{reports[0]['cells']} cells each, "
+        f"horizon={reports[0]['horizon']}, "
+        f"state_dim={reports[0]['state_dim']}"
     )
 
 

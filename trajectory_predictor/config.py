@@ -21,8 +21,8 @@ from pathlib import Path
 # This package is preset for the existing Brake dataset.
 #ENVIRONMENT = "brake_system"
 #ENVIRONMENT = "mountain_car"
-ENVIRONMENT = "cartpole"
-#ENVIRONMENT = "pendulum"
+#ENVIRONMENT = "cartpole"
+ENVIRONMENT = "pendulum"
 
 ENVIRONMENT_HORIZONS = {
     "pendulum": 20,
@@ -41,7 +41,11 @@ HORIZON = ENVIRONMENT_HORIZONS[ENVIRONMENT]
 #   1) the initial-state source for Predictor trajectories; and
 #   2) the format/provenance template copied into predictor_trajectories.npz.
 REAL_TRAJECTORIES = Path(
-    f"/home/tealab_shared/safety_results/{ENVIRONMENT}/real_trajectories.npz"
+    # f"/home/tealab_shared/safety_results/{ENVIRONMENT}/real_trajectories.npz"
+     "/home/tealab_shared/safety_results/pendulum/real_trajectories.npz"
+    # "/home/tealab_shared/safety_results/mountain_car/100cell_gmlp_real_trajectories.npz"
+    # "/home/tealab_shared/safety_results/cartpole/real_trajectories.npz"
+    # "/home/tealab_shared/safety_results/brake_system/real_trajectories.npz"
 )
 
 # JSON containing grid.dims.  Existing cells are used when their initial
@@ -53,7 +57,7 @@ GRID_RESULTS = {
     ),
     "mountain_car": Path(
         "/home/tealab_shared/safety_results/mountain_car/"
-        "safety_result_big_cell_best.json"
+        "100cell_safety_result_g_mlp_100.json"
     ),
     "cartpole": Path(
         "/home/tealab_shared/safety_results/cartpole/"
@@ -83,13 +87,6 @@ OUTPUT_DIRECTORY = Path(
 
 TRAJECTORY_OUTPUT = OUTPUT_DIRECTORY / "predictor_trajectories.npz"
 TUBE_OUTPUT = OUTPUT_DIRECTORY / "predictor_tube.json"
-
-# When a legacy NPZ has no train_traj, build_predictor.py writes the held-out
-# calibration view here.  The original REAL_TRAJECTORIES file is never
-# modified.  Pass this file to --calibration-real.
-CONFORMAL_REAL_OUTPUT = (
-    OUTPUT_DIRECTORY / "conformal_real_trajectories.npz"
-)
 
 
 # =============================================================================
@@ -131,9 +128,16 @@ TRAIN_SEED = 2025
 # 5. Build parameters
 # =============================================================================
 
-# Every cell is sampled at exactly:
-#   1) lower corner, 2) center, 3) upper corner.
+# Every cell is sampled at exactly three points.
 SAMPLES_PER_CELL = 3
+
+# Sampling modes:
+#   "latin_hypercube": seeded, well-spread random points (recommended when
+#                      generating several different tubes);
+#   "random_uniform":  seeded independent uniform points;
+#   "diagonal":        legacy lower/center/upper diagonal points.  This mode
+#                      is deterministic, so changing the seed has no effect.
+CELL_SAMPLING_STRATEGY = "latin_hypercube"
 
 # Inference batch size.  Lower this if GPU/CPU memory is insufficient.
 BATCH_SIZE = 1024
@@ -141,7 +145,19 @@ BATCH_SIZE = 1024
 # "auto" selects CUDA when available, otherwise CPU.
 DEVICE = "auto"
 
-# Reproducibility seed used during construction/inference.
+# Build one different, reproducible Predictor tube for every seed.  With the
+# default five seeds, build_predictor.py creates:
+#   predictor_tube_seed_0.json
+#   predictor_tube_seed_1.json
+#   predictor_tube_seed_2.json
+#   predictor_tube_seed_3.json
+#   predictor_tube_seed_4.json
+#
+# To restore the old single-output behavior, use BUILD_SEEDS = (0,).  A
+# single run writes the original TUBE_OUTPUT name: predictor_tube.json.
+BUILD_SEEDS = (0, 1, 2, 3, 4)
+
+# Backward-compatible fallback for older build_predictor.py versions.
 BUILD_SEED = 0
 
 
