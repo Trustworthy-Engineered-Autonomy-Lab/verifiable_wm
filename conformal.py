@@ -61,7 +61,7 @@ def nonconformity_scores(
     return l2_per_step.max(axis=1)
 
 
-def _conformal_quantile_with_rank(
+def conformal_quantile_with_rank(
     scores: np.ndarray, *, alpha: float
 ) -> tuple[float, int]:
     scores = np.asarray(scores, dtype=float)
@@ -80,7 +80,7 @@ def _conformal_quantile_with_rank(
 
 
 def conformal_quantile(scores: np.ndarray, *, alpha: float) -> float:
-    gamma, _ = _conformal_quantile_with_rank(scores, alpha=alpha)
+    gamma, _ = conformal_quantile_with_rank(scores, alpha=alpha)
     return gamma
 
 
@@ -217,7 +217,7 @@ def calibrate_gamma(
         circular_dims=circular_dims,
         period=period,
     )
-    gamma, rank = _conformal_quantile_with_rank(scores, alpha=alpha)
+    gamma, rank = conformal_quantile_with_rank(scores, alpha=alpha)
 
     return {
         "split": split,
