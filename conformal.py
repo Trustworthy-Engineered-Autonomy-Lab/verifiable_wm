@@ -137,6 +137,11 @@ def _validate_calibration_artifacts(
         raise ValueError("real and DWM initial state mismatch")
 
 
+def _optional_metadata_value(data: np.lib.npyio.NpzFile, key: str) -> str | None:
+    """Read optional provenance metadata while accepting legacy trajectory archives."""
+    return str(data[key].item()) if key in data.files else None
+
+
 def calibrate_gamma(
     *,
     real_path: Path,
@@ -147,6 +152,7 @@ def calibrate_gamma(
     circular_dims: Sequence[int] = (),
     period: float = 2 * math.pi,
     horizon: int = EXPECTED_HORIZON,
+    require_matching_starv_config: bool = True,
 ) -> dict:
     real_key = f"{split}_traj"
     with np.load(real_path, allow_pickle=False) as real_data, np.load(
@@ -157,20 +163,38 @@ def calibrate_gamma(
         actions_key = f"{split}_actions"
         real_actions = real_data[actions_key]
         dwm_actions = dwm_data[actions_key]
-        real_horizon = int(real_data["rollout_steps"].item())
-        real_starv_config = str(real_data["starv_config"].item())
-        real_controller_weights = str(real_data["controller_weights"].item())
-        dwm_horizon = int(dwm_data["rollout_steps"].item())
-        dwm_starv_config = str(dwm_data["starv_config"].item())
-        dwm_controller_weights = str(dwm_data["controller_weights"].item())
-        decoder_weights = str(dwm_data["decoder_weights"].item())
+        real_horizon = (
+            int(real_data["rollout_steps"].item())
+            if "rollout_steps" in real_data.files
+            else real_traj.shape[1] - 1
+        )
+        dwm_horizon = (
+            int(dwm_data["rollout_steps"].item())
+            if "rollout_steps" in dwm_data.files
+            else dwm_traj.shape[1] - 1
+        )
+        real_starv_config = _optional_metadata_value(real_data, "starv_config")
+        real_controller_weights = _optional_metadata_value(real_data, "controller_weights")
+        dwm_starv_config = _optional_metadata_value(dwm_data, "starv_config")
+        dwm_controller_weights = _optional_metadata_value(dwm_data, "controller_weights")
+        decoder_weights = _optional_metadata_value(dwm_data, "decoder_weights")
 
-    if real_starv_config != dwm_starv_config:
+    if (
+        require_matching_starv_config
+        and
+        real_starv_config is not None
+        and dwm_starv_config is not None
+        and real_starv_config != dwm_starv_config
+    ):
         raise ValueError(
             "starv_config mismatch: "
             f"real={real_starv_config}, dwm={dwm_starv_config}"
         )
-    if real_controller_weights != dwm_controller_weights:
+    if (
+        real_controller_weights is not None
+        and dwm_controller_weights is not None
+        and real_controller_weights != dwm_controller_weights
+    ):
         raise ValueError(
             "controller_weights mismatch: "
             f"real={real_controller_weights}, dwm={dwm_controller_weights}"
@@ -212,6 +236,7 @@ def calibrate_gamma(
         "decoder_weights": decoder_weights,
         "starv_config": real_starv_config,
         "controller_weights": real_controller_weights,
+        "require_matching_starv_config": require_matching_starv_config,
     }
 
 
