@@ -23,6 +23,7 @@ settings.json
 metrics.json
 dwm_weight/cartpole/intensity/metrics.json
 dwm_weight/cartpole/saliency/metrics.json
+# 单元测试只验证代码内部自洽，不产生任何论文产物，仅本地维护
 /tests
 *.json
 !/config/**/*.json
@@ -55,3 +56,5 @@ datasets/brake_system/ground_truth/
 *.tar.gz
 dwm_weight
 safety_results
+/tools/plot_brake_dwm_sampled_diagnostic.py
+config

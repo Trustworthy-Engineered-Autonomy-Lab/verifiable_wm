@@ -17,6 +17,7 @@ from utils import (
     starv_states_path,
     render_images,
     to_numpy,
+    dynamics_provenance,
 )
 from sampled_tube import (
     build_sampled_safety_result,
@@ -141,7 +142,7 @@ def save_dataset(config, dataset):
     return output_dir
 
 
-def save_dwm_trajectories(config, trajectory_splits):
+def save_dwm_trajectories(config, trajectory_splits, dynamic=None):
     output_dir = Path(config["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -159,6 +160,8 @@ def save_dwm_trajectories(config, trajectory_splits):
     arrays["controller_weights"] = np.array(
         str(config["controller"]["weights"])
     )
+    if dynamic is not None:
+        arrays.update(dynamics_provenance(dynamic))
 
     output_path = output_dir / f"dwm_trajectories_{decoder_variant(config)}.npz"
     np.savez_compressed(output_path, **arrays)
@@ -354,7 +357,7 @@ def generate_dataset(config):
 
     # output_dir = save_dataset(config, dataset)
     output_dir = Path(config["output_dir"])
-    save_dwm_trajectories(config, trajectory_splits)
+    save_dwm_trajectories(config, trajectory_splits, dynamic)
     return output_dir
 
 

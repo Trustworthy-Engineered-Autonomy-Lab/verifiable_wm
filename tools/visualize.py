@@ -1,3 +1,13 @@
+"""Render a StarV safety_result.json as a red/green 2D safety map.
+
+Reads the `grid` and `cells` written by verify.py and colours each cell by
+its `result` flag (green = verified safe, red = not verified). Grids whose
+extra dimensions are singletons are squeezed down to the two that vary.
+
+    python -m tools.visualize results/pendulum/safety_result.json \
+        --title "Pendulum" --save Figures/pendulum_safety.png
+"""
+
 import numpy as np
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
@@ -88,11 +98,22 @@ if __name__ == "__main__":
         dims = grid['dims']
         effective_dims = []
         for dim in dims:
-            if dim['num'] != 1:
+            if dim['num'] == 1:
                 print(f"Ignored dimension {dim['name']} whose num is 1")
+            else:
                 effective_dims.append(dim)
 
-        print(f"Grid size: {effective_dims[0]['num']} × {effective_dims[0]['num']} = {effective_dims[0]['num'] * effective_dims[1]['num']} total cells")
+        if len(effective_dims) != 2:
+            print(
+                f"Need exactly 2 varying dimensions to plot, found "
+                f"{len(effective_dims)}: {[d['name'] for d in effective_dims]}"
+            )
+            sys.exit(1)
+
+        print(
+            f"Grid size: {effective_dims[0]['num']} × {effective_dims[1]['num']}"
+            f" = {effective_dims[0]['num'] * effective_dims[1]['num']} total cells"
+        )
         
         # Create the safety matrix
         safety_matrix = _get_safety_matrix(effective_dims, cells).T
