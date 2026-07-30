@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colormaps
 from matplotlib.cm import ScalarMappable
-from matplotlib.colors import Normalize
-from matplotlib.patches import Rectangle
+from matplotlib.colors import Normalize, to_rgba
+from matplotlib.patches import Patch, Rectangle
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -195,9 +195,22 @@ def random_figure_layout() -> dict[str, Any]:
     return {
         "title_y": 0.975,
         "legend_y": 0.925,
+        "legend_columns": 5,
         "subplot_top": 0.86,
         "subplot_right": 0.88,
         "colorbar_rect": (0.91, 0.15, 0.015, 0.67),
+    }
+
+
+def random_tube_style() -> dict[str, Any]:
+    return {
+        "edge_color": "darkorange",
+        "edge_alpha": 0.95,
+        "face_alpha": 0.14,
+        "linewidth": 2.2,
+        "rectangle_zorder": 3,
+        "trajectory_zorder": 4,
+        "legend_label": "Tube rectangles",
     }
 
 
@@ -369,6 +382,130 @@ def write_diagnostic(
     return png_path, json_path
 
 
+def write_worst_complete_trajectory(
+    payload: dict[str, Any],
+    *,
+    safety_path: Path,
+    real_path: Path,
+    model_path: Path,
+    output_dir: Path,
+) -> tuple[Path, Path]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    png_path = (
+        output_dir
+        / "brake_dwm_sampled_tube_worst_complete_trajectory.png"
+    )
+    json_path = (
+        output_dir
+        / "brake_dwm_sampled_tube_worst_complete_trajectory.json"
+    )
+
+    style = random_tube_style()
+    bounds = payload["tube_bounds"]
+    norm = Normalize(vmin=0, vmax=max(len(bounds) - 1, 1))
+    cmap = colormaps["Oranges"]
+    fig, axis = plt.subplots(figsize=(12, 7))
+    for step, step_bounds in enumerate(bounds):
+        low_dis, high_dis = _interval(step_bounds[0])
+        low_vel, high_vel = _interval(step_bounds[1])
+        axis.add_patch(
+            Rectangle(
+                (low_dis, low_vel),
+                high_dis - low_dis,
+                high_vel - low_vel,
+                facecolor=to_rgba(cmap(norm(step)), style["face_alpha"]),
+                edgecolor=to_rgba(
+                    style["edge_color"], style["edge_alpha"]
+                ),
+                linewidth=style["linewidth"],
+                zorder=style["rectangle_zorder"],
+            )
+        )
+
+    real = np.asarray(payload["real_states"], dtype=float)
+    model = np.asarray(payload["model_states"], dtype=float)
+    axis.plot(
+        real[:, 0],
+        real[:, 1],
+        "o-",
+        color="tab:red",
+        label="Real",
+        zorder=style["trajectory_zorder"],
+    )
+    axis.plot(
+        model[:, 0],
+        model[:, 1],
+        "s--",
+        color="tab:blue",
+        label="DWM",
+        zorder=style["trajectory_zorder"],
+    )
+    axis.scatter(
+        real[0, 0],
+        real[0, 1],
+        s=100,
+        color="green",
+        zorder=5,
+        label="Initial state",
+    )
+    first_out = payload["first_violating_step"]
+    if first_out is not None:
+        axis.scatter(
+            real[first_out, 0],
+            real[first_out, 1],
+            s=160,
+            facecolors="none",
+            edgecolors="black",
+            linewidths=2.2,
+            zorder=6,
+            label="First real violation",
+        )
+    handles, labels = axis.get_legend_handles_labels()
+    handles.append(
+        Patch(
+            facecolor=to_rgba("orange", style["face_alpha"]),
+            edgecolor=style["edge_color"],
+            linewidth=style["linewidth"],
+            label=style["legend_label"],
+        )
+    )
+    labels.append(style["legend_label"])
+    axis.legend(handles, labels, loc="best")
+    axis.set(
+        xlabel="distance",
+        ylabel="velocity",
+        title=(
+            "Brake worst complete Real/DWM trajectory with sampled tubes\n"
+            f"traj {payload['trajectory_index']} | "
+            f"cell {payload['cell_index']} | "
+            f"first out {first_out} | "
+            f"margin {payload['worst_real_margin']:.9g}"
+        ),
+    )
+    axis.grid(alpha=0.25)
+    colorbar = fig.colorbar(
+        ScalarMappable(norm=norm, cmap=cmap), ax=axis, pad=0.02
+    )
+    colorbar.set_label("tube time step")
+    fig.tight_layout()
+    fig.savefig(png_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+    saved = {
+        **payload,
+        "selection": "minimum real signed margin",
+        "sources": {
+            "safety": str(safety_path),
+            "real": str(real_path),
+            "model": str(model_path),
+        },
+    }
+    json_path.write_text(
+        json.dumps(_json_ready(saved), indent=2), encoding="utf-8"
+    )
+    return png_path, json_path
+
+
 def write_random_diagnostics(
     payloads: Sequence[dict[str, Any]],
     *,
@@ -394,6 +531,7 @@ def write_random_diagnostics(
     norm = Normalize(vmin=0, vmax=max(max_step, 1))
     cmap = colormaps["Oranges"]
     layout = random_figure_layout()
+    tube_style = random_tube_style()
     fig, axes = plt.subplots(2, 3, figsize=(19, 11), sharex=True, sharey=True)
     for axis, payload in zip(axes.flat, payloads):
         bounds = payload["tube_bounds"]
@@ -406,16 +544,24 @@ def write_random_diagnostics(
                     (low_dis, low_vel),
                     high_dis - low_dis,
                     high_vel - low_vel,
-                    facecolor=color,
-                    edgecolor=color,
-                    alpha=0.18,
-                    linewidth=1.3,
+                    facecolor=to_rgba(color, tube_style["face_alpha"]),
+                    edgecolor=to_rgba(
+                        tube_style["edge_color"],
+                        tube_style["edge_alpha"],
+                    ),
+                    linewidth=tube_style["linewidth"],
+                    zorder=tube_style["rectangle_zorder"],
                 )
             )
         real = np.asarray(payload["real_states"], dtype=float)
         model = np.asarray(payload["model_states"], dtype=float)
         axis.plot(
-            real[:, 0], real[:, 1], "o-", color="tab:red", label="Real"
+            real[:, 0],
+            real[:, 1],
+            "o-",
+            color="tab:red",
+            label="Real",
+            zorder=tube_style["trajectory_zorder"],
         )
         axis.plot(
             model[:, 0],
@@ -423,6 +569,7 @@ def write_random_diagnostics(
             "s--",
             color="tab:blue",
             label="DWM",
+            zorder=tube_style["trajectory_zorder"],
         )
         axis.scatter(
             real[0, 0],
@@ -456,12 +603,21 @@ def write_random_diagnostics(
     for axis in axes[:, 0]:
         axis.set_ylabel("velocity")
     handles, labels = axes.flat[0].get_legend_handles_labels()
+    handles.append(
+        Patch(
+            facecolor=to_rgba("orange", tube_style["face_alpha"]),
+            edgecolor=tube_style["edge_color"],
+            linewidth=tube_style["linewidth"],
+            label=tube_style["legend_label"],
+        )
+    )
+    labels.append(tube_style["legend_label"])
     fig.legend(
         handles,
         labels,
         loc="upper center",
         bbox_to_anchor=(0.5, layout["legend_y"]),
-        ncol=4,
+        ncol=layout["legend_columns"],
     )
     colorbar_axis = fig.add_axes(layout["colorbar_rect"])
     fig.colorbar(
@@ -526,6 +682,13 @@ def main() -> None:
         model_path=args.model,
         output_dir=args.output_dir,
     )
+    worst_png_path, worst_json_path = write_worst_complete_trajectory(
+        payload,
+        safety_path=args.safety,
+        real_path=args.real,
+        model_path=args.model,
+        output_dir=args.output_dir,
+    )
     random_payloads = build_random_diagnostics(
         real, model, grid, cells, count=6, seed=728
     )
@@ -539,6 +702,8 @@ def main() -> None:
     )
     print(f"diagnostic plot: {png_path}")
     print(f"diagnostic values: {json_path}")
+    print(f"worst complete plot: {worst_png_path}")
+    print(f"worst complete values: {worst_json_path}")
     print(f"random-six plot: {random_png_path}")
     print(f"random-six values: {random_json_path}")
 
