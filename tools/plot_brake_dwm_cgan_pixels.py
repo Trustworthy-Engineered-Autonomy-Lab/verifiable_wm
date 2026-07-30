@@ -11,6 +11,8 @@ import torch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Checkpoints live in the lab-shared tree, not in the repo.
+SHARED_WEIGHTS = Path("/home/tealab_shared/dwm_weight")
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -19,8 +21,8 @@ from model import Decoder, G_MLP
 
 STATE = (6.2, 6.2)
 LATENT = (0.0, 0.0)
-DWM_WEIGHTS = PROJECT_ROOT / "dwm_weight/brake_system/decoder.pth"
-CGAN_WEIGHTS = PROJECT_ROOT / "dwm_weight/brake_system/g_mlp/G_brake.pth"
+DWM_WEIGHTS = SHARED_WEIGHTS / "brake_system/decoder.pth"
+CGAN_WEIGHTS = SHARED_WEIGHTS / "brake_system/g_mlp/G_brake.pth"
 OUTPUT_PATH = PROJECT_ROOT / "paper/Figures/brake_dwm_cgan_pixel_difference.png"
 
 

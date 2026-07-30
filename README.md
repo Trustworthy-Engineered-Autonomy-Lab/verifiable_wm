@@ -97,8 +97,10 @@ datasets/<env>/data/dataset_v1/
 | `real_trajectories.npz` | 从 `starv_states.npz` 出发，使用真实 renderer 的完整闭环轨迹。 |
 | `dwm_trajectories_<variant>.npz` | decoder 替代 renderer 后得到的完整闭环轨迹；`variant` 和 `decoder_weights` 字段记录所用 checkpoint。 |
 
-旧的无 variant 文件 `dwm_trajectories.npz` 已停用并删除。当前 variant 为 `old`、`intensity` 和
-`saliency`。
+旧的无 variant 文件 `dwm_trajectories.npz` 已停用并删除。当前在用的 variant 为 `saliency`
+（主线）、`g_mlp`（cGAN baseline），以及 MountainCar 的 `saliency_background` 和
+Pendulum 的 `clamp`。`old`、`intensity`、`baseline` 以及 λ=0 对照组 `*_lambda0` 均已废弃，
+对应权重和配置都已移除。
 
 常用 shape：
 
@@ -117,8 +119,7 @@ CartPole real/DWM trajectories:
 
 ### 1. 生成 decoder 训练数据
 
-在 `notebooks/generate_dataset.ipynb` 中运行 `run_make_decoder_dataset("cartpole")`。
-只有需要重新生成训练图片时才运行完整流程。对应的命令行为：
+只有需要重新生成训练图片时才运行完整流程：
 
 ```bash
 python make_decoder_dataset.py config/make_decoder_dataset/cartpole.json
@@ -130,8 +131,7 @@ python make_decoder_dataset.py config/make_decoder_dataset/pendulum.json
 
 ### 2. 只生成 StarV 对齐的产物
 
-如果要保留现有 decoder 训练数据，可在同一个 notebook 中运行
-`run_make_decoder_dataset("cartpole", starv_only=True)`。对应的命令行为：
+如果要保留现有 decoder 训练数据，使用 `--starv-only`：
 
 ```bash
 python make_decoder_dataset.py config/make_decoder_dataset/cartpole.json --starv-only
@@ -147,8 +147,7 @@ real_trajectories.npz
 
 ### 3. 计算 saliency 并训练 decoder
 
-在 `notebooks/saliency_diagnostics.ipynb` 第 0 节运行 `precompute_saliency_maps`，然后在
-`notebooks/train_decoder.ipynb` 中运行 `train_decoder`。对应的命令行为：
+先预计算 saliency map，再训练 decoder：
 
 ```bash
 python saliency_map/scripts/precompute_saliency_maps.py \
@@ -159,13 +158,12 @@ python saliency_map/scripts/precompute_saliency_maps.py \
   --occlusion-baseline background_median
 
 python train_decoder.py config/train_decoder/cartpole/saliency.json
-python train_decoder.py config/train_decoder/cartpole/intensity.json
 ```
 
 MountainCar 命令会生成 `saliency_occlusion_background_median.npz`。Pendulum 使用默认的
 white occlusion baseline，只需换成对应配置。
 
-`notebooks/train_decoder.ipynb` 也提供完整的 saliency `alpha × lambda_ctrl` 消融入口：
+`ablation.py` 提供完整的 saliency `alpha × lambda_ctrl` 消融入口：
 
 ```text
 alpha       = [0.5, 1, 2, 4, 8, 16, 32]
@@ -173,8 +171,7 @@ lambda_ctrl = [0, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5]
 seed        = 2025
 ```
 
-CartPole 和 Pendulum 各有 49 个训练点，不筛选 seed。网格实现位于 `ablation.py`，notebook
-只负责调用和显示表格。每个点使用独立目录：
+CartPole 和 Pendulum 各有 49 个训练点，不筛选 seed。每个点使用独立目录：
 
 ```text
 dwm_weight/<env>/alpha_lambda_grid/
@@ -190,8 +187,7 @@ dwm_weight/<env>/alpha_lambda_grid/
 
 ### 4. 生成 DWM trajectory
 
-在 `notebooks/generate_dataset.ipynb` 中运行
-`run_sampling("cartpole", decoder_variant="saliency")`。对应的命令行为：
+运行 DWM 闭环 rollout：
 
 ```bash
 python sampling.py config/sampling/cartpole.json --decoder-variant saliency
@@ -210,8 +206,7 @@ sampling 直接读取本地 `datasets/<env>/data/dataset_v1/starv_states.npz`，
 
 ### 5. 运行 StarV
 
-`verify.py` 依赖 `mpi4py` 多进程启动，不适合放进 notebook 的单进程 kernel，因此继续从命令行
-运行：
+`verify.py` 依赖 `mpi4py` 多进程启动：
 
 ```bash
 python verify.py config/starv_verification/cartpole.json
@@ -318,7 +313,7 @@ max_l2_p95     每条 trajectory 最大偏差的 95% 分位数
 
 `ablation.py` 将单帧 controller/pixel MSE 与闭环 L2 合并，并在网格根目录写出
 `training_metrics.csv`、`rollout_l2.csv` 和 `combined_metrics.csv`。MountainCar 的 validation split 用于选择
-`alpha/lambda_ctrl`；独立的 400 条 test trajectory 不参与选择，只用于最终 conformal 校准。主线晋升必须在 notebook 中显式调用
+`alpha/lambda_ctrl`；独立的 400 条 test trajectory 不参与选择，只用于最终 conformal 校准。主线晋升必须显式调用
 `promote_mainline(..., force=True)`，不会由排序结果自动覆盖。
 
 StarV 为每个初始 grid cell 计算 decoder world model 的 reachable tube。`compare.py` 根据轨迹的
@@ -340,49 +335,11 @@ $\Gamma_{0.95}$ 为排序后的第 381 个 $\delta_i$（不做插值）。valida
 的超参数选择；这 400 条 test trajectory 只用于固定模型后的 $\Gamma_{0.95}$ 校准。然后按
 Theorem 1 在每个时间步用同一个 $\Gamma_{0.95}$ 对 DWM reachable tube 做 inflation。
 
-## 测试
-
-从仓库根目录运行当前全部测试：
-
-```bash
-MPLCONFIGDIR=/tmp/matplotlib-codex \
-  /home/tealab_shared/starv/env/starv_shared/bin/python \
-  -m unittest discover -s tests -v
-```
-
-当前共 26 项测试，正常结果为 `OK`。这些测试使用 mock 和 `/tmp` 中的临时文件，不会训练模型、
-运行完整 sampling/StarV、覆盖正式 NPZ 或修改 notebook；完整运行通常不到 1 秒。
-
-测试分别覆盖：
-
-- `test_sampling.py`：variant 文件名以及 `variant`、`decoder_weights` 溯源字段；
-- `test_starv_states.py`：StarV grid 范围、完整状态维度和本地 NPZ 加载；
-- `test_ablation.py`：消融网格、断点续跑、rollout 溯源、L2 指标和 mainline 晋升保护。
-
-运行时可能出现 Gym 维护状态或系统用户 ID 的环境警告；只要最终显示 `Ran 26 tests` 和 `OK`，就表示
-测试通过。真正的失败会显示 `FAIL` 或 `ERROR`，并返回非零退出码。
-
 ## 文件树
 
 ```text
 verifiable_wm/
 ├── README.md
-├── config/
-│   ├── make_decoder_dataset/   # 各环境的数据生成配置
-│   ├── sampling/               # DWM rollout 配置
-│   ├── starv_verification/     # StarV grid、权重和验证参数
-│   └── train_decoder/          # 各环境、各 variant 的训练配置
-├── datasets/
-│   ├── cartpole/data/dataset_v1/
-│   ├── pendulum/data/dataset_v1/
-│   └── mountain_car/data/dataset_v1/
-├── dwm_weight/                 # decoder checkpoints 与训练指标
-├── notebooks/
-│   ├── generate_dataset.ipynb
-│   ├── train_decoder.ipynb
-│   └── saliency_diagnostics.ipynb
-├── report/                     # 每日工作记录
-├── results/                    # StarV 验证和对比结果
 ├── saliency_map/
 │   ├── README.md
 │   ├── methods.py              # saliency 方法与公共加载逻辑
@@ -393,20 +350,51 @@ verifiable_wm/
 │   ├── dynamic.py
 │   ├── model.py
 │   └── verifiers.py
-├── tests/
-│   ├── test_ablation.py
-│   ├── test_sampling.py
-│   └── test_starv_states.py
-├── tools/
-│   └── visualize.py
+├── tools/                      # 独立脚本，见「工具脚本」一节
 ├── make_decoder_dataset.py     # 训练数据、StarV states 与真实轨迹生成
 ├── ablation.py                 # alpha-lambda 网格、DWM rollout、L2 表与显式晋升
 ├── sampling.py                 # variant-aware DWM 闭环 rollout
 ├── train_decoder.py            # decoder 训练
+├── train_gan.py                # cGAN baseline 训练
 ├── verify.py                   # StarV/MPI 验证入口
 ├── compare.py                  # trajectory 与 reachable tube 对比
+├── conformal.py                # conformal 分位数与 rank
+├── sampled_tube.py             # per-cell 采样 tube 构建与校验
+├── signed_tube_margin.py       # 轨迹对 tube 的带符号 margin
 ├── dynamic.py                  # 真实环境 dynamics
 ├── env.py                      # renderer 与环境封装
 ├── model.py                    # controller 和 decoder
 └── utils.py                    # 数据采样与通用工具
 ```
+
+以下目录不随仓库分发，由运行流程生成或指向实验室共享存储：
+
+| 目录 | 来源 |
+| --- | --- |
+| `datasets/<env>/data/` | 由 `make_decoder_dataset.py` 和 `sampling.py` 生成 |
+| `results/` | 由 `verify.py`、`compare.py` 和 `sampled_tube.py` 生成 |
+| `config/` | 符号链接 → `/home/tealab_shared/config/`，含 `make_decoder_dataset/`、`sampling/`、`sampled_tube/`、`starv_verification/`、`train_decoder/`、`train_gan/` 六组配置 |
+| `dwm_weight/` | 符号链接 → `/home/tealab_shared/dwm_weight/`，config 中一律用该绝对路径引用 |
+| `safety_results/` | 符号链接 → `/home/tealab_shared/safety_results/` |
+| `tests/`、`report/`、`docs/`、`paper/` | 本地开发记录，不入库 |
+
+## 工具脚本
+
+`tools/` 下均为独立可执行脚本，统一用 `python -m tools.<name> --help` 查看参数。
+
+通用：
+
+- `visualize.py`：把 `safety_result.json` 画成红/绿安全网格图；
+- `gt_grid_eval.py`：三个 gym 环境的稠密真实闭环 rollout ground truth（论文 Sec. 3.3.1）；
+- `eval_sym_cp_table.py`：生成论文 `tab:tube-comparison` 的一个区块（symbolic tube 的 raw / CP-D / CP-R）；
+- `check_dynamics_vintage.py`：判定轨迹 npz 是用哪一版动力学参数生成的，混用时返回非零退出码。
+
+Brake / AEBS（需要 CARLA 数据或服务器）：
+
+- `collect_brake_real_trajectories.py`：采集 CARLA 相机闭环真实轨迹；
+- `make_brake_decoder_dataset.py`：把 CARLA 采集转成本仓 `decoder_states.npz` 格式；
+- `gt_brake_grid_eval.py`：brake 安全网格的相机闭环 ground truth（需 CARLA 服务器）；
+- `compare_brake_ground_truth.py`：StarV 安全图对比 CARLA ground truth；
+- `eval_brake_gan.py`：给 brake cGAN checkpoint 打分；
+- `plot_brake_pixel_bounds.py`：AEBS decoder 与 cGAN 的逐像素可达界；
+- `plot_brake_dwm_cgan_pixels.py`：固定状态与 latent 下的 DWM/cGAN 像素对比。

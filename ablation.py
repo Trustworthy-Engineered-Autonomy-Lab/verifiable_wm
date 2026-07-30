@@ -357,7 +357,7 @@ def run_rollout_grid(
 def run_mainline_rollouts(
     env: str,
     *,
-    variants: Sequence[str] = ("intensity", "saliency"),
+    variants: Sequence[str] = ("saliency",),
     skip_existing: bool = True,
     continue_on_error: bool = True,
     generator=None,
