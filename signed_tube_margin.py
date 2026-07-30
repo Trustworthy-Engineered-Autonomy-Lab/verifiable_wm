@@ -204,15 +204,6 @@ def trajectory_signed_margin(
     ))
 
 
-def descending_p95(scores: Sequence[float]) -> float:
-    values = np.asarray(scores, dtype=float)
-    if values.size != 400:
-        raise ValueError(f"expected exactly 400 valid trajectory scores, got {values.size}")
-    if not np.all(np.isfinite(values)):
-        raise ValueError("trajectory scores must be finite")
-    return float(np.sort(values)[::-1][379])
-
-
 def load_safety_result(path: Path) -> tuple[GridInfo, list[dict[str, Any]]]:
     with path.open(encoding="utf-8") as file:
         data = json.load(file)
@@ -290,8 +281,10 @@ def calibration_gamma(
     grid: GridInfo,
     cells: Sequence[dict[str, Any]],
     dims: Sequence[int],
-) -> tuple[float, float]:
-    """Calibrate one scalar inflation from the rank-380 signed margin."""
+    *,
+    alpha: float,
+) -> tuple[float, float, int]:
+    """Calibrate scalar CP-R inflation using a finite-sample conformal rank."""
     if calibration_trajectories.ndim != 3:
         raise ValueError(
             "calibration trajectories must have shape (N, T+1, state_dim), "
@@ -299,13 +292,20 @@ def calibration_gamma(
         )
     rows = evaluate_set(calibration_trajectories, grid, cells, dims)
     scores = [float(row["signed_margin"]) for row in rows if row["status"] == "valid"]
-    if len(rows) != 400 or len(scores) != 400:
+    if len(scores) != len(rows):
         raise ValueError(
-            "rank-380 calibration requires exactly 400 valid trajectories, "
+            "CP-R calibration requires every trajectory to be valid; "
             f"got valid={len(scores)}, total={len(rows)}"
         )
-    rank_margin = descending_p95(scores)
-    return max(0.0, -rank_margin), rank_margin
+    if not scores:
+        raise ValueError("CP-R calibration requires at least one trajectory")
+
+    gamma_raw, rank = conformal.conformal_quantile_with_rank(
+        -np.asarray(scores, dtype=float),
+        alpha=alpha,
+    )
+    rank_margin = -gamma_raw
+    return max(0.0, gamma_raw), rank_margin, rank
 
 
 def inflate_cells(
@@ -335,45 +335,28 @@ def build_tube_variants(
     grid: GridInfo,
     dims: Sequence[int],
     calibration_trajectories: np.ndarray,
-    real_path: Path,
-    model_path: Path,
-    env: str,
     alpha: float,
-    require_matching_starv_config: bool = True,
 ) -> tuple[dict[str, Sequence[dict[str, Any]]], dict[str, dict[str, Any]]]:
-    """Build the raw tube and its CP-D and CP-R scalar inflations."""
-    cp_d = conformal.calibrate_gamma(
-        real_path=real_path,
-        dwm_path=model_path,
-        dims=dims,
-        alpha=alpha,
-        split="val",
-        circular_dims=conformal.ENV_CIRCULAR_DIMS.get(env, ()),
-        horizon=conformal.ENV_HORIZON[env],
-        require_matching_starv_config=require_matching_starv_config,
-    )
-    cp_r_gamma, cp_r_rank_margin = calibration_gamma(
-        calibration_trajectories, grid, cells, dims
+    """Build the raw tube and its CP-R scalar inflation."""
+    cp_r_gamma, cp_r_rank_margin, cp_r_rank = calibration_gamma(
+        calibration_trajectories, grid, cells, dims, alpha=alpha
     )
     variants = {
         "Raw tube": cells,
-        "CP-D (inflated)": inflate_cells(
-            cells, dims, [float(cp_d["gamma"])] * len(dims)
-        ),
         "CP-R (inflated)": inflate_cells(
             cells, dims, [cp_r_gamma] * len(dims)
         ),
     }
     cp_r = {
-        "method": "descending rank-380 signed trajectory margin",
-        "n": 400,
-        "sort": "descending",
-        "rank": 380,
+        "method": "finite-sample conformal quantile of negative signed trajectory margins",
+        "n": len(calibration_trajectories),
+        "alpha": alpha,
+        "rank": cp_r_rank,
         "signed_margin_at_rank": cp_r_rank_margin,
         "gamma": cp_r_gamma,
         "check_dims": [int(dim) for dim in dims],
     }
-    return variants, {"cp_d": cp_d, "cp_r": cp_r}
+    return variants, {"cp_r": cp_r}
 
 
 def interval_union_length(bounds: Sequence[float], delta: float = 0.0) -> float:
@@ -521,7 +504,14 @@ def write_results(rows: Sequence[dict[str, Any]], label: str, output_dir: Path) 
         writer.writerows(rows)
 
     valid_scores = [float(row["signed_margin"]) for row in rows if row["status"] == "valid"]
-    p95_desc = descending_p95(valid_scores) if len(valid_scores) == 400 else None
+    if valid_scores:
+        violation_quantile = conformal.conformal_quantile(
+            -np.asarray(valid_scores, dtype=float),
+            alpha=0.05,
+        )
+        p95_desc = -violation_quantile
+    else:
+        p95_desc = None
     return {
         "total_trajectories": len(rows),
         "valid_trajectories": len(valid_scores),
@@ -549,7 +539,7 @@ def write_comparison_plots(
     model_trajectories: np.ndarray,
     dims: Sequence[int],
 ) -> dict[str, list[str]]:
-    """Write real and model comparisons for raw, CP-D, and CP-R tubes."""
+    """Write real and model comparisons for raw and CP-R tubes."""
     output_dir.mkdir(parents=True, exist_ok=True)
     compare.PLOT_DIMS = tuple(dims)
     compare.CHECK_DIMS = tuple(dims)
@@ -557,10 +547,8 @@ def write_comparison_plots(
     compare.MAX_STEPS = None
     suffixes = {
         "Raw tube": "raw",
-        "CP-D (inflated)": "cp_d",
         "CP-R (inflated)": "cp_r",
         "raw": "raw",
-        "cp_d": "cp_d",
         "cp_r": "cp_r",
     }
     plots: dict[str, list[str]] = {}
@@ -595,7 +583,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--calibration-real", type=Path, default=None,
-        help="override real trajectory NPZ used for both calibrations",
+        help="override real trajectory NPZ used for CP-R calibration",
     )
     parser.add_argument(
         "--outdir", type=Path, default=None,
@@ -649,11 +637,7 @@ def main() -> None:
         grid=grid,
         dims=dims,
         calibration_trajectories=calibration_trajectories,
-        real_path=calibration_path,
-        model_path=model_path,
-        env=args.env,
         alpha=args.alpha,
-        require_matching_starv_config=args.decoder != "cgan",
     )
     metrics_by_method = {
         method: table_metrics(real_trajectories, grid, tube_cells, dims)
@@ -661,7 +645,6 @@ def main() -> None:
     }
     method_cp = {
         "Raw tube": ("-", None),
-        "CP-D (inflated)": ("CP-D", float(calibrations["cp_d"]["gamma"])),
         "CP-R (inflated)": ("CP-R", float(calibrations["cp_r"]["gamma"])),
     }
     for method, (cp_score, cp_bound) in method_cp.items():
@@ -705,7 +688,6 @@ def main() -> None:
             },
             file, indent=2,
         )
-    print("CP-D gamma:", calibrations["cp_d"]["gamma"])
     print("CP-R gamma:", calibrations["cp_r"]["gamma"])
     print(f"table metrics: {table_path}")
     print(f"calibrations: {calibration_path_out}")
