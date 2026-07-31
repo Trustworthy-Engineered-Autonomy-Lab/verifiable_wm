@@ -99,8 +99,9 @@ datasets/<env>/data/dataset_v1/
 
 旧的无 variant 文件 `dwm_trajectories.npz` 已停用并删除。当前在用的 variant 为 `saliency`
 （主线）、`g_mlp`（cGAN baseline），以及 MountainCar 的 `saliency_background` 和
-Pendulum 的 `clamp`。`old`、`intensity`、`baseline` 以及 λ=0 对照组 `*_lambda0` 均已废弃，
-对应权重和配置都已移除。
+Pendulum 的 `clamp`。`*_lambda0` 是 λ=0（不加 $\mathcal{L}_\text{ctrl}$）的对照组，论文
+表 `tab:cp_bounds` 的 "DWM (no $\mathcal{L}_\text{ctrl}$)" 一行依赖它，必须保留。
+`old`、`intensity`、`baseline` 已废弃，对应权重和配置均已移除。
 
 常用 shape：
 
