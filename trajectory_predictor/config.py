@@ -19,9 +19,9 @@ from pathlib import Path
 
 # Supported values: "pendulum", "mountain_car", "cartpole", "brake_system".
 # This package is preset for the existing Brake dataset.
-#ENVIRONMENT = "brake_system"
+ENVIRONMENT = "brake_system"
 #ENVIRONMENT = "mountain_car"
-ENVIRONMENT = "cartpole"
+#ENVIRONMENT = "cartpole"
 #ENVIRONMENT = "pendulum"
 
 ENVIRONMENT_HORIZONS = {
@@ -40,31 +40,45 @@ HORIZON = ENVIRONMENT_HORIZONS[ENVIRONMENT]
 # The real NPZ is both:
 #   1) the initial-state source for Predictor trajectories; and
 #   2) the format/provenance template copied into predictor_trajectories.npz.
-# safety_results/<env>/ names every file <cells>cell_<model>_<kind>, so one
-# grid's runs form a block.  The big grid differs per environment; the 100-cell
-# corner runs sit alongside it under 100cell_*.  This table is duplicated from
-# signed_tube_margin.SHARED_GRID_PREFIX on purpose -- this file stays free of
-# project imports so it can be edited and read as plain settings.
-BIG_GRID_PREFIX = {
-    "pendulum": "5000cell",
-    "mountain_car": "6400cell",
-    "cartpole": "3600cell",
-    "brake_system": "1600cell",
+REAL_TRAJECTORIES = {
+    "pendulum": Path(
+        "/home/tealab_shared/safety_results/pendulum/"
+        "5000cell_real_trajectories.npz"
+    ),
+    "mountain_car": Path(
+        "/home/tealab_shared/safety_results/mountain_car/"
+        "6400cell_real_trajectories.npz"
+    ),
+    "cartpole": Path(
+        "/home/tealab_shared/safety_results/cartpole/"
+        "3600cell_real_trajectories.npz"
+    ),
+    "brake_system": Path(
+        "/home/tealab_shared/safety_results/brake_system/"
+        "1600cell_real_trajectories.npz"
+    ),
 }
-GRID_PREFIX = BIG_GRID_PREFIX[ENVIRONMENT]
-
-REAL_TRAJECTORIES = Path(
-    f"/home/tealab_shared/safety_results/{ENVIRONMENT}/"
-    f"{GRID_PREFIX}_real_trajectories.npz"
-)
+REAL_TRAJECTORIES = REAL_TRAJECTORIES[ENVIRONMENT]
 
 # JSON containing grid.dims.  Existing cells are used when their initial
 # bounds are valid; otherwise cells are reconstructed from grid.dims.
 GRID_RESULTS = {
-    env: Path(
-        f"/home/tealab_shared/safety_results/{env}/{prefix}_dwm_safety_result.json"
-    )
-    for env, prefix in BIG_GRID_PREFIX.items()
+    "pendulum": Path(
+        "/home/tealab_shared/safety_results/pendulum/"
+        "5000cell_dwm_safety_result.json"
+    ),
+    "mountain_car": Path(
+        "/home/tealab_shared/safety_results/mountain_car/"
+        "6400cell_dwm_safety_result.json"
+    ),
+    "cartpole": Path(
+        "/home/tealab_shared/safety_results/cartpole/"
+        "3600cell_dwm_safety_result.json"
+    ),
+    "brake_system": Path(
+        "/home/tealab_shared/safety_results/brake_system/"
+        "1600cell_dwm_safety_result.json"
+    ),
 }
 GRID_RESULT = GRID_RESULTS[ENVIRONMENT]
 
@@ -85,13 +99,6 @@ OUTPUT_DIRECTORY = Path(
 
 TRAJECTORY_OUTPUT = OUTPUT_DIRECTORY / "predictor_trajectories.npz"
 TUBE_OUTPUT = OUTPUT_DIRECTORY / "predictor_tube.json"
-
-# When a legacy NPZ has no train_traj, build_predictor.py writes the held-out
-# calibration view here.  The original REAL_TRAJECTORIES file is never
-# modified.  Pass this file to --calibration-real.
-CONFORMAL_REAL_OUTPUT = (
-    OUTPUT_DIRECTORY / "conformal_real_trajectories.npz"
-)
 
 
 # =============================================================================
@@ -133,9 +140,16 @@ TRAIN_SEED = 2025
 # 5. Build parameters
 # =============================================================================
 
-# Every cell is sampled at exactly:
-#   1) lower corner, 2) center, 3) upper corner.
+# Every cell is sampled at exactly three points.
 SAMPLES_PER_CELL = 3
+
+# Sampling modes:
+#   "latin_hypercube": seeded, well-spread random points (recommended when
+#                      generating several different tubes);
+#   "random_uniform":  seeded independent uniform points;
+#   "diagonal":        legacy lower/center/upper diagonal points.  This mode
+#                      is deterministic, so changing the seed has no effect.
+CELL_SAMPLING_STRATEGY = "latin_hypercube"
 
 # Inference batch size.  Lower this if GPU/CPU memory is insufficient.
 BATCH_SIZE = 1024
@@ -143,17 +157,25 @@ BATCH_SIZE = 1024
 # "auto" selects CUDA when available, otherwise CPU.
 DEVICE = "auto"
 
-# Reproducibility seed used during construction/inference.
+# Build one different, reproducible Predictor tube for every seed.  With the
+# default five seeds, build_predictor.py creates:
+#   predictor_tube_seed_0.json
+#   predictor_tube_seed_1.json
+#   predictor_tube_seed_2.json
+#   predictor_tube_seed_3.json
+#   predictor_tube_seed_4.json
+#
+# To restore the old single-output behavior, use BUILD_SEEDS = (0,).  A
+# single run writes the original TUBE_OUTPUT name: predictor_tube.json.
+BUILD_SEEDS = (0, 1, 2, 3, 4)
+
+# Backward-compatible fallback for older build_predictor.py versions.
 BUILD_SEED = 0
 
 
 # =============================================================================
 # 6. Compatibility policy
 # =============================================================================
-
-# Applied when the source has an independent train_traj.  For split_val,
-# build_predictor.py derives the expected count from the checkpoint indices.
-EXPECTED_CALIBRATION_COUNT = 400
 
 # Refuse a derived split that leaves too little independent calibration data.
 MIN_DERIVED_CALIBRATION_COUNT = 20
