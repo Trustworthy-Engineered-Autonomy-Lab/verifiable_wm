@@ -1072,7 +1072,13 @@ class ProductionWrapperConfigTests(unittest.TestCase):
                 except ValueError as error:
                     self.fail(f"{path} should validate: {error}")
                 self.assertEqual(wrapper["samples_per_cell"], 3)
-                self.assertEqual(wrapper["seed"], 2025)
+                # The seed value itself is free -- it only picks which
+                # samples_per_cell points each cell draws. What must hold is
+                # that every wrapper of one environment shares it, so the DWM
+                # and cGAN tubes are built from identical initial states
+                # (checked after the loop). Pinning a literal here would fail
+                # whenever the sweep is rerun under a different seed.
+                self.assertIsInstance(wrapper["seed"], int)
                 self.assertEqual(
                     len(sampled_tube.grid_cell_bounds(canonical["grid"])),
                     expected_cells,
@@ -1082,6 +1088,10 @@ class ProductionWrapperConfigTests(unittest.TestCase):
 
             self.assertEqual(wrappers[0]["states_file"], wrappers[1]["states_file"])
             self.assertEqual(wrappers[0]["grid_config"], wrappers[1]["grid_config"])
+            # Same states_file only means the same path; the seed must match
+            # too, otherwise regenerating that file under one wrapper would
+            # silently invalidate the other.
+            self.assertEqual(wrappers[0]["seed"], wrappers[1]["seed"])
             self.assertNotEqual(
                 wrappers[0]["trajectory_file"], wrappers[1]["trajectory_file"]
             )

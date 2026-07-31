@@ -45,27 +45,24 @@ CASE_DIRS = {
     ("cgan", "sampled"): "b_cgan_sampled",
 }
 
+# safety_results/<env>/ names files <cells>cell_<variant>_<kind>, so one grid's
+# runs form a block and, inside it, each world model's tube and trajectories sit
+# next to each other. real_trajectories has no variant -- both models share it.
+# The big grid differs per environment; the 100-cell corner runs live alongside.
+SHARED_GRID_PREFIX = {
+    "cartpole": "3600cell",
+    "mountain_car": "6400cell",
+    "pendulum": "5000cell",
+    "brake_system": "1600cell",
+}
+
 DWM_INPUTS = {
-    "cartpole": (
-        "results/cartpole/safety_result_big_cell_a8_lamda01.json",
-        "datasets/cartpole/big_cell/real_trajectories.npz",
-        "datasets/cartpole/big_cell/dwm_trajectories_saliency.npz",
-    ),
-    "mountain_car": (
-        "results/mountain_car/safety_result_big_cell_best.json",
-        "datasets/mountain_car/big_cell_best/real_trajectories.npz",
-        "datasets/mountain_car/big_cell_best/dwm_trajectories_saliency.npz",
-    ),
-    "pendulum": (
-        "results/pendulum/safety_result_big_cell_a16_lambda05.json",
-        "datasets/pendulum/big_cell/real_trajectories.npz",
-        "datasets/pendulum/big_cell/dwm_trajectories_saliency.npz",
-    ),
-    "brake_system": (
-        "safety_results/brake_system/safety_result.json",
-        "safety_results/brake_system/real_trajectories.npz",
-        "safety_results/brake_system/dwm_trajectories_saliency.npz",
-    ),
+    env: (
+        f"safety_results/{env}/{prefix}_dwm_safety_result.json",
+        f"safety_results/{env}/{prefix}_real_trajectories.npz",
+        f"safety_results/{env}/{prefix}_dwm_trajectories.npz",
+    )
+    for env, prefix in SHARED_GRID_PREFIX.items()
 }
 
 SAMPLED_TUBES = {
@@ -107,9 +104,10 @@ def resolve_experiment(
     if decoder == "dwm":
         symbolic_safety, real, model = DWM_INPUTS[env]
     else:
-        symbolic_safety = f"safety_results/{env}/safety_result_g_mlp.json"
-        real = f"safety_results/{env}/real_trajectories.npz"
-        model = f"safety_results/{env}/dwm_trajectories_g_mlp.npz"
+        prefix = SHARED_GRID_PREFIX[env]
+        symbolic_safety = f"safety_results/{env}/{prefix}_g_mlp_safety_result.json"
+        real = f"safety_results/{env}/{prefix}_real_trajectories.npz"
+        model = f"safety_results/{env}/{prefix}_g_mlp_trajectories.npz"
 
     safety = (
         symbolic_safety
