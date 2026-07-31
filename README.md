@@ -231,12 +231,7 @@ $$
 训练损失为完整轨迹 MSE 加终点状态额外惩罚：
 
 $$
-\mathcal{L}
-=
-\operatorname{MSE}(\hat{s}_{0:H},s_{0:H})
-+
-\lambda_{\mathrm{terminal}}
-\operatorname{MSE}(\hat{s}_H,s_H)
+\mathcal{L} = \operatorname{MSE}(\hat{s}_{0:H}, s_{0:H}) + \lambda_{\mathrm{terminal}}\operatorname{MSE}(\hat{s}_H, s_H)
 $$
 
 训练完成后生成：
