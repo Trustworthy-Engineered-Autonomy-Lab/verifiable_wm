@@ -40,29 +40,31 @@ HORIZON = ENVIRONMENT_HORIZONS[ENVIRONMENT]
 # The real NPZ is both:
 #   1) the initial-state source for Predictor trajectories; and
 #   2) the format/provenance template copied into predictor_trajectories.npz.
+# safety_results/<env>/ names every file <cells>cell_<model>_<kind>, so one
+# grid's runs form a block.  The big grid differs per environment; the 100-cell
+# corner runs sit alongside it under 100cell_*.  This table is duplicated from
+# signed_tube_margin.SHARED_GRID_PREFIX on purpose -- this file stays free of
+# project imports so it can be edited and read as plain settings.
+BIG_GRID_PREFIX = {
+    "pendulum": "5000cell",
+    "mountain_car": "6400cell",
+    "cartpole": "3600cell",
+    "brake_system": "1600cell",
+}
+GRID_PREFIX = BIG_GRID_PREFIX[ENVIRONMENT]
+
 REAL_TRAJECTORIES = Path(
-    f"/home/tealab_shared/safety_results/{ENVIRONMENT}/real_trajectories.npz"
+    f"/home/tealab_shared/safety_results/{ENVIRONMENT}/"
+    f"{GRID_PREFIX}_real_trajectories.npz"
 )
 
 # JSON containing grid.dims.  Existing cells are used when their initial
 # bounds are valid; otherwise cells are reconstructed from grid.dims.
 GRID_RESULTS = {
-    "pendulum": Path(
-        "/home/tealab_shared/safety_results/pendulum/"
-        "safety_result_big_cell_a16_lambda05.json"
-    ),
-    "mountain_car": Path(
-        "/home/tealab_shared/safety_results/mountain_car/"
-        "safety_result_big_cell_best.json"
-    ),
-    "cartpole": Path(
-        "/home/tealab_shared/safety_results/cartpole/"
-        "safety_result_big_cell_a8_lamda01.json"
-    ),
-    "brake_system": Path(
-        "/home/tealab_shared/safety_results/brake_system/"
-        "safety_result.json"
-    ),
+    env: Path(
+        f"/home/tealab_shared/safety_results/{env}/{prefix}_dwm_safety_result.json"
+    )
+    for env, prefix in BIG_GRID_PREFIX.items()
 }
 GRID_RESULT = GRID_RESULTS[ENVIRONMENT]
 

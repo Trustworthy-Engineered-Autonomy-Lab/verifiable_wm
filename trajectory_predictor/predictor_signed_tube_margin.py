@@ -23,13 +23,19 @@ import numpy as np
 
 # This runner lives inside trajectory_predictor/.  Add the unchanged project
 # root only so the existing compare.py can be imported for its plotting
-# helpers.  Conformal calibration is provided by the Predictor-local helper.
+# helpers, and so the shared safety_results/ layout is read from the one place
+# that defines it.  Conformal calibration is provided by the Predictor-local
+# helper -- signed_tube_margin's own conformal import is not used here.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import compare  # noqa: E402
 import predictor_conformal as conformal  # noqa: E402
+from signed_tube_margin import (  # noqa: E402
+    DWM_INPUTS,
+    SHARED_GRID_PREFIX,
+)
 ENV_DIMS = {
     "cartpole": (0, 2),
     "mountain_car": (0, 1),
@@ -50,28 +56,8 @@ CASE_DIRS = {
     ("cgan", "sampled"): "b_cgan_sampled",
 }
 
-DWM_INPUTS = {
-    "cartpole": (
-        "results/cartpole/safety_result_big_cell_a8_lamda01.json",
-        "datasets/cartpole/big_cell/real_trajectories.npz",
-        "datasets/cartpole/big_cell/dwm_trajectories_saliency.npz",
-    ),
-    "mountain_car": (
-        "results/mountain_car/safety_result_big_cell_best.json",
-        "datasets/mountain_car/big_cell_best/real_trajectories.npz",
-        "datasets/mountain_car/big_cell_best/dwm_trajectories_saliency.npz",
-    ),
-    "pendulum": (
-        "results/pendulum/safety_result_big_cell_a16_lambda05.json",
-        "datasets/pendulum/big_cell/real_trajectories.npz",
-        "datasets/pendulum/big_cell/dwm_trajectories_saliency.npz",
-    ),
-    "brake_system": (
-        "safety_results/brake_system/safety_result.json",
-        "safety_results/brake_system/real_trajectories.npz",
-        "safety_results/brake_system/dwm_trajectories_saliency.npz",
-    ),
-}
+# DWM_INPUTS and SHARED_GRID_PREFIX come from signed_tube_margin so that a
+# rename under safety_results/ only has to be made once.
 
 SAMPLED_TUBES = {
     ("cartpole", "dwm"): "results/cartpole/sampled_tube/sampled_reachable_tube_saliency_seed_2025.json",
@@ -112,9 +98,10 @@ def resolve_experiment(
     if decoder == "dwm":
         symbolic_safety, real, model = DWM_INPUTS[env]
     else:
-        symbolic_safety = f"safety_results/{env}/safety_result_g_mlp.json"
-        real = f"safety_results/{env}/real_trajectories.npz"
-        model = f"safety_results/{env}/dwm_trajectories_g_mlp.npz"
+        prefix = SHARED_GRID_PREFIX[env]
+        symbolic_safety = f"safety_results/{env}/{prefix}_g_mlp_safety_result.json"
+        real = f"safety_results/{env}/{prefix}_real_trajectories.npz"
+        model = f"safety_results/{env}/{prefix}_g_mlp_trajectories.npz"
 
     safety = (
         symbolic_safety
