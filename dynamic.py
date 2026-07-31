@@ -70,12 +70,17 @@ class MountainCar(DynmaicModel):
         self.env.close()
 
 class Pendulum(DynmaicModel):
-    def __init__(self, 
-            max_speed=8.0, 
-            max_torque=2.0, 
-            dt=0.02, 
-            g=10.0, 
-            m=1.0, 
+    # Parameters and step() mirror gym's Pendulum-v1 exactly, including
+    # dt=0.05. The controller and the rendered images both come from that
+    # environment, and the verifier's 20-step horizon is 1.0s of simulated
+    # time under it -- long enough for the swing-up the goal criterion asks
+    # for. A shorter dt silently changes the system being verified.
+    def __init__(self,
+            max_speed=8.0,
+            max_torque=2.0,
+            dt=0.05,
+            g=10.0,
+            m=1.0,
             l=1.0
         ):
         from gym import spaces

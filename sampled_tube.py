@@ -45,10 +45,13 @@ _VERIFIER_SYSTEMS = {
         "state_dim": 2,
         "decoder_state_indices": [0, 1],
         "dynamic_name": "Pendulum",
+        # Must stay identical to dynamic.Pendulum.__init__'s defaults; the
+        # comparison below is exact, so a stale copy here rejects otherwise
+        # valid configs. dt is 0.05 to match gym's Pendulum-v1.
         "dynamic_defaults": {
             "max_speed": 8.0,
             "max_torque": 2.0,
-            "dt": 0.02,
+            "dt": 0.05,
             "g": 10.0,
             "m": 1.0,
             "l": 1.0,

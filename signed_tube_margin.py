@@ -45,27 +45,24 @@ CASE_DIRS = {
     ("cgan", "sampled"): "b_cgan_sampled",
 }
 
+# safety_results/<env>/ names files <cells>cell_<variant>_<kind>, so one grid's
+# runs form a block and, inside it, each world model's tube and trajectories sit
+# next to each other. real_trajectories has no variant -- both models share it.
+# The big grid differs per environment; the 100-cell corner runs live alongside.
+SHARED_GRID_PREFIX = {
+    "cartpole": "3600cell",
+    "mountain_car": "6400cell",
+    "pendulum": "5000cell",
+    "brake_system": "1600cell",
+}
+
 DWM_INPUTS = {
-    "cartpole": (
-        "results/cartpole/safety_result_big_cell_a8_lamda01.json",
-        "datasets/cartpole/big_cell/real_trajectories.npz",
-        "datasets/cartpole/big_cell/dwm_trajectories_saliency.npz",
-    ),
-    "mountain_car": (
-        "results/mountain_car/safety_result_big_cell_best.json",
-        "datasets/mountain_car/big_cell_best/real_trajectories.npz",
-        "datasets/mountain_car/big_cell_best/dwm_trajectories_saliency.npz",
-    ),
-    "pendulum": (
-        "results/pendulum/safety_result_big_cell_a16_lambda05.json",
-        "datasets/pendulum/big_cell/real_trajectories.npz",
-        "datasets/pendulum/big_cell/dwm_trajectories_saliency.npz",
-    ),
-    "brake_system": (
-        "safety_results/brake_system/safety_result.json",
-        "safety_results/brake_system/real_trajectories.npz",
-        "safety_results/brake_system/dwm_trajectories_saliency.npz",
-    ),
+    env: (
+        f"safety_results/{env}/{prefix}_dwm_safety_result.json",
+        f"safety_results/{env}/{prefix}_real_trajectories.npz",
+        f"safety_results/{env}/{prefix}_dwm_trajectories.npz",
+    )
+    for env, prefix in SHARED_GRID_PREFIX.items()
 }
 
 SAMPLED_TUBES = {
@@ -107,9 +104,10 @@ def resolve_experiment(
     if decoder == "dwm":
         symbolic_safety, real, model = DWM_INPUTS[env]
     else:
-        symbolic_safety = f"safety_results/{env}/safety_result_g_mlp.json"
-        real = f"safety_results/{env}/real_trajectories.npz"
-        model = f"safety_results/{env}/dwm_trajectories_g_mlp.npz"
+        prefix = SHARED_GRID_PREFIX[env]
+        symbolic_safety = f"safety_results/{env}/{prefix}_g_mlp_safety_result.json"
+        real = f"safety_results/{env}/{prefix}_real_trajectories.npz"
+        model = f"safety_results/{env}/{prefix}_g_mlp_trajectories.npz"
 
     safety = (
         symbolic_safety
@@ -204,15 +202,6 @@ def trajectory_signed_margin(
     ))
 
 
-def descending_p95(scores: Sequence[float]) -> float:
-    values = np.asarray(scores, dtype=float)
-    if values.size != 400:
-        raise ValueError(f"expected exactly 400 valid trajectory scores, got {values.size}")
-    if not np.all(np.isfinite(values)):
-        raise ValueError("trajectory scores must be finite")
-    return float(np.sort(values)[::-1][379])
-
-
 def load_safety_result(path: Path) -> tuple[GridInfo, list[dict[str, Any]]]:
     with path.open(encoding="utf-8") as file:
         data = json.load(file)
@@ -290,8 +279,10 @@ def calibration_gamma(
     grid: GridInfo,
     cells: Sequence[dict[str, Any]],
     dims: Sequence[int],
-) -> tuple[float, float]:
-    """Calibrate one scalar inflation from the rank-380 signed margin."""
+    *,
+    alpha: float,
+) -> tuple[float, float, int]:
+    """Calibrate scalar CP-R inflation using a finite-sample conformal rank."""
     if calibration_trajectories.ndim != 3:
         raise ValueError(
             "calibration trajectories must have shape (N, T+1, state_dim), "
@@ -299,13 +290,20 @@ def calibration_gamma(
         )
     rows = evaluate_set(calibration_trajectories, grid, cells, dims)
     scores = [float(row["signed_margin"]) for row in rows if row["status"] == "valid"]
-    if len(rows) != 400 or len(scores) != 400:
+    if len(scores) != len(rows):
         raise ValueError(
-            "rank-380 calibration requires exactly 400 valid trajectories, "
+            "CP-R calibration requires every trajectory to be valid; "
             f"got valid={len(scores)}, total={len(rows)}"
         )
-    rank_margin = descending_p95(scores)
-    return max(0.0, -rank_margin), rank_margin
+    if not scores:
+        raise ValueError("CP-R calibration requires at least one trajectory")
+
+    gamma_raw, rank = conformal.conformal_quantile_with_rank(
+        -np.asarray(scores, dtype=float),
+        alpha=alpha,
+    )
+    rank_margin = -gamma_raw
+    return max(0.0, gamma_raw), rank_margin, rank
 
 
 def inflate_cells(
@@ -335,45 +333,28 @@ def build_tube_variants(
     grid: GridInfo,
     dims: Sequence[int],
     calibration_trajectories: np.ndarray,
-    real_path: Path,
-    model_path: Path,
-    env: str,
     alpha: float,
-    require_matching_starv_config: bool = True,
 ) -> tuple[dict[str, Sequence[dict[str, Any]]], dict[str, dict[str, Any]]]:
-    """Build the raw tube and its CP-D and CP-R scalar inflations."""
-    cp_d = conformal.calibrate_gamma(
-        real_path=real_path,
-        dwm_path=model_path,
-        dims=dims,
-        alpha=alpha,
-        split="val",
-        circular_dims=conformal.ENV_CIRCULAR_DIMS.get(env, ()),
-        horizon=conformal.ENV_HORIZON[env],
-        require_matching_starv_config=require_matching_starv_config,
-    )
-    cp_r_gamma, cp_r_rank_margin = calibration_gamma(
-        calibration_trajectories, grid, cells, dims
+    """Build the raw tube and its CP-R scalar inflation."""
+    cp_r_gamma, cp_r_rank_margin, cp_r_rank = calibration_gamma(
+        calibration_trajectories, grid, cells, dims, alpha=alpha
     )
     variants = {
         "Raw tube": cells,
-        "CP-D (inflated)": inflate_cells(
-            cells, dims, [float(cp_d["gamma"])] * len(dims)
-        ),
         "CP-R (inflated)": inflate_cells(
             cells, dims, [cp_r_gamma] * len(dims)
         ),
     }
     cp_r = {
-        "method": "descending rank-380 signed trajectory margin",
-        "n": 400,
-        "sort": "descending",
-        "rank": 380,
+        "method": "finite-sample conformal quantile of negative signed trajectory margins",
+        "n": len(calibration_trajectories),
+        "alpha": alpha,
+        "rank": cp_r_rank,
         "signed_margin_at_rank": cp_r_rank_margin,
         "gamma": cp_r_gamma,
         "check_dims": [int(dim) for dim in dims],
     }
-    return variants, {"cp_d": cp_d, "cp_r": cp_r}
+    return variants, {"cp_r": cp_r}
 
 
 def interval_union_length(bounds: Sequence[float], delta: float = 0.0) -> float:
@@ -512,27 +493,6 @@ def write_table_metrics(metrics_by_method: dict[str, dict[str, Any]], output_dir
     return path
 
 
-def write_results(rows: Sequence[dict[str, Any]], label: str, output_dir: Path) -> dict[str, Any]:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    path = output_dir / f"{label}_signed_tube_margins.csv"
-    with path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=["traj_index", "cell_index", "status", "signed_margin", "error"])
-        writer.writeheader()
-        writer.writerows(rows)
-
-    valid_scores = [float(row["signed_margin"]) for row in rows if row["status"] == "valid"]
-    p95_desc = descending_p95(valid_scores) if len(valid_scores) == 400 else None
-    return {
-        "total_trajectories": len(rows),
-        "valid_trajectories": len(valid_scores),
-        "invalid_trajectories": len(rows) - len(valid_scores),
-        "minimum": float(min(valid_scores)) if valid_scores else None,
-        "maximum": float(max(valid_scores)) if valid_scores else None,
-        "p95_desc": p95_desc,
-        "csv": str(path),
-    }
-
-
 def load_trajectory(path: Path, key: str) -> np.ndarray:
     with np.load(path, allow_pickle=False) as data:
         if key not in data:
@@ -549,7 +509,7 @@ def write_comparison_plots(
     model_trajectories: np.ndarray,
     dims: Sequence[int],
 ) -> dict[str, list[str]]:
-    """Write real and model comparisons for raw, CP-D, and CP-R tubes."""
+    """Write real and model comparisons for raw and CP-R tubes."""
     output_dir.mkdir(parents=True, exist_ok=True)
     compare.PLOT_DIMS = tuple(dims)
     compare.CHECK_DIMS = tuple(dims)
@@ -557,10 +517,8 @@ def write_comparison_plots(
     compare.MAX_STEPS = None
     suffixes = {
         "Raw tube": "raw",
-        "CP-D (inflated)": "cp_d",
         "CP-R (inflated)": "cp_r",
         "raw": "raw",
-        "cp_d": "cp_d",
         "cp_r": "cp_r",
     }
     plots: dict[str, list[str]] = {}
@@ -595,7 +553,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--calibration-real", type=Path, default=None,
-        help="override real trajectory NPZ used for both calibrations",
+        help="override real trajectory NPZ used for CP-R calibration",
     )
     parser.add_argument(
         "--outdir", type=Path, default=None,
@@ -649,11 +607,7 @@ def main() -> None:
         grid=grid,
         dims=dims,
         calibration_trajectories=calibration_trajectories,
-        real_path=calibration_path,
-        model_path=model_path,
-        env=args.env,
         alpha=args.alpha,
-        require_matching_starv_config=args.decoder != "cgan",
     )
     metrics_by_method = {
         method: table_metrics(real_trajectories, grid, tube_cells, dims)
@@ -661,7 +615,6 @@ def main() -> None:
     }
     method_cp = {
         "Raw tube": ("-", None),
-        "CP-D (inflated)": ("CP-D", float(calibrations["cp_d"]["gamma"])),
         "CP-R (inflated)": ("CP-R", float(calibrations["cp_r"]["gamma"])),
     }
     for method, (cp_score, cp_bound) in method_cp.items():
@@ -705,7 +658,6 @@ def main() -> None:
             },
             file, indent=2,
         )
-    print("CP-D gamma:", calibrations["cp_d"]["gamma"])
     print("CP-R gamma:", calibrations["cp_r"]["gamma"])
     print(f"table metrics: {table_path}")
     print(f"calibrations: {calibration_path_out}")

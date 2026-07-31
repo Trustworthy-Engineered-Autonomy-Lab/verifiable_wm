@@ -23,6 +23,8 @@ settings.json
 metrics.json
 dwm_weight/cartpole/intensity/metrics.json
 dwm_weight/cartpole/saliency/metrics.json
+# Unit tests only check internal consistency and produce no paper artifacts;
+# they are maintained locally and not distributed.
 /tests
 *.json
 !/config/**/*.json
@@ -55,3 +57,5 @@ datasets/brake_system/ground_truth/
 *.tar.gz
 dwm_weight
 safety_results
+/tools/plot_brake_dwm_sampled_diagnostic.py
+config

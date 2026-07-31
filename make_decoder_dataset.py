@@ -19,6 +19,7 @@ from utils import (
     starv_states_path,
     render_images,
     to_numpy,
+    dynamics_provenance,
 )
 
 
@@ -97,7 +98,7 @@ def load_starv_config(config):
     return load_config(starv_config_path)
 
 
-def save_real_trajectories(config, trajectory_splits):
+def save_real_trajectories(config, trajectory_splits, dynamic=None):
     output_dir = Path(config["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -111,6 +112,8 @@ def save_real_trajectories(config, trajectory_splits):
     arrays["controller_weights"] = np.array(
         str(config["controller"]["weights"])
     )
+    if dynamic is not None:
+        arrays.update(dynamics_provenance(dynamic))
 
     np.savez_compressed(output_dir / "real_trajectories.npz", **arrays)
 
@@ -192,7 +195,7 @@ def generate_dataset(config, starv_only=False):
             f"actions={tuple(actions.shape)}"
         )
 
-    save_real_trajectories(config, trajectory_splits)
+    save_real_trajectories(config, trajectory_splits, dynamic)
     return Path(config["output_dir"])
 
 

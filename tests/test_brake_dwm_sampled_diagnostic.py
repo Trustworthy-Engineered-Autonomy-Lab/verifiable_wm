@@ -15,12 +15,21 @@ class BrakeDwmSampledDiagnosticTests(unittest.TestCase):
 
         self.assertLess(layout["subplot_top"], layout["legend_y"])
         self.assertLess(layout["legend_y"], layout["title_y"])
+        self.assertEqual(layout["legend_columns"], 5)
         self.assertGreater(
             layout["colorbar_rect"][0], layout["subplot_right"]
         )
         self.assertLessEqual(
             layout["colorbar_rect"][0] + layout["colorbar_rect"][2], 1.0
         )
+
+    def test_random_tube_style_keeps_true_size_but_makes_edges_visible(self):
+        style = diagnostic.random_tube_style()
+
+        self.assertGreaterEqual(style["edge_alpha"], 0.9)
+        self.assertGreaterEqual(style["linewidth"], 2.0)
+        self.assertLess(style["rectangle_zorder"], style["trajectory_zorder"])
+        self.assertEqual(style["legend_label"], "Tube rectangles")
 
     def test_build_diagnostic_selects_worst_real_and_pairs_model_index(self):
         grid = stm.GridInfo(
@@ -100,6 +109,45 @@ class BrakeDwmSampledDiagnosticTests(unittest.TestCase):
             self.assertEqual(saved["seed"], 728)
             self.assertEqual(saved["trajectory_index"], 1)
             self.assertEqual(len(saved["real_margins"]), 2)
+
+    def test_write_worst_complete_trajectory_creates_single_plot_artifacts(self):
+        payload = {
+            "trajectory_index": 342,
+            "cell_index": 1545,
+            "first_violating_step": 1,
+            "worst_real_margin": -0.010292009,
+            "real_states": np.array([[6.4, 6.259], [5.8, 6.258]]),
+            "model_states": np.array([[6.4, 6.259], [5.8, 6.258]]),
+            "tube_bounds": [
+                [[6.39, 6.41], [6.25, 6.26]],
+                [[5.79, 5.81], [6.245, 6.253]],
+            ],
+            "real_margins": np.array([0.001, -0.005]),
+            "model_margins": np.array([0.001, -0.005]),
+            "state_difference": np.zeros((2, 2)),
+            "max_abs_state_difference": 0.0,
+            "seed": 728,
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            png_path, json_path = (
+                diagnostic.write_worst_complete_trajectory(
+                    payload,
+                    safety_path=Path("tube_seed_728.json"),
+                    real_path=Path("real.npz"),
+                    model_path=Path("dwm.npz"),
+                    output_dir=Path(tmp),
+                )
+            )
+
+            self.assertEqual(
+                png_path.name,
+                "brake_dwm_sampled_tube_worst_complete_trajectory.png",
+            )
+            self.assertTrue(png_path.is_file())
+            self.assertGreater(png_path.stat().st_size, 0)
+            saved = json.loads(json_path.read_text())
+            self.assertEqual(saved["trajectory_index"], 342)
+            self.assertEqual(saved["selection"], "minimum real signed margin")
 
     def test_build_random_diagnostics_uses_fixed_seed_and_model_indices(self):
         grid = stm.GridInfo(

@@ -17,6 +17,7 @@ from utils import (
     starv_states_path,
     render_images,
     to_numpy,
+    dynamics_provenance,
 )
 from sampled_tube import (
     build_sampled_safety_result,
@@ -98,50 +99,7 @@ def build_initial_state_splits(config, device):
     }
 
 
-# 当前主流程不调用下面两个 transition helper。它们只为未来可能恢复的
-# learned-dynamics `(state, action, next_state)` 数据生成保留，请勿当作
-# 当前 sampling 的输出路径；当前输出只有 variant-aware DWM trajectory。
-@torch.no_grad()
-def rollout_transition(states0, steps, controller, dynamic, device, render_batch_size):
-    states = states0.clone()
-
-    all_states = []
-    all_actions = []
-    all_next_states = []
-
-    for step in range(steps):
-        images = render_images(dynamic, states, device, render_batch_size)
-        actions = controller(images)
-        next_states = dynamic.step(states, actions)
-
-        all_states.append(states)
-        all_actions.append(actions)
-        all_next_states.append(next_states)
-
-        states = next_states
-
-    states = torch.cat(all_states, dim=0)
-    actions = torch.cat(all_actions, dim=0)
-    next_states = torch.cat(all_next_states, dim=0)
-
-    return states, actions, next_states
-
-
-def save_dataset(config, dataset):
-    output_dir = Path(config["output_dir"])
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    arrays = {}
-    for split_name, split_data in dataset.items():
-        arrays[f"{split_name}_states"] = to_numpy(split_data["states"])
-        arrays[f"{split_name}_actions"] = to_numpy(split_data["actions"])
-        arrays[f"{split_name}_next_states"] = to_numpy(split_data["next_states"])
-
-    np.savez_compressed(output_dir / "transition_dataset.npz", **arrays)
-    return output_dir
-
-
-def save_dwm_trajectories(config, trajectory_splits):
+def save_dwm_trajectories(config, trajectory_splits, dynamic=None):
     output_dir = Path(config["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -159,6 +117,8 @@ def save_dwm_trajectories(config, trajectory_splits):
     arrays["controller_weights"] = np.array(
         str(config["controller"]["weights"])
     )
+    if dynamic is not None:
+        arrays.update(dynamics_provenance(dynamic))
 
     output_path = output_dir / f"dwm_trajectories_{decoder_variant(config)}.npz"
     np.savez_compressed(output_path, **arrays)
@@ -294,7 +254,6 @@ def generate_dataset(config):
     decoder = load_decoder(config, device)
 
     steps = int(config["rollout_steps"])
-    render_batch_size = int(config.get("render_batch_size", 64))
     decoder_state_indices = config.get(
         "decoder_state_indices",
         config["decoder"].get("state_indices"),
@@ -305,33 +264,12 @@ def generate_dataset(config):
 
     initial_splits = build_initial_state_splits(config, device)
 
-    # transition_dataset.npz 生成已停用：(s,a,s') 单步转移对是给 learned dynamics 用的，
-    # 当前 pipeline 的 dynamics 是解析已知的（dynamic.py），全仓库没有下游消费者，
-    # 而它的真实渲染是 sampling 里最慢的部分。以后要做 learned dynamics 实验时，
-    # 取消本函数里相关注释即可恢复（rollout_transition / save_dataset 都还保留着）。
-    # dataset = {}
+    # Sampling only produces variant-aware DWM trajectories. The (s, a, s')
+    # single-step transition pairs existed for learned dynamics, but this
+    # pipeline's dynamics are analytic (dynamic.py) and nothing downstream
+    # consumed them, so those helpers were removed.
     trajectory_splits = {}
     for split_name, states0 in initial_splits.items():
-        # states, actions, next_states = rollout_transition(
-        #     states0,
-        #     steps,
-        #     controller,
-        #     dynamic,
-        #     device,
-        #     render_batch_size,
-        # )
-        # dataset[split_name] = {
-        #     "states": states,
-        #     "actions": actions,
-        #     "next_states": next_states,
-        # }
-        # print(
-        #     f"[Rollout] {split_name}: "
-        #     f"states={tuple(states.shape)}, "
-        #     f"actions={tuple(actions.shape)}, "
-        #     f"next_states={tuple(next_states.shape)}"
-        # )
-
         traj, dwm_actions = rollout_dwm_trajectory(
             states0,
             steps,
@@ -352,9 +290,8 @@ def generate_dataset(config):
             f"actions={tuple(dwm_actions.shape)}"
         )
 
-    # output_dir = save_dataset(config, dataset)
     output_dir = Path(config["output_dir"])
-    save_dwm_trajectories(config, trajectory_splits)
+    save_dwm_trajectories(config, trajectory_splits, dynamic)
     return output_dir
 
 

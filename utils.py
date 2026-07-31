@@ -110,3 +110,37 @@ def render_images(dynamic, states, device, render_batch_size):
 
 def to_numpy(tensor):
     return tensor.detach().cpu().numpy().astype(np.float32)
+
+
+# config/sampling/*.json pins only {"name": "Pendulum"} with no args, so dt and
+# friends fall back to dynamic.py's defaults. Changing a default silently turns
+# every previously generated trajectory into data from a different system, and
+# nothing in the npz can tell the two apart -- mixing pendulum dataset_v1
+# (dt=0.05) with dataset_v1_clamp_100 (dt=0.02) once produced a spurious
+# deviation of 7.97. Snapshotting the effective parameters makes the vintage of
+# each trajectory file decidable after the fact.
+DYNAMICS_PARAM_NAMES = (
+    "dt",
+    "g",
+    "m",
+    "l",
+    "max_speed",
+    "max_torque",
+    "min_pos",
+    "max_pos",
+    "min_speed",
+    "min_action",
+    "max_action",
+    "power",
+    "v_lead",
+)
+
+
+def dynamics_provenance(dynamic):
+    """Effective scalar dynamics parameters, stamped into trajectory npz files."""
+    provenance = {"dynamics_name": np.array(type(dynamic).__name__)}
+    for name in DYNAMICS_PARAM_NAMES:
+        value = getattr(dynamic, name, None)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            provenance[f"dynamics_{name}"] = np.array(float(value))
+    return provenance
