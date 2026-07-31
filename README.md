@@ -43,48 +43,6 @@ state trajectories, inflated by its calibration residuals).
 Across all four benchmarks the DWM yields substantially tighter reachable tubes than both
 baselines while meeting the 95% target coverage after conformal inflation.
 
-## Requirements
-
-- Python 3.9, PyTorch, NumPy
-- StarV and pybdr for symbolic reachability
-- Gurobi (LP solver used by StarV)
-- `mpi4py` — reachability over a large grid is run under MPI
-- Gym for the three classic-control benchmarks; a CARLA server is only needed to regenerate the
-  braking dataset
-
-Rendering runs headless (`PYGLET_HEADLESS=True`, set by the scripts).
-
-## Quick start
-
-```bash
-# 1. Generate decoder training images, StarV initial states and real trajectories
-python make_decoder_dataset.py config/make_decoder_dataset/cartpole.json
-
-# 2. Precompute the controller saliency maps, then train the decoder
-python saliency_map/scripts/precompute_saliency_maps.py \
-    --config config/make_decoder_dataset/cartpole.json
-python train_decoder.py config/train_decoder/cartpole/saliency.json
-
-# 3. Roll out the closed loop with the decoder in place of the renderer
-python sampling.py config/sampling/cartpole.json --decoder-variant saliency
-
-# 4. Symbolic reachability over the initial grid
-mpirun -n <ranks> python verify.py config/starv_verification/cartpole.json
-
-# 5. Conformal inflation and coverage / tube-area metrics
-python signed_tube_margin.py --env cartpole --decoder dwm --construction symbolic
-```
-
-Step 4 is the expensive one; steps 1–3 run on a single machine in minutes.
-
-To reproduce the full comparison table (all four benchmarks × three tube constructions, reported
-as mean ± std over five seeded repetitions):
-
-```bash
-python repeated_tube_evaluation.py preflight   # validate inputs first
-python repeated_tube_evaluation.py run-all
-```
-
 ## Repository layout
 
 ```text
