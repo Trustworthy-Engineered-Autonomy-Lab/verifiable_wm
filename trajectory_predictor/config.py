@@ -19,10 +19,10 @@ from pathlib import Path
 
 # Supported values: "pendulum", "mountain_car", "cartpole", "brake_system".
 # This package is preset for the existing Brake dataset.
-#ENVIRONMENT = "brake_system"
+ENVIRONMENT = "brake_system"
 #ENVIRONMENT = "mountain_car"
 #ENVIRONMENT = "cartpole"
-ENVIRONMENT = "pendulum"
+#ENVIRONMENT = "pendulum"
 
 ENVIRONMENT_HORIZONS = {
     "pendulum": 20,
@@ -40,32 +40,44 @@ HORIZON = ENVIRONMENT_HORIZONS[ENVIRONMENT]
 # The real NPZ is both:
 #   1) the initial-state source for Predictor trajectories; and
 #   2) the format/provenance template copied into predictor_trajectories.npz.
-REAL_TRAJECTORIES = Path(
-    # f"/home/tealab_shared/safety_results/{ENVIRONMENT}/real_trajectories.npz"
-     "/home/tealab_shared/safety_results/pendulum/real_trajectories.npz"
-    # "/home/tealab_shared/safety_results/mountain_car/100cell_gmlp_real_trajectories.npz"
-    # "/home/tealab_shared/safety_results/cartpole/real_trajectories.npz"
-    # "/home/tealab_shared/safety_results/brake_system/real_trajectories.npz"
-)
+REAL_TRAJECTORIES = {
+    "pendulum": Path(
+        "/home/tealab_shared/safety_results/pendulum/"
+        "5000cell_real_trajectories.npz"
+    ),
+    "mountain_car": Path(
+        "/home/tealab_shared/safety_results/mountain_car/"
+        "6400cell_real_trajectories.npz"
+    ),
+    "cartpole": Path(
+        "/home/tealab_shared/safety_results/cartpole/"
+        "3600cell_real_trajectories.npz"
+    ),
+    "brake_system": Path(
+        "/home/tealab_shared/safety_results/brake_system/"
+        "1600cell_real_trajectories.npz"
+    ),
+}
+REAL_TRAJECTORIES = REAL_TRAJECTORIES[ENVIRONMENT]
 
 # JSON containing grid.dims.  Existing cells are used when their initial
 # bounds are valid; otherwise cells are reconstructed from grid.dims.
 GRID_RESULTS = {
     "pendulum": Path(
         "/home/tealab_shared/safety_results/pendulum/"
-        "safety_result_big_cell_a16_lambda05.json"
+        "5000cell_dwm_safety_result.json"
     ),
     "mountain_car": Path(
         "/home/tealab_shared/safety_results/mountain_car/"
-        "100cell_safety_result_g_mlp_100.json"
+        "6400cell_dwm_safety_result.json"
     ),
     "cartpole": Path(
         "/home/tealab_shared/safety_results/cartpole/"
-        "safety_result_big_cell_a8_lamda01.json"
+        "3600cell_dwm_safety_result.json"
     ),
     "brake_system": Path(
         "/home/tealab_shared/safety_results/brake_system/"
-        "safety_result.json"
+        "1600cell_dwm_safety_result.json"
     ),
 }
 GRID_RESULT = GRID_RESULTS[ENVIRONMENT]
@@ -164,10 +176,6 @@ BUILD_SEED = 0
 # =============================================================================
 # 6. Compatibility policy
 # =============================================================================
-
-# Applied when the source has an independent train_traj.  For split_val,
-# build_predictor.py derives the expected count from the checkpoint indices.
-EXPECTED_CALIBRATION_COUNT = 400
 
 # Refuse a derived split that leaves too little independent calibration data.
 MIN_DERIVED_CALIBRATION_COUNT = 20
