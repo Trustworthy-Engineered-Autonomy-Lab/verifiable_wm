@@ -50,6 +50,8 @@ from matplotlib.colors import Normalize
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
+# Per-experiment default path sets (uncomment one to switch, or pass
+# --safety / --real / --dwm / --outdir):
 # DEFAULT_SAFETY_PATH = PROJECT_ROOT / "results/cartpole/safety_result_cell_100_a8_lamda01.json"
 # DEFAULT_REAL_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/data_cell_100/real_trajectories.npz"
 # DEFAULT_DWM_TRAJ_PATH = PROJECT_ROOT / "datasets/cartpole/data_cell_100/dwm_trajectories_saliency.npz"
@@ -91,6 +93,7 @@ DWM_KEY = "test_traj"
 # Environment-specific dimensions used by default.
 # CartPole compares cart position x (dim 0) and pole angle theta (dim 2).
 # MountainCar and Pendulum continue to compare dimensions (0, 1).
+# Available environments (uncomment one to switch, or pass --env):
 # DEFAULT_ENV = "cartpole"
 # DEFAULT_ENV = "mountain_car"
 DEFAULT_ENV = "pendulum"

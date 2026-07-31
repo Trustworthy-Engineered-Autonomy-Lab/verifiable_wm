@@ -495,34 +495,6 @@ def write_table_metrics(metrics_by_method: dict[str, dict[str, Any]], output_dir
     return path
 
 
-def write_results(rows: Sequence[dict[str, Any]], label: str, output_dir: Path) -> dict[str, Any]:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    path = output_dir / f"{label}_signed_tube_margins.csv"
-    with path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=["traj_index", "cell_index", "status", "signed_margin", "error"])
-        writer.writeheader()
-        writer.writerows(rows)
-
-    valid_scores = [float(row["signed_margin"]) for row in rows if row["status"] == "valid"]
-    if valid_scores:
-        violation_quantile = conformal.conformal_quantile(
-            -np.asarray(valid_scores, dtype=float),
-            alpha=0.05,
-        )
-        p95_desc = -violation_quantile
-    else:
-        p95_desc = None
-    return {
-        "total_trajectories": len(rows),
-        "valid_trajectories": len(valid_scores),
-        "invalid_trajectories": len(rows) - len(valid_scores),
-        "minimum": float(min(valid_scores)) if valid_scores else None,
-        "maximum": float(max(valid_scores)) if valid_scores else None,
-        "p95_desc": p95_desc,
-        "csv": str(path),
-    }
-
-
 def load_trajectory(path: Path, key: str) -> np.ndarray:
     with np.load(path, allow_pickle=False) as data:
         if key not in data:
