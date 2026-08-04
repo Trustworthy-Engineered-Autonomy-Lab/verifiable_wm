@@ -1,38 +1,38 @@
 # Deterministic World Models for Closed-loop Reachability Analysis of End-to-End Vision-based Control
 
-Reference implementation for verifying end-to-end vision-based controllers by replacing the
-camera with a **Deterministic World Model (DWM)** — a latent-free neural decoder that maps
+Reference implementation for the closed-loop verification of end-to-end vision-based controllers.
+The camera is replaced by a Deterministic World Model (DWM): a latent-free neural decoder mapping
 physical states directly to synthetic images.
 
-Because the DWM has no stochastic latent input, the closed loop
+Since the DWM admits no stochastic latent input, the closed loop
 
 ```text
-state --> decoder --> controller --> dynamics --> next state
+state -> decoder -> controller -> dynamics -> next state
 ```
 
-becomes a plain feed-forward network composition that symbolic reachability tools can propagate
-without the overapproximation introduced by sampling a latent variable. The DWM is trained with a
-dual objective combining saliency-weighted reconstruction and a control-consistency term, and the
-resulting reachable tubes are inflated by a distribution-free conformal bound so that the
-surrogate guarantee transfers to the real system with high probability.
+reduces to a feed-forward network composition, which symbolic reachability tools propagate without
+the overapproximation induced by sampling a latent variable. The decoder is trained under a dual
+objective combining saliency-weighted reconstruction with a control-consistency term. The
+resulting reachable tubes are inflated by a distribution-free conformal bound, transferring the
+surrogate guarantee to the real system with high probability.
 
 ## Method
 
-1. **Train the decoder.** A controller-occlusion saliency map `H` weights the reconstruction loss
-   pixel-wise, `w = 1 + αH`; a control-consistency term keeps the controller's action on the
-   reconstructed image close to its action on the real frame.
-2. **Verify the closed loop.** StarV / ImageStar propagates each initial grid cell through
-   decoder → controller → dynamics for a fixed horizon, producing a reachable tube per cell.
-3. **Transfer the guarantee.** The signed margin of held-out real trajectories against the tube
-   gives a conformal quantile γ, which inflates every cell so the tube covers real trajectories
-   with probability ≥ 1 − α.
+1. **Decoder training.** A controller-occlusion saliency map `H` weights the reconstruction loss
+   pixel-wise as `w = 1 + αH`. A control-consistency term penalises the discrepancy between the
+   controller's action on the reconstructed image and on the real frame.
+2. **Closed-loop verification.** StarV/ImageStar propagates each initial grid cell through
+   decoder, controller and dynamics over a fixed horizon, yielding one reachable tube per cell.
+3. **Guarantee transfer.** The signed margin of held-out real trajectories against the tube yields
+   a conformal quantile γ. Inflating every cell by γ gives coverage of real trajectories with
+   probability at least 1 − α.
 
-Two baselines are compared against. A **cGAN** surrogate camera swaps the decoder for a generator
-whose latent is verified as a bounded interval, which is what makes its tubes wider. An
-**image-free trajectory predictor** skips images entirely: a transformer trained on state
-trajectories, inflated by its calibration residuals. The decoder is the only model this
-repository trains — the controllers, the cGAN generators and the pretrained braking decoder are
-given artifacts that it verifies and evaluates.
+Two baselines are evaluated for comparison. The cGAN baseline substitutes a conditional generator
+for the decoder; its latent is verified as a bounded interval, which accounts for its wider tubes.
+The image-free trajectory predictor bypasses image generation altogether, using a transformer
+trained on state trajectories and inflated by its calibration residuals. The decoder is the only
+model trained by this repository; controllers, cGAN generators and the braking decoder are
+pretrained artifacts that the pipeline verifies and evaluates.
 
 ## Benchmarks
 
@@ -43,110 +43,118 @@ given artifacts that it verifies and evaluates.
 | Pendulum | angle, angular velocity | Gym `Pendulum-v1` | 100 × 50 = 5000 cells | 20 |
 | Braking (AEBS) | distance, velocity | CARLA camera | 40 × 40 = 1600 cells | 10 |
 
-CartPole and MountainCar pin their velocity dimensions to a single point, so all four grids are
-two-dimensional in practice. Across the four benchmarks the DWM yields substantially tighter
-reachable tubes than both baselines while meeting the 95% target coverage after conformal
+The CartPole and MountainCar grids fix their velocity dimensions to a single point, so all four
+grids are effectively two-dimensional. Across the four benchmarks the DWM yields substantially
+tighter reachable tubes than both baselines while meeting the 95% target coverage after conformal
 inflation.
 
-## Pipeline
+## Usage
 
-Each stage reads one JSON config. Steps 1–3 build the decoder, so `<env>` there is one of the
-three gym benchmarks — the braking decoder is a given artifact and its dataset is captured
-differently (see Notes). Steps 4–7 accept all four.
+Each stage is driven by a single JSON configuration. Stages 1 to 3 construct the decoder and
+apply to the three gym benchmarks; the braking decoder is a pretrained artifact whose dataset is
+captured separately (see Implementation notes). Stages 4 to 7 apply to all four benchmarks.
 
 ```bash
-# 1. Render the decoder training set, the StarV initial states, and the real
-#    closed-loop trajectories the conformal step later calibrates against.
+# 1. Decoder training set, StarV initial states, real closed-loop trajectories
 python make_decoder_dataset.py config/make_decoder_dataset/<env>.json
 
-# 2. Precompute the controller-occlusion saliency maps H.
-python saliency_map/scripts/precompute_saliency_maps.py --config config/train_decoder/<env>/saliency.json
+# 2. Controller-occlusion saliency maps
+python saliency_map/scripts/precompute_saliency_maps.py \
+    --config config/train_decoder/<env>/saliency.json
 
-# 3. Train the decoder. One --alpha/--lambda-ctrl value each trains a single
-#    decoder; several values run the ablation grid over their cartesian product
-#    and write alpha_lambda_grid.csv next to the runs.
+# 3. Decoder training
 python train_decoder.py config/train_decoder/<env>/saliency.json --alpha 8 --lambda-ctrl 0.1
-python train_decoder.py config/train_decoder/<env>/saliency.json --alpha 4 8 16 --lambda-ctrl 0 0.1 0.5
 
-# 4. Symbolic reachability over the grid, one MPI rank per shard of cells.
+# 4. Symbolic reachability, distributed over MPI ranks
 mpirun -n 16 python verify.py config/starv_verification/<env>.json
 
-# 5. Empirical tube from three rollouts per cell, for the sampling-based comparison.
+# 5. Empirical tube from three rollouts per cell
 python sampling.py config/sampling/<env>.json
 
-# 6. Signed margin, conformal quantile γ, inflated tube, containment plots.
+# 6. Signed margin, conformal quantile, inflated tube, containment plots
 python signed_tube_margin.py --env <env> --decoder dwm --construction symbolic
 
-# 7. Seeded repeated evaluation across both models and both constructions.
+# 7. Seeded repeated evaluation over both models and both constructions
 python repeated_tube_evaluation.py run-all
 ```
 
-Swap `<env>.json` for `<env>_g_mlp.json` in steps 4–5 and `--decoder cgan` in step 6 to run the
-cGAN baseline; the trajectory-predictor baseline lives entirely under `trajectory_predictor/`.
+Supplying several values to `--alpha` or `--lambda-ctrl` runs the ablation grid over their
+cartesian product, writing one run per combination together with a summary `alpha_lambda_grid.csv`:
 
-**Reachability ground truth.** `tools/gt_grid_eval.py` (gym) and `tools/gt_brake_grid_eval.py`
-(braking) run the true closed loop from real camera images and label every grid cell, and
-`tools/compare_ground_truth.py` scores a verified safety map against those labels. A false
-positive there would break soundness; conservatism shows up as recall below one.
+```bash
+python train_decoder.py config/train_decoder/<env>/saliency.json \
+    --alpha 4 8 16 --lambda-ctrl 0 0.1 0.5
+```
 
-## Repository layout
+The cGAN baseline is obtained by substituting `<env>_g_mlp.json` in stages 4 and 5 and
+`--decoder cgan` in stage 6. The trajectory-predictor baseline is self-contained under
+`trajectory_predictor/`.
+
+Reachability ground truth is computed by executing the true closed loop from real camera images:
+`tools/gt_grid_eval.py` for the gym benchmarks and `tools/gt_brake_grid_eval.py` for the braking
+system label every grid cell, and `tools/compare_ground_truth.py` scores a verified safety map
+against those labels. False positives indicate a violation of soundness; conservatism is reflected
+in recall below one.
+
+Consistency checks are run with `python -m pytest tests/`. They validate artifact formats and
+configuration invariants, requiring no GPU, dataset or CARLA server.
+
+## Repository structure
 
 ```text
 make_decoder_dataset.py       training images, StarV initial states, real trajectories
-train_decoder.py              DWM decoder training and the alpha x lambda ablation grid
+train_decoder.py              decoder training and the alpha-lambda ablation grid
 sampling.py                   three-rollout-per-cell empirical tube construction
-verify.py                     StarV / MPI symbolic reachability
+verify.py                     StarV/MPI symbolic reachability
 signed_tube_margin.py         signed margin, conformal quantile, tube inflation
 conformal.py                  finite-sample conformal quantile
-compare.py                    containment scoring and tube plots, driven by signed_tube_margin
-repeated_tube_evaluation.py   seeded repeated evaluation, produces the comparison table
+compare.py                    containment scoring and tube plots
+repeated_tube_evaluation.py   seeded repeated evaluation and comparison table
 
 model.py                      controller, DWM decoder, cGAN generator
 dynamic.py                    analytic dynamics for the four benchmarks
-env.py                        the CartPole renderer and the CARLA AEBS environment
+env.py                        CartPole renderer and CARLA AEBS environment
 utils.py                      sampling, image and dynamics-provenance helpers
 
 saliency_map/                 occlusion saliency and its precomputation script
 starv_verification/           StarV-side models, dynamics and verifiers
 trajectory_predictor/         image-free transformer baseline
 tools/                        braking dataset capture, ground truth, safety maps
-tests/                        internal-consistency checks for the artifact formats
+tests/                        internal-consistency checks
 ```
 
-Run the checks with `python -m pytest tests/`. They validate artifact formats and config
-invariants and need no GPU, dataset or CARLA server.
+## Data and configuration
 
-## Artifacts and configuration
+Configurations reside under `config/`, grouped by stage: `make_decoder_dataset`, `train_decoder`,
+`sampling` and `starv_verification`. All paths within them are relative to the repository root.
 
-Configs live under `config/`, grouped by stage: `make_decoder_dataset`, `train_decoder`,
-`sampling`, `starv_verification`. Every path inside them is relative to the repository root.
+Configurations, datasets, trained weights and verification results are not distributed with the
+repository. The entries `config/`, `dwm_weight/` and `safety_results/` are expected to resolve to
+the locations holding those artifacts, for which a symbolic link into shared storage is
+sufficient. The directories `datasets/` and `results/` are produced locally.
 
-Configs, datasets, trained weights and verification results are not distributed with the
-repository. `config/`, `dwm_weight/` and `safety_results/` are expected to point at wherever
-those artifacts live — a symlink into shared storage works — and `datasets/` and `results/` are
-produced locally.
+## Implementation notes
 
-## Notes
-
-- The braking benchmark is the one whose frames come from a simulator rather than a gym renderer,
-  so `make_decoder_dataset.py` does not apply to it. Its dataset is captured over the verification
-  grid with `tools/collect_brake_grid_dataset.py`, flattened by
-  `tools/convert_brake_grid_dataset.py`, and split into the repo's format by
-  `tools/make_brake_decoder_dataset.py`; the held-out real trajectories come from
-  `tools/collect_brake_real_trajectories.py`. Every one of those steps needs a CARLA server.
-- Braking frames go through PIL's `"L"` conversion before being resized, reproducing the capture
-  pipeline the braking controller and decoder were trained on; the gym benchmarks convert with
-  luma weights after rendering and resize with `F.interpolate`. The two are equivalent in intent
-  but not interchangeable within one benchmark (`utils.carla_frame_to_gray` versus
-  `utils.rgb_to_gray_01`).
-- CartPole feeds only `[position, angle]` to the decoder; the full four-dimensional state is still
-  used for the dynamics and for locating the initial grid cell.
-- Angular differences for Pendulum are mapped to the shortest circular difference before any
-  distance is computed, so trajectories crossing ±π do not produce spurious errors near 2π.
-- All conformal scores use the L2 norm.
-- Trajectory `.npz` files record the dynamics parameters actually in effect, so datasets produced
-  under different integration steps can be told apart (`tools/check_dynamics_vintage.py`).
+- The braking benchmark obtains its frames from a simulator rather than a gym renderer, so
+  `make_decoder_dataset.py` does not apply. Its dataset is captured over the verification grid by
+  `tools/collect_brake_grid_dataset.py`, flattened by `tools/convert_brake_grid_dataset.py` and
+  split into the repository format by `tools/make_brake_decoder_dataset.py`. Held-out real
+  trajectories are collected by `tools/collect_brake_real_trajectories.py`. All of these stages
+  require a CARLA server.
+- Braking frames are converted through PIL's `"L"` mode before resizing, reproducing the capture
+  pipeline under which the braking controller and decoder were trained. The gym benchmarks apply
+  luma weights after rendering and resize with `F.interpolate`. The two conventions are equivalent
+  in intent but not interchangeable within a single benchmark; see `utils.carla_frame_to_gray` and
+  `utils.rgb_to_gray_01`.
+- CartPole supplies only `[position, angle]` to the decoder. The full four-dimensional state
+  remains in use for the dynamics and for locating the initial grid cell.
+- Pendulum angular differences are mapped to the shortest circular difference prior to any
+  distance computation, so trajectories crossing ±π incur no spurious error near 2π.
+- All conformal scores are computed under the L2 norm.
+- Trajectory `.npz` files record the dynamics parameters in effect at generation time, allowing
+  datasets produced under different integration steps to be distinguished
+  (`tools/check_dynamics_vintage.py`).
 
 ## Citation
 
-Paper under review. Citation information will be added here once it is available.
+Paper under review. Citation information will be added once available.
