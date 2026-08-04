@@ -22,29 +22,11 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import env as _env  # noqa: F401,E402  (registers the CARLA AEBS envs)
-import torch.nn as nn
-import torch.nn.functional as F
+from model import Controller  # noqa: E402
+from dynamic import Brake  # noqa: E402
+from utils import carla_frame_to_gray  # noqa: E402
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
-from PIL import Image
-
-
-class BrakeController(nn.Module):
-    def __init__(self):
-        super(BrakeController, self).__init__()
-        self.conv1 = nn.Conv2d(1, 4, kernel_size=4, stride=2, padding=1)
-        self.conv2 = nn.Conv2d(4, 1, kernel_size=4, stride=2, padding=1)
-        self.fc1 = nn.Linear(24 * 24, 64)
-        self.fc2 = nn.Linear(64, 1)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        x = torch.sigmoid(x)
-        return x
 
 
 def parse_args():
@@ -76,21 +58,6 @@ def parse_args():
     parser.add_argument("--resume", action="store_true",
                         help="Resume from latest checkpoint if it exists")
     return parser.parse_args()
-
-
-def resize_rgb_image(img: np.ndarray, image_size: int) -> np.ndarray:
-    if img.dtype != np.uint8:
-        img = np.clip(img, 0, 255).astype(np.uint8)
-    pil_img = Image.fromarray(img)
-    pil_img = pil_img.resize((image_size, image_size), Image.BILINEAR)
-    return np.array(pil_img, dtype=np.uint8)
-
-
-def image_to_tensor(img: np.ndarray, device) -> torch.Tensor:
-    x = torch.from_numpy(img).float() / 255.0
-    x = x.mean(dim=2, keepdim=True)
-    x = x.permute(2, 0, 1).unsqueeze(0).to(device)
-    return x
 
 
 def safe_reset(env):
@@ -189,16 +156,6 @@ def set_env_state(env, dist_m: float, vel_val: float,
     return np.array(out, dtype=np.float32), env
 
 
-def step_dynamics_unnorm(dist_m, vel_val, action_tanh, dt, v_lead=0.0):
-    brake = float(np.clip(0.5 * (action_tanh + 1.0), 0.0, 1.0))
-    decel = 0.009 * brake + 0.0042
-    next_dist = dist_m + (v_lead - vel_val) * dt
-    next_vel  = vel_val - decel * dt
-    next_dist = max(0.0, next_dist)
-    next_vel  = max(0.0, next_vel)
-    return next_dist, next_vel
-
-
 @torch.no_grad()
 def rollout_one_sample(env,
                        controller,
@@ -206,18 +163,26 @@ def rollout_one_sample(env,
                        steps, image_size, device,
                        dt, v_lead,
                        distance_scale, velocity_scale):
+    # The state advances through dynamic.Brake, the same analytic dynamics the
+    # verifier propagates; CARLA only supplies the camera frame. Stepping in
+    # float64 keeps this ground truth free of the float32 rounding that the
+    # batched rollouts accept.
+    dynamics = Brake(dt=dt, v_lead=v_lead)
     dist = float(init_dist)
     vel  = float(init_vel)
 
     for _ in range(steps):
         _, env = set_env_state(env, dist, vel)
 
-        img    = safe_render_rgb(env)
-        img    = resize_rgb_image(img, image_size)
-        x      = image_to_tensor(img, device)
+        gray   = carla_frame_to_gray(safe_render_rgb(env), image_size)
+        x      = torch.from_numpy(gray[None, None]).to(device)
         action = controller(x).squeeze().item()
 
-        dist, vel = step_dynamics_unnorm(dist, vel, action, dt, v_lead)
+        state = dynamics.step(
+            torch.tensor([[dist, vel]], dtype=torch.float64),
+            torch.tensor([[action]], dtype=torch.float64),
+        )
+        dist, vel = float(state[0, 0]), float(state[0, 1])
 
     return np.array([dist, vel], dtype=np.float32), env
 
@@ -281,7 +246,7 @@ def evaluate_grid(args):
         args.device if (torch.cuda.is_available() or "cpu" in args.device) else "cpu"
     )
 
-    controller = BrakeController().to(device)
+    controller = Controller(activation="sigmoid").to(device)
     ckpt = torch.load(args.controller_path, map_location=device, weights_only=True)
     controller.load_state_dict(ckpt)
     controller.eval()

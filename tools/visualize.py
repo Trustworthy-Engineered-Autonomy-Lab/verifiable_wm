@@ -58,11 +58,35 @@ def _plot_2d_safety_map(x_dim: Dict, y_dim: Dict, safety_matrix: np.ndarray, tit
     fig.tight_layout()
     return fig, ax
 
-def _get_safety_matrix(dims, cells: List[Dict]) -> np.ndarray:
-    
-    shape = [dim['num'] for dim in dims]
-    safety_matrix = np.array([cell['result'] for cell in cells], dtype=int).reshape(shape)
+def safety_matrix_from_cells(dims: List[Dict], cells: List[Dict]) -> np.ndarray:
+    """Grid-shaped 0/1 safety map, located by each cell's own initial bounds.
 
+    Cells are placed by the midpoint of the initial box they recorded rather
+    than by their position in the list, so a reordered or partially
+    regenerated result still lands on the right square, and a missing cell is
+    reported instead of silently shifting the map. A cell that errored during
+    verification carries no `result` and counts as not verified.
+    """
+    edges = [
+        np.linspace(float(dim["start"]), float(dim["stop"]), int(dim["num"]) + 1)
+        for dim in dims
+    ]
+    shape = tuple(int(dim["num"]) for dim in dims)
+    safety_matrix = np.full(shape, -1, dtype=np.int8)
+
+    for cell in cells:
+        initial = np.asarray(cell["bounds"][0], dtype=float)
+        index = tuple(
+            int(np.clip(
+                np.searchsorted(edges[d], initial[d].mean()) - 1, 0, shape[d] - 1
+            ))
+            for d in range(len(dims))
+        )
+        safety_matrix[index] = 1 if cell.get("result") else 0
+
+    missing = int((safety_matrix < 0).sum())
+    if missing:
+        raise ValueError(f"{missing} grid cells are missing from the safety result")
     return safety_matrix
 
 
@@ -116,7 +140,7 @@ if __name__ == "__main__":
         )
         
         # Create the safety matrix
-        safety_matrix = _get_safety_matrix(effective_dims, cells).T
+        safety_matrix = safety_matrix_from_cells(effective_dims, cells).T
     except KeyError as e:
         print(f"Could not find field {e.args[0]} in {args.result_file}")
         sys.exit(1)

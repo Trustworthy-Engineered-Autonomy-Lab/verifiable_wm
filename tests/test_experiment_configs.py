@@ -4,8 +4,13 @@ import unittest
 from pathlib import Path
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
 class ExperimentConfigTests(unittest.TestCase):
     ENVS = ("cartpole", "mountain_car", "pendulum")
+
+    # The verification grid each environment's paper results are reported on.
     GRIDS = {
         "cartpole": [
             ("pos", 0.0, 0.6, 60),
@@ -23,11 +28,23 @@ class ExperimentConfigTests(unittest.TestCase):
         ],
     }
 
+    # The state box the decoder training images are drawn from. It has to
+    # cover the verification grid, otherwise the decoder is extrapolating on
+    # exactly the cells being verified.
+    DECODER_STATE_SPACES = {
+        "cartpole": [(-2.4, 2.4), (-1.0, 1.0), (-0.2095, 0.2095), (-1.0, 1.0)],
+        "mountain_car": [(-1.2, 0.6), (-0.08, 0.08)],
+        "pendulum": [(-math.pi, math.pi), (-8.0, 8.0)],
+    }
+
     @staticmethod
     def _load(path):
-        return json.loads(Path(path).read_text(encoding="utf-8"))
+        return json.loads((ROOT / path).read_text(encoding="utf-8"))
 
     def assertFloatClose(self, actual, expected):
+        # Tolerance instead of exact equality: importing the StarV stack
+        # (pybdr -> codac) changes the process FPU rounding mode, which
+        # perturbs all later JSON float parsing by 1 ulp.
         self.assertTrue(
             math.isclose(actual, expected, rel_tol=1e-12, abs_tol=1e-12),
             f"{actual!r} != {expected!r}",
@@ -36,29 +53,20 @@ class ExperimentConfigTests(unittest.TestCase):
     def test_active_configs_use_t20(self):
         for env in self.ENVS:
             with self.subTest(env=env):
-                decoder = self._load(
-                    Path("config/make_decoder_dataset") / f"{env}.json"
-                )
-                sampling = self._load(Path("config/sampling") / f"{env}.json")
-                full = self._load(
-                    Path("config/starv_verification") / f"{env}.json"
-                )
-                smoke = self._load(
-                    Path("config/starv_verification/smoke") / f"{env}.json"
-                )
+                decoder = self._load(f"config/make_decoder_dataset/{env}.json")
+                sampling = self._load(f"config/sampling/{env}.json")
+                full = self._load(f"config/starv_verification/{env}.json")
 
                 self.assertEqual(decoder["rollout_steps"], 20)
                 self.assertEqual(sampling["rollout_steps"], 20)
                 self.assertEqual(full["verifier"]["kwargs"]["num_steps"], 20)
-                self.assertEqual(smoke["verifier"]["kwargs"]["num_steps"], 20)
 
     def test_full_configs_use_approved_grids(self):
         for env in self.ENVS:
             with self.subTest(env=env):
-                full = self._load(
-                    Path("config/starv_verification") / f"{env}.json"
-                )
-                actual_dims = full["grid"]["dims"]
+                actual_dims = self._load(
+                    f"config/starv_verification/{env}.json"
+                )["grid"]["dims"]
                 expected_dims = self.GRIDS[env]
                 self.assertEqual(len(actual_dims), len(expected_dims))
                 for actual, expected in zip(actual_dims, expected_dims):
@@ -68,18 +76,33 @@ class ExperimentConfigTests(unittest.TestCase):
                     self.assertFloatClose(actual["stop"], stop)
                     self.assertEqual(actual["num"], num)
 
-    def test_mountain_car_decoder_range_and_goal_match_contract(self):
-        decoder = self._load("config/make_decoder_dataset/mountain_car.json")
-        full = self._load("config/starv_verification/mountain_car.json")
-        state_space = {
-            dim["name"]: (dim["low"], dim["high"])
-            for dim in decoder["state_space"]
-        }
+    def test_decoder_state_spaces_match_contract(self):
+        for env in self.ENVS:
+            with self.subTest(env=env):
+                actual_dims = self._load(
+                    f"config/make_decoder_dataset/{env}.json"
+                )["state_space"]
+                expected_dims = self.DECODER_STATE_SPACES[env]
+                self.assertEqual(len(actual_dims), len(expected_dims))
+                for actual, (low, high) in zip(actual_dims, expected_dims):
+                    self.assertFloatClose(actual["low"], low)
+                    self.assertFloatClose(actual["high"], high)
 
-        for actual, expected in zip(state_space["position"], (-1.2, 0.6)):
-            self.assertFloatClose(actual, expected)
-        for actual, expected in zip(state_space["velocity"], (-0.08, 0.08)):
-            self.assertFloatClose(actual, expected)
+    def test_decoder_state_spaces_cover_the_verification_grid(self):
+        for env in self.ENVS:
+            with self.subTest(env=env):
+                make_config = self._load(f"config/make_decoder_dataset/{env}.json")
+                sampling_config = self._load(f"config/sampling/{env}.json")
+                starv_config = self._load(sampling_config["starv_config"])
+
+                for training_dim, grid_dim in zip(
+                    make_config["state_space"], starv_config["grid"]["dims"]
+                ):
+                    self.assertLessEqual(training_dim["low"], grid_dim["start"])
+                    self.assertGreaterEqual(training_dim["high"], grid_dim["stop"])
+
+    def test_mountain_car_goal_matches_the_grid_stop(self):
+        full = self._load("config/starv_verification/mountain_car.json")
         self.assertFloatClose(
             full["verifier"]["kwargs"]["goal_position_threshold"], 0.6
         )

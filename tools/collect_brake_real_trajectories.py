@@ -26,13 +26,13 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from PIL import Image
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from model import Controller  # noqa: E402  (repo controller == BrakeController)
-from utils import load_config, load_state_splits  # noqa: E402
+from model import Controller  # noqa: E402
+from dynamic import Brake  # noqa: E402
+from utils import carla_frame_to_gray, load_config, load_state_splits  # noqa: E402
 
 ENV_ID = "AdvancedEmergencyBrakingSystemWithRendering-v0"
 STARV_CONFIG = "config/starv_verification/brake_system.json"
@@ -43,21 +43,24 @@ V_LEAD = 0.0
 IMAGE_SIZE = 96
 
 
+DYNAMICS = Brake(dt=DT, v_lead=V_LEAD)
+
+
 def step_dynamics(dist, vel, action):
-    # Must stay identical to dynamic.Brake.step (the WM rollout dynamics).
-    brake = float(np.clip(0.5 * (action + 1.0), 0.0, 1.0))
-    decel = 0.009 * brake + 0.0042
-    next_dist = max(0.0, dist + (V_LEAD - vel) * DT)
-    next_vel = max(0.0, vel - decel * DT)
-    return next_dist, next_vel
+    """Advance the state with the same analytic dynamics the verifier uses.
+
+    CARLA supplies only the camera frame; the state itself never comes from
+    the simulator, so this rollout and the reachable tube describe one system.
+    """
+    state = DYNAMICS.step(
+        torch.tensor([[dist, vel]], dtype=torch.float64),
+        torch.tensor([[action]], dtype=torch.float64),
+    )
+    return float(state[0, 0]), float(state[0, 1])
 
 
 def rgb_to_gray_tensor(img_rgb, device):
-    if img_rgb.dtype != np.uint8:
-        img_rgb = np.clip(img_rgb, 0, 255).astype(np.uint8)
-    pil = Image.fromarray(img_rgb).convert("L")
-    pil = pil.resize((IMAGE_SIZE, IMAGE_SIZE), Image.BILINEAR)
-    gray = np.array(pil, dtype=np.float32) / 255.0
+    gray = carla_frame_to_gray(img_rgb, IMAGE_SIZE)
     return torch.from_numpy(gray[None, None]).to(device)
 
 

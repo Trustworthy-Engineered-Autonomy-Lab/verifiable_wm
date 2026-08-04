@@ -16,37 +16,22 @@ cell is safe iff the reachable distance lower bound stayed > 0 for all steps.
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from tools.visualize import safety_matrix_from_cells  # noqa: E402
 
 
 def load_prediction(safety_path):
     with open(safety_path) as f:
         data = json.load(f)
-
-    cells = data["cells"]
-    dims = data["grid"]["dims"]
-    edges = [
-        np.linspace(dim["start"], dim["stop"], dim["num"] + 1)
-        for dim in dims
-    ]
-    shape = tuple(dim["num"] for dim in dims)
-    pred = np.full(shape, -1, dtype=np.int8)
-
-    for cell in cells:
-        init = np.array(cell["bounds"][0])  # (dims, 2): [lo, hi] per dim
-        idx = tuple(
-            int(np.clip(np.searchsorted(edges[d], init[d].mean()) - 1, 0, shape[d] - 1))
-        for d in range(len(dims))
-        )
-        pred[idx] = 1 if cell.get("result") else 0
-
-    if (pred < 0).any():
-        raise ValueError(f"{(pred < 0).sum()} grid cells missing from {safety_path}")
-    return pred
+    return safety_matrix_from_cells(data["grid"]["dims"], data["cells"])
 
 
 def main():

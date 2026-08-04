@@ -90,6 +90,29 @@ def rgb_to_gray_01(frames_rgb):
     return gray / 255.0
 
 
+def carla_frame_to_gray(frame_rgb, image_size=96):
+    """RGB -> PIL "L" -> bilinear resize, the AEBS camera capture pipeline.
+
+    The braking controller and decoder were both trained on frames converted
+    exactly this way (aebs_carla/generate_dataset.py), so every tool that
+    feeds the braking controller a CARLA frame has to reproduce it.
+
+    Deliberately not rgb_to_gray_01 + F.interpolate: PIL's "L" applies the
+    same ITU-R 601-2 luma weights but quantizes to uint8, and it converts
+    before resizing rather than after. The gym benchmarks were captured with
+    render_images and keep that path; only the ordering and the quantization
+    differ, but the two are not interchangeable within one benchmark.
+    """
+    from PIL import Image
+
+    frame = np.asarray(frame_rgb)
+    if frame.dtype != np.uint8:
+        frame = np.clip(frame, 0, 255).astype(np.uint8)
+    image = Image.fromarray(frame).convert("L")
+    image = image.resize((int(image_size), int(image_size)), Image.BILINEAR)
+    return np.asarray(image, dtype=np.float32) / 255.0
+
+
 @torch.no_grad()
 def render_images(dynamic, states, device, render_batch_size):
     states_np = states.detach().cpu().numpy()
