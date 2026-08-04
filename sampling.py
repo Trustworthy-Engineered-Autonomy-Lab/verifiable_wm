@@ -33,10 +33,6 @@ from sampled_tube import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DEFAULT_CONFIGS = tuple(
-    PROJECT_ROOT / "config" / "sampling" / f"{environment}.json"
-    for environment in ("cartpole", "mountain_car", "pendulum")
-)
 
 
 def load_state_dict(path, device):
@@ -60,7 +56,16 @@ def load_controller(config, device):
 
 
 def decoder_variant(config):
-    return config["decoder"].get("variant", "old")
+    """Which trained world model this rollout uses.
+
+    Names the decoder checkpoint, the output file, and the model_id that
+    config/sampled_tube/*.json has to agree with, so it is required rather
+    than defaulted -- a wrong default silently rolls out the wrong model.
+    """
+    try:
+        return config["decoder"]["variant"]
+    except KeyError:
+        raise KeyError("sampling config must define 'decoder.variant'") from None
 
 
 def resolve_decoder_weights(config):
@@ -483,18 +488,11 @@ def generate_cellwise_tube(wrapper, wrapper_path):
     return tube_path
 
 
-def run_sampling_config(config, config_path, decoder_variant=None):
+def run_sampling_config(config, config_path):
     mode = config.get("sampling_mode", "state_splits")
     if mode == "state_splits":
-        if decoder_variant is not None:
-            config["decoder"]["variant"] = decoder_variant
         return generate_dataset(config)
     if mode == "cellwise_tube":
-        if decoder_variant is not None:
-            raise ValueError(
-                "--decoder-variant is not supported for cellwise wrapper "
-                "configs; select the matching wrapper config instead"
-            )
         return generate_cellwise_tube(config, Path(config_path))
     raise ValueError(f"Unsupported sampling_mode: {mode!r}")
 
@@ -507,12 +505,6 @@ def parse_args():
         type=Path,
         help="Config JSON files.",
     )
-    parser.add_argument(
-        "--decoder-variant",
-        default=None,
-        help="Which decoder weights to roll out with (old / intensity / saliency). "
-        "Overrides the config's decoder.variant.",
-    )
     return parser.parse_args()
 
 
@@ -522,11 +514,7 @@ def main():
     for config_path in args.configs:
         print(f"[Config] {config_path}")
         config = load_config(config_path)
-        output_path = run_sampling_config(
-            config,
-            config_path,
-            decoder_variant=args.decoder_variant,
-        )
+        output_path = run_sampling_config(config, config_path)
         if config.get("sampling_mode", "state_splits") == "cellwise_tube":
             print(f"[Done] sampled tube saved to {output_path}")
         else:

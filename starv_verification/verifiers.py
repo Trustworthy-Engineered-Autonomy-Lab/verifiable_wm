@@ -2,7 +2,6 @@ import numpy as np
 
 from typing import Dict, List
 from abc import ABC, abstractmethod
-import random
 
 from starv_verification.model import FullModel
 from starv_verification.dynamic import Pendulum, MountainCar, CartPole, Brake
@@ -184,15 +183,3 @@ class BrakeVerifier(Verifier):
     def criteria(self, bounds: List[np.ndarray]) -> bool:
         dis_bound = np.array(bounds)[:, :, 0]
         return bool(np.all(dis_bound > 0.0))
-
-# class _Test(Verifier):
-    # def __init__(self, raise_error = True):
-    #     self.raise_error = raise_error
-
-    # def verify_single_cell(self, cell):
-    #     if self.raise_error:
-    #         raise RuntimeError("Error raised to test the program")
-        
-    #     while True:
-    #         yield random.choice([True, False])
-        

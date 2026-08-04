@@ -128,7 +128,10 @@ def grid_cell_bounds(grid: dict[str, Any]) -> np.ndarray:
 
 
 def _decoder_variant(config: dict[str, Any]) -> str:
-    return str(config["decoder"].get("variant", "old"))
+    try:
+        return str(config["decoder"]["variant"])
+    except KeyError:
+        raise ValueError("sampling config must define 'decoder.variant'") from None
 
 
 def _decoder_weights(config: dict[str, Any]) -> str:

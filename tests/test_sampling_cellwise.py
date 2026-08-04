@@ -24,7 +24,6 @@ class SamplingDispatchTests(unittest.TestCase):
             result = sampling.run_sampling_config(
                 config,
                 Path("config/sampling/cartpole.json"),
-                decoder_variant=None,
             )
 
         self.assertEqual(result, Path("legacy"))
@@ -45,7 +44,6 @@ class SamplingDispatchTests(unittest.TestCase):
             result = sampling.run_sampling_config(
                 config,
                 Path("config/sampled_tube/cartpole.json"),
-                decoder_variant=None,
             )
 
         self.assertEqual(result, Path("sampled.json"))

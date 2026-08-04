@@ -1,10 +1,6 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 import numpy as np
-
-from abc import ABC, abstractmethod
 
 from StarV.layer.FullyConnectedLayer import FullyConnectedLayer
 from StarV.layer.ConvTranspose2DLayer import ConvTranspose2DLayer
@@ -16,7 +12,6 @@ from StarV.layer.LogSigLayer import LogSigLayer
 from StarV.set.star import Star
 from StarV.set.imagestar import ImageStar
 
-from typing import Dict, List
 from collections import OrderedDict
 
 import model

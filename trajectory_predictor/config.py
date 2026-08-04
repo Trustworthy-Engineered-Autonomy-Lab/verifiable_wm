@@ -42,19 +42,19 @@ HORIZON = ENVIRONMENT_HORIZONS[ENVIRONMENT]
 #   2) the format/provenance template copied into predictor_trajectories.npz.
 REAL_TRAJECTORIES = {
     "pendulum": Path(
-        "/home/tealab_shared/safety_results/pendulum/"
+        "safety_results/pendulum/"
         "5000cell_real_trajectories.npz"
     ),
     "mountain_car": Path(
-        "/home/tealab_shared/safety_results/mountain_car/"
+        "safety_results/mountain_car/"
         "6400cell_real_trajectories.npz"
     ),
     "cartpole": Path(
-        "/home/tealab_shared/safety_results/cartpole/"
+        "safety_results/cartpole/"
         "3600cell_real_trajectories.npz"
     ),
     "brake_system": Path(
-        "/home/tealab_shared/safety_results/brake_system/"
+        "safety_results/brake_system/"
         "1600cell_real_trajectories.npz"
     ),
 }
@@ -64,19 +64,19 @@ REAL_TRAJECTORIES = REAL_TRAJECTORIES[ENVIRONMENT]
 # bounds are valid; otherwise cells are reconstructed from grid.dims.
 GRID_RESULTS = {
     "pendulum": Path(
-        "/home/tealab_shared/safety_results/pendulum/"
+        "safety_results/pendulum/"
         "5000cell_dwm_safety_result.json"
     ),
     "mountain_car": Path(
-        "/home/tealab_shared/safety_results/mountain_car/"
+        "safety_results/mountain_car/"
         "6400cell_dwm_safety_result.json"
     ),
     "cartpole": Path(
-        "/home/tealab_shared/safety_results/cartpole/"
+        "safety_results/cartpole/"
         "3600cell_dwm_safety_result.json"
     ),
     "brake_system": Path(
-        "/home/tealab_shared/safety_results/brake_system/"
+        "safety_results/brake_system/"
         "1600cell_dwm_safety_result.json"
     ),
 }
@@ -85,7 +85,7 @@ GRID_RESULT = GRID_RESULTS[ENVIRONMENT]
 # The training program creates this checkpoint.  The build program then reads
 # the same file.
 CHECKPOINT = Path(
-    f"/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/{ENVIRONMENT}/predictor_transformer.pth"
+    f"trajectory_predictor/models/{ENVIRONMENT}/predictor_transformer.pth"
 )
 
 
@@ -93,9 +93,7 @@ CHECKPOINT = Path(
 # 3. Output paths
 # =============================================================================
 
-OUTPUT_DIRECTORY = Path(
-    f"/home/UFAD/xinyangwang/projects/verifiable_wm/trajectory_predictor/models/{ENVIRONMENT}"
-)
+OUTPUT_DIRECTORY = Path(f"trajectory_predictor/models/{ENVIRONMENT}")
 
 TRAJECTORY_OUTPUT = OUTPUT_DIRECTORY / "predictor_trajectories.npz"
 TUBE_OUTPUT = OUTPUT_DIRECTORY / "predictor_tube.json"

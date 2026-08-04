@@ -18,7 +18,9 @@ import signed_tube_margin as stm
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-SHARED_SAFETY_ROOT = Path("/home/tealab_shared/safety_results")
+# Symbolic tubes and real trajectories are large binary artifacts kept outside
+# the repository; safety_results/ points at wherever they live.
+SHARED_SAFETY_ROOT = PROJECT_ROOT / "safety_results"
 PREDICTOR_ROOT = SHARED_SAFETY_ROOT / "predictor"
 DEFAULT_MASTER_SEED = 2025
 POOL_SIZE = 800
@@ -1147,7 +1149,7 @@ def aggregate_results(
         "decoders": list(decoders),
         "brake_weight_path_migration": {
             "symbolic_recorded_prefix": "dwm_weight/now_weight/brake_system",
-            "current_prefix": "/home/tealab_shared/dwm_weight/brake_system",
+            "current_prefix": "dwm_weight/brake_system",
             "confirmed_same_weights": True,
         },
     }

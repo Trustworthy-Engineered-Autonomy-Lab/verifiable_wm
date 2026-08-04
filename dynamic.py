@@ -83,9 +83,7 @@ class Pendulum(DynmaicModel):
             m=1.0,
             l=1.0
         ):
-        from gym import spaces
-        from gym.utils import seeding
-
+        super().__init__()
         self.max_speed = max_speed
         self.max_torque = max_torque
         self.dt = dt

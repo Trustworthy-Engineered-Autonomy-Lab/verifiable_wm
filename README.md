@@ -51,28 +51,33 @@ train_decoder.py              DWM decoder training (saliency + control-consisten
 train_gan.py                  cGAN baseline training
 sampling.py                   closed-loop rollout with the decoder in place of the renderer
 verify.py                     StarV / MPI symbolic reachability
-compare.py                    trajectory vs. reachable-tube containment plots
-signed_tube_margin.py         signed margin, conformal quantile, tube inflation
 sampled_tube.py               per-cell sampling-based tube construction
+signed_tube_margin.py         signed margin, conformal quantile, tube inflation
 conformal.py                  finite-sample conformal quantile
+compare.py                    containment scoring and tube plots, driven by signed_tube_margin
 repeated_tube_evaluation.py   seeded repeated evaluation, produces the comparison table
-ablation.py                   alpha x lambda grid over the decoder loss
 
 model.py                      controller, DWM decoder, cGAN generator
 dynamic.py                    analytic dynamics for the four benchmarks
 env.py                        renderers and environment wrappers
 utils.py                      sampling helpers and dynamics provenance
 
-saliency_map/                 occlusion saliency methods and precomputation scripts
+saliency_map/                 occlusion saliency and its precomputation script
 starv_verification/           StarV-side models, dynamics and verifiers
 trajectory_predictor/         image-free transformer baseline
-tools/                        standalone utilities (ground truth, plots, diagnostics)
+tools/                        ground-truth rollouts, safety maps, dynamics provenance
+tests/                        internal-consistency checks for the artifact formats
 ```
 
+`train_decoder.py` takes the loss weights from the command line: one `--alpha` and one
+`--lambda` value train a single decoder, several values run the ablation grid over their
+cartesian product and write `alpha_lambda_grid.csv` next to the runs.
+
 Configurations live under `config/` grouped by stage (`make_decoder_dataset`, `train_decoder`,
-`train_gan`, `sampling`, `sampled_tube`, `starv_verification`). Datasets, trained weights and
-verification results are large binary artifacts and are not distributed with the repository;
-paths to them are set in the configuration files.
+`train_gan`, `sampling`, `sampled_tube`, `starv_verification`). Configurations, datasets, trained
+weights and verification results are not distributed with the repository; `config/`,
+`dwm_weight/` and `safety_results/` are expected to point at wherever those artifacts live, and
+every path inside the configuration files is relative to the repository root.
 
 ## Notes
 

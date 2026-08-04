@@ -1,61 +1,41 @@
-results/
-weights/
-verify.sh
+# Build and editor droppings
 __pycache__/
-data/
-datasets/*/data/
-datasets/**/*.pth
 .vscode/
+.ipynb_checkpoints/
+settings.json
 *.out
 *.env
-.ipynb_checkpoints/
-*.ipynb
-logs/
-report/
-/docs/
-*.pth
-*.pdf
-chat_history_exports
-saliency_map/output/
-dwm_weight/*/alpha_lambda_grid/
-*.png
-settings.json
-metrics.json
-dwm_weight/cartpole/intensity/metrics.json
-dwm_weight/cartpole/saliency/metrics.json
-# Unit tests only check internal consistency and produce no paper artifacts;
-# they are maintained locally and not distributed.
-/tests
-*.json
-!/config/**/*.json
-# Local experiment configurations (do not commit)
-/config/make_decoder_dataset/cartpole_g_mlp_100.json
-/config/make_decoder_dataset/mountain_car_g_mlp_100.json
-/config/make_decoder_dataset/pendulum_clamp_100.json
-/config/sampling/cartpole_g_mlp_100.json
-/config/sampling/mountain_car_g_mlp_100.json
-/config/sampling/pendulum_clamp_100.json
-/config/sampling/pendulum_g_mlp.json
-/config/sampling/pendulum_sigmoid_100.json
-/config/starv_verification/cartpole_g_mlp_100.json
-/config/starv_verification/mountain_car_g_mlp_100.json
-/config/starv_verification/pendulum_clamp.json
-/config/starv_verification/pendulum_clamp_100.json
-/config/starv_verification/pendulum_g_mlp.json
-/config/starv_verification/pendulum_sigmoid_100.json
-/config/train_gan/brake_system.json
-/aebs_carla.zip
-/aebs_carla/
-/paper/
-EMSOFT2026__World_Model_Closed_loop_Safety_Verification.zip
-log/
 *.log
-*.npy
-*.npz
-datasets/brake_system/ground_truth/
-*.zip
-*.tar.gz
+log/
+logs/
+
+# Large binary artifacts. dwm_weight/, safety_results/ and config/ are
+# symlinks into the lab-shared tree; datasets/ and results/ are produced
+# locally. None of them are distributed with the repository.
+config
 dwm_weight
 safety_results
-/tools/plot_brake_dwm_sampled_diagnostic.py
-config
+datasets/*/data/
+datasets/**/*.pth
+datasets/brake_system/ground_truth/
+data/
+results/
+weights/
+*.pth
+*.npy
+*.npz
+*.json
+*.png
+*.pdf
+*.zip
+*.tar.gz
+
+# Working material that is not part of the reference implementation
+*.ipynb
+report/
+/docs/
+/paper/
+/aebs_carla/
+chat_history_exports
+saliency_map/output/
+verify.sh

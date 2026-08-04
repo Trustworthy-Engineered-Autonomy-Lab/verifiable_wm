@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Dict, Tuple, Sequence
+from typing import List, Dict
 import time
 import os
 import json
@@ -13,7 +13,6 @@ from mpi4py import MPI
 
 from starv_verification.model import FullModel
 from starv_verification.verifiers import Verifier
-from collections import OrderedDict
 import traceback
 import shutil
 from colorama import Fore, Style

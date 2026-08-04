@@ -14,9 +14,8 @@ Override the target with CARLA_HOST / CARLA_PORT if the server moves.
     python tools/collect_brake_real_trajectories.py --splits test
     python tools/collect_brake_real_trajectories.py --splits train val test
 
-Afterwards run:
-
-    python conformal.py --env brake_system --variant old --alpha 0.05
+Afterwards run signed_tube_margin.py to score the collected trajectories
+against the brake reachable tube.
 """
 
 import argparse
@@ -37,7 +36,7 @@ from utils import load_config, load_state_splits  # noqa: E402
 
 ENV_ID = "AdvancedEmergencyBrakingSystemWithRendering-v0"
 STARV_CONFIG = "config/starv_verification/brake_system.json"
-CONTROLLER_WEIGHTS = "/home/tealab_shared/dwm_weight/brake_system/controller.pth"
+CONTROLLER_WEIGHTS = "dwm_weight/brake_system/controller.pth"
 ROLLOUT_STEPS = 10
 DT = 0.1
 V_LEAD = 0.0
