@@ -4,7 +4,7 @@ make_decoder_dataset.py renders on-line from a gym env, which is not an option
 for the braking system: its frames come from CARLA and were captured offline
 into aebs_carla/dataset_decoder.npz. That file stores uint8 NHWC frames, while
 every other benchmark's decoder_states.npz stores float32 NCHW images already
-scaled to [0,1] -- which is what train_gan.py and train_decoder.py assume. The
+scaled to [0,1] -- which is what train_decoder.py assumes. The
 missing /255 here is exactly what made G_brake.pth collapse to a black image:
 the discriminator saw "real" pixels up to 229 against a generator clamped to 1.
 """

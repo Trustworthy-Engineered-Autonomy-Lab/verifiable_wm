@@ -17,14 +17,17 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import gym
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import env as _env  # noqa: F401,E402  (registers the CARLA AEBS envs)
 from model import Controller  # noqa: E402
 from dynamic import Brake  # noqa: E402
 from utils import carla_frame_to_gray  # noqa: E402
+from tools.carla_aebs_client import (  # noqa: E402
+    make_env,
+    safe_render_rgb,
+    set_env_state,
+)
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 
@@ -58,102 +61,6 @@ def parse_args():
     parser.add_argument("--resume", action="store_true",
                         help="Resume from latest checkpoint if it exists")
     return parser.parse_args()
-
-
-def safe_reset(env):
-    out = env.reset()
-    if isinstance(out, tuple):
-        out = out[0]
-    return out
-
-
-def safe_render_rgb(env):
-    if hasattr(env, "unwrapped") and hasattr(env.unwrapped, "image"):
-        img = env.unwrapped.image
-        if img is not None:
-            return np.array(img, dtype=np.uint8)
-    try:
-        img = env.render(mode="rgb_array")
-    except TypeError:
-        img = env.render()
-    return np.array(img, dtype=np.uint8)
-
-
-def drain_sensor_queues(env, max_drain: int = 50):
-    unwrapped = getattr(env, "unwrapped", env)
-    if hasattr(unwrapped, "_queues"):
-        for q in unwrapped._queues:
-            drained = 0
-            while drained < max_drain:
-                try:
-                    q.get_nowait()
-                    drained += 1
-                except Exception:
-                    break
-    for attr in ["_collision_queue", "collision_queue"]:
-        if hasattr(unwrapped, attr):
-            q = getattr(unwrapped, attr)
-            drained = 0
-            while drained < max_drain:
-                try:
-                    q.get_nowait()
-                    drained += 1
-                except Exception:
-                    break
-
-
-def make_env(env_id: str) -> gym.Env:
-    env = gym.make(env_id)
-    _ = safe_reset(env)
-    time.sleep(2.0)
-    return env
-
-
-def set_env_state(env, dist_m: float, vel_val: float,
-                  max_tries: int = 6, sleep_sec: float = 2.0):
-    last_err = None
-    for attempt in range(1, max_tries + 1):
-        try:
-            drain_sensor_queues(env)
-
-            if hasattr(env, "unwrapped") and hasattr(env.unwrapped, "reset_to_state"):
-                out = env.unwrapped.reset_to_state(dist_m, vel_val)
-            elif hasattr(env, "unwrapped") and hasattr(env.unwrapped, "reset"):
-                out = env.unwrapped.reset(state=[dist_m, vel_val])
-            else:
-                raise AttributeError("Cannot find reset_to_state or reset(state=...) on env.")
-
-            if isinstance(out, tuple):
-                out = out[0]
-            return np.array(out, dtype=np.float32), env
-
-        except queue.Empty as e:
-            last_err = e
-            wait = sleep_sec * attempt
-            print(f"[Warn] queue.Empty on reset (d={dist_m:.4f}, v={vel_val:.4f}), "
-                  f"try {attempt}/{max_tries}, sleeping {wait:.0f}s")
-            time.sleep(wait)
-
-        except Exception:
-            raise
-
-    print(f"[Warn] All {max_tries} retries failed. Restarting CARLA env...")
-    try:
-        env.close()
-    except Exception:
-        pass
-    time.sleep(5.0)
-    env = make_env(env.__spec__.id if hasattr(env, "__spec__") and env.__spec__ else
-                   "AdvancedEmergencyBrakingSystemWithRendering-v0")
-
-    drain_sensor_queues(env)
-    if hasattr(env, "unwrapped") and hasattr(env.unwrapped, "reset_to_state"):
-        out = env.unwrapped.reset_to_state(dist_m, vel_val)
-    else:
-        out = env.unwrapped.reset(state=[dist_m, vel_val])
-    if isinstance(out, tuple):
-        out = out[0]
-    return np.array(out, dtype=np.float32), env
 
 
 @torch.no_grad()
