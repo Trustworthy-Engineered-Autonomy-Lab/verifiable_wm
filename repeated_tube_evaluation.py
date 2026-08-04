@@ -39,9 +39,9 @@ ENVIRONMENTS: dict[str, dict[str, Any]] = {
             "dwm": SHARED_SAFETY_ROOT / "cartpole" / "3600cell_dwm_safety_result.json",
             "cgan": SHARED_SAFETY_ROOT / "cartpole" / "3600cell_g_mlp_safety_result.json",
         },
-        "wrappers": {
-            "dwm": PROJECT_ROOT / "config" / "sampled_tube" / "cartpole.json",
-            "cgan": PROJECT_ROOT / "config" / "sampled_tube" / "cartpole_g_mlp.json",
+        "sampling_configs": {
+            "dwm": PROJECT_ROOT / "config" / "sampling" / "cartpole.json",
+            "cgan": PROJECT_ROOT / "config" / "sampling" / "cartpole_g_mlp.json",
         },
     },
     "mountain_car": {
@@ -53,9 +53,9 @@ ENVIRONMENTS: dict[str, dict[str, Any]] = {
             "dwm": SHARED_SAFETY_ROOT / "mountain_car" / "6400cell_dwm_safety_result.json",
             "cgan": SHARED_SAFETY_ROOT / "mountain_car" / "6400cell_g_mlp_safety_result.json",
         },
-        "wrappers": {
-            "dwm": PROJECT_ROOT / "config" / "sampled_tube" / "mountain_car.json",
-            "cgan": PROJECT_ROOT / "config" / "sampled_tube" / "mountain_car_g_mlp.json",
+        "sampling_configs": {
+            "dwm": PROJECT_ROOT / "config" / "sampling" / "mountain_car.json",
+            "cgan": PROJECT_ROOT / "config" / "sampling" / "mountain_car_g_mlp.json",
         },
     },
     "pendulum": {
@@ -67,9 +67,9 @@ ENVIRONMENTS: dict[str, dict[str, Any]] = {
             "dwm": SHARED_SAFETY_ROOT / "pendulum" / "5000cell_dwm_safety_result.json",
             "cgan": SHARED_SAFETY_ROOT / "pendulum" / "5000cell_g_mlp_safety_result.json",
         },
-        "wrappers": {
-            "dwm": PROJECT_ROOT / "config" / "sampled_tube" / "pendulum.json",
-            "cgan": PROJECT_ROOT / "config" / "sampled_tube" / "pendulum_g_mlp.json",
+        "sampling_configs": {
+            "dwm": PROJECT_ROOT / "config" / "sampling" / "pendulum.json",
+            "cgan": PROJECT_ROOT / "config" / "sampling" / "pendulum_g_mlp.json",
         },
     },
     "brake_system": {
@@ -81,9 +81,9 @@ ENVIRONMENTS: dict[str, dict[str, Any]] = {
             "dwm": SHARED_SAFETY_ROOT / "brake_system" / "1600cell_dwm_safety_result.json",
             "cgan": SHARED_SAFETY_ROOT / "brake_system" / "1600cell_g_mlp_safety_result.json",
         },
-        "wrappers": {
-            "dwm": PROJECT_ROOT / "config" / "sampled_tube" / "brake_system.json",
-            "cgan": PROJECT_ROOT / "config" / "sampled_tube" / "brake_system_g_mlp.json",
+        "sampling_configs": {
+            "dwm": PROJECT_ROOT / "config" / "sampling" / "brake_system.json",
+            "cgan": PROJECT_ROOT / "config" / "sampling" / "brake_system_g_mlp.json",
         },
     },
 }
@@ -324,8 +324,8 @@ def aggregate_metric_rows(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def build_repeat_wrapper(
-    wrapper: dict[str, Any],
+def build_repeat_sampling_config(
+    sampling_config: dict[str, Any],
     *,
     env: str,
     decoder: str,
@@ -334,10 +334,10 @@ def build_repeat_wrapper(
     data_root: Path,
     result_root: Path,
 ) -> dict[str, Any]:
-    """Redirect one existing sampled-tube wrapper into a repeat directory."""
+    """Redirect one unified sampling config into a repeat directory."""
     if decoder not in {"dwm", "cgan"}:
         raise ValueError(f"unknown decoder: {decoder}")
-    result = copy.deepcopy(wrapper)
+    result = copy.deepcopy(sampling_config)
     repeat_name = f"repeat_{int(repeat_index):02d}"
     data_dir = Path(data_root) / env / "sampled" / repeat_name
     result_dir = Path(result_root) / env / "b_sampled" / decoder / repeat_name
@@ -353,12 +353,12 @@ def build_repeat_wrapper(
 def apply_experiment_overrides(
     env: str,
     decoder: str,
-    base_config: dict[str, Any],
+    sampling_config: dict[str, Any],
     model_starv_config: dict[str, Any],
     canonical_grid_config: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Apply the approved Brake grid and CartPole cGAN corrections in memory."""
-    base = copy.deepcopy(base_config)
+    sampling = copy.deepcopy(sampling_config)
     model_starv = copy.deepcopy(model_starv_config)
     canonical = copy.deepcopy(canonical_grid_config)
     if env == "brake_system":
@@ -369,9 +369,9 @@ def apply_experiment_overrides(
             velocity_dims[0]["stop"] = 6.4
             velocity_dims[0]["num"] = 40
     if env == "cartpole" and decoder == "cgan":
-        base["decoder"].setdefault("args", {})["z_range"] = 0.05
+        sampling["decoder"].setdefault("args", {})["z_range"] = 0.05
         model_starv["layers"]["G_MLP"].setdefault("kwargs", {})["z_range"] = 0.05
-    return base, model_starv, canonical
+    return sampling, model_starv, canonical
 
 
 def materialize_case_configs(
@@ -382,27 +382,23 @@ def materialize_case_configs(
     overwrite: bool,
 ) -> Path:
     """Write a self-contained corrected config snapshot for one sampled case."""
-    wrapper_source = Path(ENVIRONMENTS[env]["wrappers"][decoder])
-    wrapper = load_json(wrapper_source)
-    base = load_json(PROJECT_ROOT / wrapper["base_sampling_config"])
-    model_starv = load_json(PROJECT_ROOT / base["starv_config"])
-    canonical = load_json(PROJECT_ROOT / wrapper["grid_config"])
-    base, model_starv, canonical = apply_experiment_overrides(
-        env, decoder, base, model_starv, canonical
+    sampling_source = Path(ENVIRONMENTS[env]["sampling_configs"][decoder])
+    sampling_config = load_json(sampling_source)
+    model_starv = load_json(PROJECT_ROOT / sampling_config["starv_config"])
+    canonical = load_json(PROJECT_ROOT / sampling_config["grid_config"])
+    sampling_config, model_starv, canonical = apply_experiment_overrides(
+        env, decoder, sampling_config, model_starv, canonical
     )
     config_dir = Path(result_root) / "configs" / env / decoder
     model_starv_path = config_dir / "model_starv.json"
     grid_path = Path(result_root) / "configs" / env / "dwm" / "canonical_grid.json"
-    base_path = config_dir / "sampling.json"
-    wrapper_path = config_dir / "wrapper.json"
-    base["starv_config"] = str(model_starv_path)
-    wrapper["base_sampling_config"] = str(base_path)
-    wrapper["grid_config"] = str(grid_path)
+    sampling_path = config_dir / "sampling.json"
+    sampling_config["starv_config"] = str(model_starv_path)
+    sampling_config["grid_config"] = str(grid_path)
     write_json_artifact(model_starv_path, model_starv, overwrite=overwrite)
     write_json_artifact(grid_path, canonical, overwrite=overwrite)
-    write_json_artifact(base_path, base, overwrite=overwrite)
-    write_json_artifact(wrapper_path, wrapper, overwrite=overwrite)
-    return wrapper_path
+    write_json_artifact(sampling_path, sampling_config, overwrite=overwrite)
+    return sampling_path
 
 
 def prepare_environment_splits(
@@ -697,18 +693,20 @@ def evaluate_symbolic(
 
 
 def validate_existing_sampled_outputs(
-    wrapper: dict[str, Any],
+    sampling_config: dict[str, Any],
     *,
     expected_cells: int,
 ) -> None:
-    from sampled_tube import validate_sampled_safety_result
+    from sampling import validate_sampled_safety_result
 
     for key in ("states_file", "trajectory_file", "tube_file"):
-        if not Path(wrapper[key]).is_file():
-            raise FileNotFoundError(f"missing existing sampled artifact: {wrapper[key]}")
-    payload = load_json(Path(wrapper["tube_file"]))
+        if not Path(sampling_config[key]).is_file():
+            raise FileNotFoundError(
+                f"missing existing sampled artifact: {sampling_config[key]}"
+            )
+    payload = load_json(Path(sampling_config["tube_file"]))
     validate_sampled_safety_result(payload)
-    if int(payload["seed"]) != int(wrapper["seed"]):
+    if int(payload["seed"]) != int(sampling_config["seed"]):
         raise ValueError("existing sampled tube seed mismatch")
     if len(payload["cells"]) != int(expected_cells):
         raise ValueError("existing sampled tube cell count mismatch")
@@ -731,14 +729,14 @@ def sample_tubes(
         for repeat_index in repeat_indices:
             seed_row = seeds[repeat_index]
             for decoder in decoders:
-                wrapper_path = materialize_case_configs(
+                sampling_path = materialize_case_configs(
                     env,
                     decoder,
                     result_root=result_root,
                     overwrite=overwrite,
                 )
-                wrapper = build_repeat_wrapper(
-                    load_json(wrapper_path),
+                sampling_config = build_repeat_sampling_config(
+                    load_json(sampling_path),
                     env=env,
                     decoder=decoder,
                     repeat_index=repeat_index,
@@ -746,15 +744,15 @@ def sample_tubes(
                     data_root=data_root,
                     result_root=result_root,
                 )
-                tube_path = Path(wrapper["tube_file"])
+                tube_path = Path(sampling_config["tube_file"])
                 if tube_path.exists() and not overwrite:
                     validate_existing_sampled_outputs(
-                        wrapper,
+                        sampling_config,
                         expected_cells=int(ENVIRONMENTS[env]["expected_cells"]),
                     )
                     print(f"[Sample] reuse {env}/{decoder}/repeat_{repeat_index:02d}: {tube_path}")
                     continue
-                sampling.generate_cellwise_tube(wrapper, wrapper_path)
+                sampling.generate_sampled_tube(sampling_config, sampling_path)
 
 
 def evaluate_sampled_case(
@@ -1017,7 +1015,7 @@ def write_predictor_summary(
 
 def preflight(environments: Sequence[str], decoders: Sequence[str]) -> dict[str, Any]:
     """Validate fixed inputs and model/grid configs without running sampling."""
-    from sampled_tube import grid_cell_bounds, validate_cellwise_setup
+    from sampling import grid_cell_bounds, validate_cellwise_setup
     from utils import load_config
 
     report: dict[str, Any] = {}
@@ -1040,15 +1038,22 @@ def preflight(environments: Sequence[str], decoders: Sequence[str]) -> dict[str,
                 raise ValueError(f"{env}/{decoder} symbolic cell count mismatch")
             strict_table_metrics(pool, grid, cells, tuple(spec["dims"]))
 
-            wrapper_path = Path(spec["wrappers"][decoder])
-            wrapper = load_config(wrapper_path)
-            base = load_config(PROJECT_ROOT / wrapper["base_sampling_config"])
-            model_starv = load_config(PROJECT_ROOT / base["starv_config"])
-            canonical = load_config(PROJECT_ROOT / wrapper["grid_config"])
-            base, model_starv, canonical = apply_experiment_overrides(
-                env, decoder, base, model_starv, canonical
+            sampling_path = Path(spec["sampling_configs"][decoder])
+            sampling_config = load_config(sampling_path)
+            model_starv = load_config(
+                PROJECT_ROOT / sampling_config["starv_config"]
             )
-            metadata = validate_cellwise_setup(wrapper, base, model_starv, canonical)
+            canonical = load_config(
+                PROJECT_ROOT / sampling_config["grid_config"]
+            )
+            sampling_config, model_starv, canonical = apply_experiment_overrides(
+                env, decoder, sampling_config, model_starv, canonical
+            )
+            metadata = validate_cellwise_setup(
+                sampling_config,
+                model_starv,
+                canonical,
+            )
             cell_count = len(grid_cell_bounds(canonical["grid"]))
             if cell_count != int(spec["expected_cells"]):
                 raise ValueError(

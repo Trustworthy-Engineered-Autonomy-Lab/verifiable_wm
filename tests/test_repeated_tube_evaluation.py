@@ -350,7 +350,7 @@ class PredictorEvaluationTests(unittest.TestCase):
             self.assertIn("95.00 ± 1.00", formatted)
 
 
-class SamplingWrapperTests(unittest.TestCase):
+class UnifiedSamplingConfigTests(unittest.TestCase):
     def test_materialized_dwm_and_cgan_configs_reference_one_canonical_grid(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -395,10 +395,8 @@ class SamplingWrapperTests(unittest.TestCase):
         self.assertEqual(adjusted_base["decoder"]["args"]["z_range"], 0.05)
         self.assertEqual(adjusted_starv["layers"]["G_MLP"]["kwargs"]["z_range"], 0.05)
 
-    def test_repeat_wrapper_redirects_all_generated_files_to_experiment_tree(self):
-        wrapper = {
-            "sampling_mode": "cellwise_tube",
-            "base_sampling_config": "config/sampling/cartpole.json",
+    def test_repeat_config_redirects_all_generated_files_to_experiment_tree(self):
+        config = {
             "grid_config": "config/starv_verification/cartpole.json",
             "model_id": "saliency",
             "samples_per_cell": 3,
@@ -409,8 +407,8 @@ class SamplingWrapperTests(unittest.TestCase):
             "tube_file": "old/tube.json",
         }
 
-        actual = rte.build_repeat_wrapper(
-            wrapper,
+        actual = rte.build_repeat_sampling_config(
+            config,
             env="cartpole",
             decoder="dwm",
             repeat_index=2,
@@ -433,10 +431,8 @@ class SamplingWrapperTests(unittest.TestCase):
             "results/repeated/cartpole/b_sampled/dwm/repeat_02/sampled_tube.json",
         )
 
-    def test_dwm_and_cgan_repeat_wrappers_share_the_state_file(self):
+    def test_dwm_and_cgan_repeat_configs_share_the_state_file(self):
         base = {
-            "sampling_mode": "cellwise_tube",
-            "base_sampling_config": "base.json",
             "grid_config": "grid.json",
             "samples_per_cell": 3,
             "seed": 728,
@@ -445,7 +441,7 @@ class SamplingWrapperTests(unittest.TestCase):
             "trajectory_file": "old/trajectories.npz",
             "tube_file": "old/tube.json",
         }
-        dwm = rte.build_repeat_wrapper(
+        dwm = rte.build_repeat_sampling_config(
             {**base, "model_id": "old"},
             env="brake_system",
             decoder="dwm",
@@ -454,7 +450,7 @@ class SamplingWrapperTests(unittest.TestCase):
             data_root=Path("datasets/repeated"),
             result_root=Path("results/repeated"),
         )
-        cgan = rte.build_repeat_wrapper(
+        cgan = rte.build_repeat_sampling_config(
             {**base, "model_id": "g_mlp"},
             env="brake_system",
             decoder="cgan",
