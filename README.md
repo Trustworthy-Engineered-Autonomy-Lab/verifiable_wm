@@ -50,9 +50,8 @@ baselines while meeting the 95% target coverage after conformal inflation.
 ```text
 make_decoder_dataset.py       training images, StarV initial states, real trajectories
 train_decoder.py              DWM decoder training (saliency + control-consistency loss)
-sampling.py                   closed-loop rollout with the decoder in place of the renderer
+sampling.py                   closed-loop rollout and three-rollout-per-cell tube construction
 verify.py                     StarV / MPI symbolic reachability
-sampled_tube.py               per-cell sampling-based tube construction
 signed_tube_margin.py         signed margin, conformal quantile, tube inflation
 conformal.py                  finite-sample conformal quantile
 compare.py                    containment scoring and tube plots, driven by signed_tube_margin
@@ -80,7 +79,7 @@ python train_decoder.py config/train_decoder/cartpole/saliency.json --alpha 4 8 
 ```
 
 Configurations live under `config/` grouped by stage (`make_decoder_dataset`, `train_decoder`,
-`sampling`, `sampled_tube`, `starv_verification`). Configurations, datasets, trained
+`sampling`, `starv_verification`). Configurations, datasets, trained
 weights and verification results are not distributed with the repository; `config/`,
 `dwm_weight/` and `safety_results/` are expected to point at wherever those artifacts live, and
 every path inside the configuration files is relative to the repository root.
