@@ -287,7 +287,7 @@ def run_grid(config, alphas, lambdas, device):
 def main():
     parser = argparse.ArgumentParser(
         description=(
-            "Train the DWM decoder. One --alpha/--lambda value each trains a "
+            "Train the DWM decoder. One --alpha/--lambda-ctrl value each trains a "
             "single decoder; several values run the ablation grid over their "
             "cartesian product."
         )
@@ -301,9 +301,7 @@ def main():
         help="Override weight.alpha. Several values run the alpha x lambda grid.",
     )
     parser.add_argument(
-        "--lambda",
-        # "lambda" is a Python keyword, so argparse needs an explicit dest.
-        dest="lambda_ctrl",
+        "--lambda-ctrl",
         type=float,
         nargs="+",
         default=None,

@@ -72,7 +72,7 @@ tests/                        internal-consistency checks for the artifact forma
 ```
 
 `train_decoder.py` takes the loss weights from the command line: one `--alpha` and one
-`--lambda` value train a single decoder, several values run the ablation grid over their
+`--lambda-ctrl` value train a single decoder, several values run the ablation grid over their
 cartesian product and write `alpha_lambda_grid.csv` next to the runs.
 
 Configurations live under `config/` grouped by stage (`make_decoder_dataset`, `train_decoder`,
