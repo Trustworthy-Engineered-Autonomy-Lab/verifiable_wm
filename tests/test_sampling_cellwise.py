@@ -11,54 +11,38 @@ import torch
 import sampling
 
 
-class SamplingDispatchTests(unittest.TestCase):
-    def test_legacy_config_without_mode_uses_existing_generator(self):
-        self.assertTrue(
-            hasattr(sampling, "run_sampling_config"),
-            "run_sampling_config is required",
-        )
-        config = {"decoder": {"variant": "saliency"}}
-        with mock.patch.object(
-            sampling, "generate_dataset", return_value=Path("legacy")
-        ) as legacy:
-            result = sampling.run_sampling_config(
-                config,
-                Path("config/sampling/cartpole.json"),
-            )
+class SamplingEntryPointTests(unittest.TestCase):
+    def test_legacy_state_split_generator_is_removed(self):
+        self.assertFalse(hasattr(sampling, "generate_dataset"))
+        self.assertFalse(hasattr(sampling, "run_sampling_config"))
 
-        self.assertEqual(result, Path("legacy"))
-        legacy.assert_called_once_with(config)
-
-    def test_cellwise_wrapper_uses_new_generator(self):
-        self.assertTrue(
-            hasattr(sampling, "run_sampling_config"),
-            "run_sampling_config is required",
-        )
-        config = {"sampling_mode": "cellwise_tube"}
+    def test_main_routes_each_config_directly_to_sampled_tube_generator(self):
+        config_path = Path("config/sampling/cartpole.json")
+        config = {"model_id": "saliency"}
         with mock.patch.object(
             sampling,
-            "generate_cellwise_tube",
+            "parse_args",
+            return_value=mock.Mock(configs=[config_path]),
+        ), mock.patch.object(
+            sampling,
+            "load_config",
+            return_value=config,
+        ), mock.patch.object(
+            sampling,
+            "generate_sampled_tube",
             return_value=Path("sampled.json"),
-            create=True,
-        ) as cellwise:
-            result = sampling.run_sampling_config(
-                config,
-                Path("config/sampled_tube/cartpole.json"),
-            )
+        ) as generate:
+            sampling.main()
 
-        self.assertEqual(result, Path("sampled.json"))
-        cellwise.assert_called_once_with(
-            config,
-            Path("config/sampled_tube/cartpole.json"),
-        )
+        generate.assert_called_once_with(config, config_path)
 
 
 class ExplicitLatentRolloutTests(unittest.TestCase):
     def test_rollout_uses_the_explicit_latent_at_each_step(self):
         self.assertIn(
             "latents",
-            inspect.signature(sampling.rollout_dwm_trajectory).parameters,
-            "rollout_dwm_trajectory must accept explicit latents",
+            inspect.signature(sampling.rollout_sampled_trajectories).parameters,
+            "rollout_sampled_trajectories must accept explicit latents",
         )
 
         class Decoder(torch.nn.Module):
@@ -82,7 +66,7 @@ class ExplicitLatentRolloutTests(unittest.TestCase):
                 [[3.0], [4.0]],
             ]
         )
-        trajectories, actions = sampling.rollout_dwm_trajectory(
+        trajectories, actions = sampling.rollout_sampled_trajectories(
             states0,
             steps=2,
             decoder=Decoder(),
@@ -158,9 +142,7 @@ class CellwisePipelineSmokeTests(unittest.TestCase):
     def test_invalid_rollout_is_not_published_as_a_trajectory_artifact(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            wrapper = {
-                "sampling_mode": "cellwise_tube",
-                "base_sampling_config": "base.json",
+            tube_fields = {
                 "grid_config": "grid.json",
                 "model_id": "old",
                 "samples_per_cell": 3,
@@ -181,6 +163,7 @@ class CellwisePipelineSmokeTests(unittest.TestCase):
                 },
                 "dynamic": {"name": "Brake"},
             }
+            config = {**base, **tube_fields}
             verifier = {
                 "name": "BrakeVerifier",
                 "kwargs": {"num_steps": 1, "early_stop": False},
@@ -221,7 +204,7 @@ class CellwisePipelineSmokeTests(unittest.TestCase):
             with mock.patch.object(
                 sampling,
                 "load_config",
-                side_effect=[base, starv, starv],
+                side_effect=[starv, starv],
             ), mock.patch.object(
                 sampling,
                 "validate_cellwise_setup",
@@ -251,18 +234,18 @@ class CellwisePipelineSmokeTests(unittest.TestCase):
                 "write_npz_atomic",
             ) as writer:
                 with self.assertRaisesRegex(ValueError, "finite"):
-                    sampling.generate_cellwise_tube(
-                        wrapper,
-                        root / "wrapper.json",
+                    sampling.generate_sampled_tube(
+                        config,
+                        root / "sampling.json",
                     )
 
             writer.assert_not_called()
-            self.assertFalse(Path(wrapper["trajectory_file"]).exists())
+            self.assertFalse(Path(config["trajectory_file"]).exists())
 
     def test_dwm_and_g_mlp_generate_compare_compatible_artifacts(self):
         self.assertTrue(
-            hasattr(sampling, "generate_cellwise_tube"),
-            "generate_cellwise_tube is required",
+            hasattr(sampling, "generate_sampled_tube"),
+            "generate_sampled_tube is required",
         )
 
         class FakeDecoder(torch.nn.Module):
@@ -377,15 +360,14 @@ class CellwisePipelineSmokeTests(unittest.TestCase):
             dwm_base_path.write_text(json.dumps(dwm_base))
             g_mlp_base_path.write_text(json.dumps(g_mlp_base))
 
-            wrappers = []
-            for model_id, base_path in (
-                ("old", dwm_base_path),
-                ("g_mlp", g_mlp_base_path),
+            configs = []
+            for model_id, base in (
+                ("old", dwm_base),
+                ("g_mlp", g_mlp_base),
             ):
-                wrappers.append(
+                configs.append(
                     {
-                        "sampling_mode": "cellwise_tube",
-                        "base_sampling_config": str(base_path),
+                        **base,
                         "grid_config": str(canonical_path),
                         "model_id": model_id,
                         "samples_per_cell": 3,
@@ -409,22 +391,22 @@ class CellwisePipelineSmokeTests(unittest.TestCase):
                 side_effect=lambda config, device: FakeController(),
             ):
                 output_paths = [
-                    sampling.generate_cellwise_tube(
-                        wrapper, root / f"{wrapper['model_id']}.json"
+                    sampling.generate_sampled_tube(
+                        config, root / f"{config['model_id']}.json"
                     )
-                    for wrapper in wrappers
+                    for config in configs
                 ]
 
             self.assertEqual(
                 output_paths,
-                [Path(item["tube_file"]) for item in wrappers],
+                [Path(item["tube_file"]) for item in configs],
             )
             with np.load(states_path, allow_pickle=False) as shared:
                 shared_states = np.asarray(shared["states"])
                 self.assertEqual(shared_states.shape, (2, 3, 2))
 
-            for wrapper in wrappers:
-                payload = json.loads(Path(wrapper["tube_file"]).read_text())
+            for config in configs:
+                payload = json.loads(Path(config["tube_file"]).read_text())
                 self.assertEqual(
                     payload["method"],
                     "cellwise_sampled_trajectory_envelope",
@@ -435,12 +417,12 @@ class CellwisePipelineSmokeTests(unittest.TestCase):
                 )
                 expected_layer = (
                     "G_MLP"
-                    if wrapper["model_id"] == "g_mlp"
+                    if config["model_id"] == "g_mlp"
                     else "Decoder"
                 )
                 self.assertIn(expected_layer, payload["layers"])
                 with np.load(
-                    wrapper["trajectory_file"], allow_pickle=False
+                    config["trajectory_file"], allow_pickle=False
                 ) as artifact:
                     self.assertEqual(
                         artifact["trajectories"].shape, (2, 3, 3, 2)
@@ -455,10 +437,10 @@ class CellwisePipelineSmokeTests(unittest.TestCase):
                         "dynamic_name",
                         "dynamic_args_json",
                         "formal_semantics_match",
-                        "source_wrapper_config",
+                        "source_sampling_config",
                     ):
                         self.assertIn(field, artifact.files)
-                    if wrapper["model_id"] == "g_mlp":
+                    if config["model_id"] == "g_mlp":
                         self.assertEqual(
                             artifact["latents"].shape, (2, 3, 2, 2)
                         )
