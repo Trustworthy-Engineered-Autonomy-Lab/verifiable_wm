@@ -9,6 +9,8 @@ Because the DWM has no stochastic latent input, the closed loop
 ```text
 state --> decoder --> controller --> dynamics --> next state
 ```
+python train_decoder.py config/train_decoder/cartpole/saliency.json --alpha 8 --lambda 0.1
+python train_decoder.py config/train_decoder/cartpole/saliency.json --alpha 4 8 16 --lambda 0 0.1 0.5
 
 becomes a plain feed-forward network composition that symbolic reachability tools can propagate
 without the overapproximation introduced by sampling a latent variable. The DWM is trained with a
