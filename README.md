@@ -52,10 +52,9 @@ make_decoder_dataset.py       training images, StarV initial states, real trajec
 train_decoder.py              DWM decoder training (saliency + control-consistency loss)
 sampling.py                   closed-loop rollout and three-rollout-per-cell tube construction
 verify.py                     StarV / MPI symbolic reachability
-signed_tube_margin.py         signed margin, conformal quantile, tube inflation
-conformal.py                  finite-sample conformal quantile
-compare.py                    containment scoring and tube plots, driven by signed_tube_margin
-repeated_tube_evaluation.py   seeded repeated evaluation, produces the comparison table
+evaluate_tube.py              real-trajectory coverage, tube area and diagnostic plot
+inflate_tube.py               conformal calibration and StarV-format tube inflation
+repeated_tube_evaluation.py   arbitrary raw/inflated repeats and grouped statistics
 
 model.py                      controller, DWM decoder, cGAN generator
 dynamic.py                    analytic dynamics for the four benchmarks
@@ -65,7 +64,7 @@ utils.py                      sampling helpers and dynamics provenance
 saliency_map/                 occlusion saliency and its precomputation script
 starv_verification/           StarV-side models, dynamics and verifiers
 trajectory_predictor/         image-free transformer baseline
-tools/                        ground-truth rollouts, safety maps, dynamics provenance
+tools/                        real-tube plotting, ground-truth rollouts and diagnostics
 tests/                        internal-consistency checks for the artifact formats
 ```
 

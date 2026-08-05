@@ -270,7 +270,7 @@ class SampledTubeJsonTests(unittest.TestCase):
             atol=1e-6,
         )
 
-    def test_written_result_is_consumed_by_existing_compare(self):
+    def test_written_result_is_consumed_by_tube_evaluator(self):
         self.assertTrue(
             hasattr(self.sampling, "build_sampled_safety_result"),
             "build_sampled_safety_result is required",
@@ -286,8 +286,7 @@ class SampledTubeJsonTests(unittest.TestCase):
             ).parameters,
             "build_sampled_safety_result must receive the canonical grid config",
         )
-        compare = importlib.import_module("compare")
-        stm = importlib.import_module("signed_tube_margin")
+        evaluation_module = importlib.import_module("evaluate_tube")
         source = {
             "layers": {"Decoder": {"args": [], "kwargs": {"weights": "x.pth"}}},
             "verifier": {
@@ -339,7 +338,7 @@ class SampledTubeJsonTests(unittest.TestCase):
             path = Path(tmp) / "sampled.json"
             self.sampling.write_json_atomic(path, payload)
             loaded = json.loads(path.read_text(encoding="utf-8"))
-            grid, loaded_cells = stm.load_safety_result(path)
+            _, grid, loaded_cells = evaluation_module.load_tube(path)
 
         self.assertEqual(
             loaded["method"], "cellwise_sampled_trajectory_envelope"
@@ -358,26 +357,16 @@ class SampledTubeJsonTests(unittest.TestCase):
                 rtol=0.0,
                 atol=1e-12,
             )
-        old_check_dims = compare.CHECK_DIMS
-        old_max_steps = compare.MAX_STEPS
-        old_delta = compare.DELTA
         evaluation = np.array(
             [[[0.2, 0.0], [0.7, 0.0]]],
             dtype=np.float32,
         )
-        try:
-            compare.CHECK_DIMS = (0, 1)
-            compare.MAX_STEPS = None
-            compare.DELTA = 0.0
-            rows = compare.compare_set(
-                evaluation,
-                grid,
-                loaded_cells,
-            )
-        finally:
-            compare.CHECK_DIMS = old_check_dims
-            compare.MAX_STEPS = old_max_steps
-            compare.DELTA = old_delta
+        _, rows = evaluation_module.calculate_metrics(
+            evaluation,
+            grid,
+            loaded_cells,
+            dims=(0, 1),
+        )
 
         self.assertTrue(rows[0]["fully_inside"])
 

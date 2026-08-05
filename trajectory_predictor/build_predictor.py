@@ -619,7 +619,7 @@ def load_reference_npz(
             if action_key not in source.files:
                 raise KeyError(
                     f"{path} is missing {action_key}; "
-                    "conformal.py requires matching action arrays"
+                    "the compatible trajectory artifact requires matching action arrays"
                 )
             actions = np.asarray(source[action_key])
             if actions.ndim != 3:
@@ -637,8 +637,8 @@ def load_reference_npz(
             if not np.isfinite(actions).all():
                 raise ValueError(f"{action_key} contains NaN or Inf")
 
-        # Provenance metadata is optional in the server datasets and in
-        # conformal.py.  The complete source payload has already been copied,
+        # Provenance metadata is optional in the server datasets and downstream
+        # evaluation.  The complete source payload has already been copied,
         # so every metadata field that is present will be preserved exactly.
         # Only validate rollout_steps when the source actually records it.
         if "rollout_steps" in source.files:
@@ -674,7 +674,7 @@ def make_compatible_predictions(
             )
 
         # Match the real trajectory dtype, then copy state zero after the cast.
-        # Existing conformal.py uses np.array_equal rather than np.allclose.
+        # Preserve initial states exactly rather than relying on allclose.
         compatible = predicted.astype(reference.dtype, copy=True)
         compatible[:, 0, :] = reference[:, 0, :]
         if not np.array_equal(
