@@ -14,7 +14,7 @@ Override the target with CARLA_HOST / CARLA_PORT if the server moves.
     python tools/collect_brake_real_trajectories.py --splits test
     python tools/collect_brake_real_trajectories.py --splits train val test
 
-Afterwards run signed_tube_margin.py to score the collected trajectories
+Afterwards run evaluate_tube.py to score the collected trajectories
 against the brake reachable tube.
 """
 
