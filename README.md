@@ -83,6 +83,12 @@ weights and verification results are not distributed with the repository; `confi
 `dwm_weight/` and `safety_results/` are expected to point at wherever those artifacts live, and
 every path inside the configuration files is relative to the repository root.
 
+Reachability ground truth runs the true closed loop from real camera images:
+`tools/gt_grid_eval.py` for the gym benchmarks and `tools/gt_brake_grid_eval.py` for the braking
+system label every grid cell, and `tools/compare_ground_truth.py` scores a verified safety map
+against those labels. A false positive there would break soundness; conservatism shows up as
+recall below one.
+
 ## Notes
 
 - The braking benchmark is the one whose frames come from a simulator rather than a gym renderer,
