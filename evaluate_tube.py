@@ -17,42 +17,78 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parent
 EPS = 1e-10
 
-EVALUATION_CONFIGS = {
-    "cartpole": {
-        "tube": PROJECT_ROOT / "safety_results/cartpole/3600cell_dwm_safety_result.json",
-        "real": PROJECT_ROOT / "safety_results/cartpole/3600cell_real_trajectories.npz",
-        "real_key": "test_traj",
-        "check_dims": (0, 2),
-        "outdir": PROJECT_ROOT / "results/cartpole/tube_evaluation",
-    },
-    "mountain_car": {
-        "tube": PROJECT_ROOT / "safety_results/mountain_car/6400cell_dwm_safety_result.json",
-        "real": PROJECT_ROOT / "safety_results/mountain_car/6400cell_real_trajectories.npz",
-        "real_key": "test_traj",
-        "check_dims": (0, 1),
-        "outdir": PROJECT_ROOT / "results/mountain_car/tube_evaluation",
-    },
-    "pendulum": {
-        "tube": PROJECT_ROOT / "safety_results/pendulum/5000cell_dwm_safety_result.json",
-        "real": PROJECT_ROOT / "safety_results/pendulum/5000cell_real_trajectories.npz",
-        "real_key": "test_traj",
-        "check_dims": (0, 1),
-        "outdir": PROJECT_ROOT / "results/pendulum/tube_evaluation",
-    },
-    "brake_system": {
-        "tube": PROJECT_ROOT / "safety_results/brake_system/1600cell_dwm_safety_result.json",
-        "real": PROJECT_ROOT / "safety_results/brake_system/1600cell_real_trajectories.npz",
-        "real_key": "test_traj",
-        "check_dims": (0, 1),
-        "outdir": PROJECT_ROOT / "results/brake_system/tube_evaluation",
-    },
-}
 
-# Select one default environment. Command-line arguments may override every field.
-ACTIVE_ENV = "cartpole"
-# ACTIVE_ENV = "mountain_car"
-# ACTIVE_ENV = "pendulum"
-# ACTIVE_ENV = "brake_system"
+def _required(mapping: dict[str, Any], key: str, field: str) -> Any:
+    if key not in mapping:
+        raise ValueError(f"missing config field: {field}")
+    return mapping[key]
+
+
+def _project_path(value: Any, project_root: Path) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else project_root / path
+
+
+def load_postprocess_config(
+    path: Path,
+    section: str,
+    *,
+    project_root: Path = PROJECT_ROOT,
+) -> dict[str, Any]:
+    path = Path(path)
+    with path.open(encoding="utf-8") as file:
+        config = json.load(file)
+    if not isinstance(config, dict):
+        raise ValueError("postprocess config must be a JSON object")
+
+    tube = _project_path(_required(config, "tube", "tube"), project_root)
+    real = _project_path(
+        _required(config, "real_trajectories", "real_trajectories"), project_root
+    )
+    dims_value = _required(config, "check_dims", "check_dims")
+    if (
+        not isinstance(dims_value, list)
+        or len(dims_value) != 2
+        or any(not isinstance(dim, int) or isinstance(dim, bool) for dim in dims_value)
+    ):
+        raise ValueError("config field check_dims must contain exactly two integers")
+    dims = tuple(dims_value)
+
+    section_config = _required(config, section, section)
+    if not isinstance(section_config, dict):
+        raise ValueError(f"config field {section} must be an object")
+    if section == "evaluation":
+        return {
+            "tube_path": tube,
+            "real_path": real,
+            "real_key": str(_required(
+                section_config, "real_key", "evaluation.real_key"
+            )),
+            "dims": dims,
+            "outdir": _project_path(_required(
+                section_config, "output_dir", "evaluation.output_dir"
+            ), project_root),
+        }
+    if section == "inflation":
+        alpha = float(_required(section_config, "alpha", "inflation.alpha"))
+        if not 0.0 < alpha < 1.0:
+            raise ValueError("config field inflation.alpha must be between 0 and 1")
+        return {
+            "tube_path": tube,
+            "calibration_path": real,
+            "calibration_key": str(_required(
+                section_config, "calibration_key", "inflation.calibration_key"
+            )),
+            "dims": dims,
+            "alpha": alpha,
+            "output_path": _project_path(_required(
+                section_config, "output", "inflation.output"
+            ), project_root),
+            "calibration_output_path": _project_path(_required(
+                section_config, "calibration_output", "inflation.calibration_output"
+            ), project_root),
+        }
+    raise ValueError(f"unknown postprocess config section: {section}")
 
 
 @dataclass(frozen=True)
@@ -370,29 +406,17 @@ def run_evaluation(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--env", choices=tuple(EVALUATION_CONFIGS), default=ACTIVE_ENV)
-    parser.add_argument("--tube", type=Path, default=None)
-    parser.add_argument("--real", type=Path, default=None)
-    parser.add_argument("--real-key", default=None)
-    parser.add_argument("--check-dims", type=int, nargs=2, default=None)
-    parser.add_argument("--outdir", type=Path, default=None)
+    parser.add_argument("config", type=Path, help="tube postprocess config JSON")
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
 
-def main() -> None:
-    args = build_parser().parse_args()
-    config = EVALUATION_CONFIGS[args.env]
-    metrics = run_evaluation(
-        tube_path=args.tube or config["tube"],
-        real_path=args.real or config["real"],
-        real_key=args.real_key or config["real_key"],
-        dims=tuple(args.check_dims or config["check_dims"]),
-        outdir=args.outdir or config["outdir"],
-        overwrite=args.overwrite,
-    )
-    print(f"Coverage: {100.0 * metrics['coverage']:.2f}%")
-    print(f"Area: {metrics['area']:.6f}")
+def main(argv: Sequence[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
+    config = load_postprocess_config(args.config, "evaluation")
+    metrics = run_evaluation(**config, overwrite=args.overwrite)
+    print(f"coverage: {100.0 * metrics['coverage']:.2f}%")
+    print(f"area: {metrics['area']:.12g}")
 
 
 if __name__ == "__main__":

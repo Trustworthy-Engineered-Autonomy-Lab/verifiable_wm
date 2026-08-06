@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
@@ -82,6 +83,29 @@ class InflateTubeTests(unittest.TestCase):
         self.assertAlmostEqual(result["gamma"], 0.2)
         self.assertEqual(written_calibration["rank"], 19)
         self.assertEqual(written_calibration["check_dims"], [0, 1])
+
+    def test_main_reads_inflation_section_from_positional_config(self):
+        loaded = {
+            "tube_path": Path("raw.json"),
+            "calibration_path": Path("real.npz"),
+            "calibration_key": "val_traj",
+            "dims": (0, 1),
+            "alpha": 0.05,
+            "output_path": Path("inflated.json"),
+            "calibration_output_path": Path("calibration.json"),
+        }
+        with mock.patch.object(
+            evaluation, "load_postprocess_config", return_value=loaded
+        ) as load_config, mock.patch.object(
+            inflation, "run_inflation", return_value={
+                "gamma": 0.2,
+                "inflated_tube": "inflated.json",
+            }
+        ) as run:
+            inflation.main(["config.json", "--overwrite"])
+
+        load_config.assert_called_once_with(Path("config.json"), "inflation")
+        run.assert_called_once_with(**loaded, overwrite=True)
 
 
 if __name__ == "__main__":

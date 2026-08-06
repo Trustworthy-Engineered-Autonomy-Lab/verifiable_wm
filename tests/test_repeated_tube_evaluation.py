@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
@@ -39,6 +40,109 @@ class AggregateTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "duplicate repeat"):
             repeated.validate_repeats(repeats)
+
+
+class RepeatedConfigTests(unittest.TestCase):
+    def write_config(self, root: Path, repeats: list[dict]) -> Path:
+        path = root / "postprocess.json"
+        path.write_text(json.dumps({
+            "tube": "safety/default_tube.json",
+            "real_trajectories": "safety/default_real.npz",
+            "check_dims": [0, 2],
+            "evaluation": {
+                "real_key": "test_traj",
+                "output_dir": "results/evaluation",
+            },
+            "inflation": {
+                "calibration_key": "val_traj",
+                "alpha": 0.05,
+                "output": "results/inflated.json",
+                "calibration_output": "results/calibration.json",
+            },
+            "repeated_evaluation": {
+                "output_dir": "results/repeated",
+                "repeats": repeats,
+            },
+        }), encoding="utf-8")
+        return path
+
+    def test_load_repeated_config_inherits_shared_postprocess_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = self.write_config(root, [
+                {"name": "repeat_0", "group": "raw", "inflate": False},
+                {"name": "repeat_0", "group": "inflated", "inflate": True},
+            ])
+
+            config = repeated.load_repeated_config(path, project_root=root)
+
+        self.assertEqual(config["dims"], (0, 2))
+        self.assertEqual(config["output_dir"], root / "results/repeated")
+        self.assertEqual(config["repeats"][0], {
+            "name": "repeat_0",
+            "group": "raw",
+            "inflate": False,
+            "tube": root / "safety/default_tube.json",
+            "evaluation_real": root / "safety/default_real.npz",
+            "evaluation_key": "test_traj",
+        })
+        self.assertEqual(config["repeats"][1], {
+            "name": "repeat_0",
+            "group": "inflated",
+            "inflate": True,
+            "tube": root / "safety/default_tube.json",
+            "evaluation_real": root / "safety/default_real.npz",
+            "evaluation_key": "test_traj",
+            "calibration_real": root / "safety/default_real.npz",
+            "calibration_key": "val_traj",
+            "alpha": 0.05,
+        })
+
+    def test_load_repeated_config_applies_per_repeat_overrides(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = self.write_config(root, [{
+                "name": "repeat_1",
+                "group": "inflated",
+                "inflate": True,
+                "tube": "other/tube.json",
+                "evaluation_real": "other/test.npz",
+                "evaluation_key": "held_out",
+                "calibration_real": "other/val.npz",
+                "calibration_key": "calibration",
+                "alpha": 0.1,
+            }])
+
+            config = repeated.load_repeated_config(path, project_root=root)
+
+        self.assertEqual(config["repeats"], [{
+            "name": "repeat_1",
+            "group": "inflated",
+            "inflate": True,
+            "tube": root / "other/tube.json",
+            "evaluation_real": root / "other/test.npz",
+            "evaluation_key": "held_out",
+            "calibration_real": root / "other/val.npz",
+            "calibration_key": "calibration",
+            "alpha": 0.1,
+        }])
+
+    def test_main_loads_repeats_from_positional_config(self):
+        loaded = {
+            "repeats": [{"name": "repeat_0"}],
+            "dims": (0, 1),
+            "output_dir": Path("results"),
+        }
+        payload = {"groups": {}}
+        with mock.patch.object(
+            repeated, "load_repeated_config", return_value=loaded
+        ) as load_config, mock.patch.object(
+            repeated, "run_repeated_evaluation", return_value=payload
+        ) as run:
+            repeated.main(["config.json", "--overwrite"])
+
+        load_config.assert_called_once_with(Path("config.json"))
+        run.assert_called_once_with(**loaded, overwrite=True)
 
 
 class RepeatedEvaluationTests(unittest.TestCase):
