@@ -22,60 +22,63 @@ STD_DDOF = 0
 SAFE_NAME = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
-def _default_repeats(env: str, cell_prefix: str) -> list[dict[str, Any]]:
-    tube = PROJECT_ROOT / f"safety_results/{env}/{cell_prefix}_dwm_safety_result.json"
-    real = PROJECT_ROOT / f"safety_results/{env}/{cell_prefix}_real_trajectories.npz"
-    return [
-        {
-            "name": "repeat_0",
-            "group": "raw",
-            "inflate": False,
-            "tube": tube,
-            "evaluation_real": real,
-            "evaluation_key": "test_traj",
-        },
-        {
-            "name": "repeat_0",
-            "group": "inflated",
-            "inflate": True,
-            "tube": tube,
-            "calibration_real": real,
-            "calibration_key": "val_traj",
-            "evaluation_real": real,
-            "evaluation_key": "test_traj",
-            "alpha": 0.05,
-        },
-    ]
+def load_repeated_config(
+    path: Path,
+    *,
+    project_root: Path = PROJECT_ROOT,
+) -> dict[str, Any]:
+    path = Path(path)
+    with path.open(encoding="utf-8") as file:
+        payload = json.load(file)
+    if not isinstance(payload, dict):
+        raise ValueError("postprocess config must be a JSON object")
 
+    evaluation_defaults = evaluation.load_postprocess_config(
+        path, "evaluation", project_root=project_root
+    )
+    inflation_defaults = evaluation.load_postprocess_config(
+        path, "inflation", project_root=project_root
+    )
+    section = payload.get("repeated_evaluation")
+    if not isinstance(section, dict):
+        raise ValueError("config field repeated_evaluation must be an object")
+    if "output_dir" not in section:
+        raise ValueError("missing config field: repeated_evaluation.output_dir")
+    repeat_items = section.get("repeats")
+    if not isinstance(repeat_items, list):
+        raise ValueError("config field repeated_evaluation.repeats must be a list")
 
-REPEAT_CONFIGS: dict[str, dict[str, Any]] = {
-    "cartpole": {
-        "check_dims": (0, 2),
-        "output_dir": PROJECT_ROOT / "results/repeated_tube_evaluation/cartpole",
-        "repeats": _default_repeats("cartpole", "3600cell"),
-    },
-    "mountain_car": {
-        "check_dims": (0, 1),
-        "output_dir": PROJECT_ROOT / "results/repeated_tube_evaluation/mountain_car",
-        "repeats": _default_repeats("mountain_car", "6400cell"),
-    },
-    "pendulum": {
-        "check_dims": (0, 1),
-        "output_dir": PROJECT_ROOT / "results/repeated_tube_evaluation/pendulum",
-        "repeats": _default_repeats("pendulum", "5000cell"),
-    },
-    "brake_system": {
-        "check_dims": (0, 1),
-        "output_dir": PROJECT_ROOT / "results/repeated_tube_evaluation/brake_system",
-        "repeats": _default_repeats("brake_system", "1600cell"),
-    },
-}
+    repeats = []
+    for index, item in enumerate(repeat_items):
+        if not isinstance(item, dict):
+            raise ValueError(f"config repeat {index} must be an object")
+        repeat = dict(item)
+        repeat["tube"] = _path(
+            repeat.get("tube", evaluation_defaults["tube_path"]), project_root
+        )
+        repeat["evaluation_real"] = _path(
+            repeat.get("evaluation_real", evaluation_defaults["real_path"]),
+            project_root,
+        )
+        repeat.setdefault("evaluation_key", evaluation_defaults["real_key"])
+        if repeat.get("inflate") is True:
+            repeat["calibration_real"] = _path(
+                repeat.get(
+                    "calibration_real", inflation_defaults["calibration_path"]
+                ),
+                project_root,
+            )
+            repeat.setdefault(
+                "calibration_key", inflation_defaults["calibration_key"]
+            )
+            repeat.setdefault("alpha", inflation_defaults["alpha"])
+        repeats.append(repeat)
 
-# Select one default environment. Add or remove entries in its `repeats` list.
-ACTIVE_ENV = "cartpole"
-# ACTIVE_ENV = "mountain_car"
-# ACTIVE_ENV = "pendulum"
-# ACTIVE_ENV = "brake_system"
+    return {
+        "repeats": repeats,
+        "dims": evaluation_defaults["dims"],
+        "output_dir": _path(section["output_dir"], project_root),
+    }
 
 
 def aggregate_values(values: Sequence[float]) -> dict[str, float | int]:
@@ -130,9 +133,9 @@ def validate_repeats(repeats: Sequence[dict[str, Any]]) -> None:
                 )
 
 
-def _path(value: Any) -> Path:
+def _path(value: Any, project_root: Path = PROJECT_ROOT) -> Path:
     path = Path(value)
-    return path if path.is_absolute() else PROJECT_ROOT / path
+    return path if path.is_absolute() else project_root / path
 
 
 def _repeat_dir(output_dir: Path, repeat: dict[str, Any]) -> Path:
@@ -338,20 +341,16 @@ def run_repeated_evaluation(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--env", choices=tuple(REPEAT_CONFIGS), default=ACTIVE_ENV)
-    parser.add_argument("--check-dims", type=int, nargs=2, default=None)
-    parser.add_argument("--outdir", type=Path, default=None)
+    parser.add_argument("config", type=Path, help="tube postprocess config JSON")
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
 
-def main() -> None:
-    args = build_parser().parse_args()
-    config = REPEAT_CONFIGS[args.env]
+def main(argv: Sequence[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
+    config = load_repeated_config(args.config)
     payload = run_repeated_evaluation(
-        repeats=config["repeats"],
-        dims=tuple(args.check_dims or config["check_dims"]),
-        output_dir=args.outdir or config["output_dir"],
+        **config,
         overwrite=args.overwrite,
     )
     for group, metrics in payload["groups"].items():

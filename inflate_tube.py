@@ -15,54 +15,6 @@ import numpy as np
 import evaluate_tube as evaluation
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-
-INFLATION_CONFIGS = {
-    "cartpole": {
-        "tube": PROJECT_ROOT / "safety_results/cartpole/3600cell_dwm_safety_result.json",
-        "calibration": PROJECT_ROOT / "safety_results/cartpole/3600cell_real_trajectories.npz",
-        "calibration_key": "val_traj",
-        "check_dims": (0, 2),
-        "alpha": 0.05,
-        "output": PROJECT_ROOT / "results/cartpole/inflated_tube/dwm_symbolic_inflated.json",
-        "calibration_output": PROJECT_ROOT / "results/cartpole/inflated_tube/dwm_symbolic_calibration.json",
-    },
-    "mountain_car": {
-        "tube": PROJECT_ROOT / "safety_results/mountain_car/6400cell_dwm_safety_result.json",
-        "calibration": PROJECT_ROOT / "safety_results/mountain_car/6400cell_real_trajectories.npz",
-        "calibration_key": "val_traj",
-        "check_dims": (0, 1),
-        "alpha": 0.05,
-        "output": PROJECT_ROOT / "results/mountain_car/inflated_tube/dwm_symbolic_inflated.json",
-        "calibration_output": PROJECT_ROOT / "results/mountain_car/inflated_tube/dwm_symbolic_calibration.json",
-    },
-    "pendulum": {
-        "tube": PROJECT_ROOT / "safety_results/pendulum/5000cell_dwm_safety_result.json",
-        "calibration": PROJECT_ROOT / "safety_results/pendulum/5000cell_real_trajectories.npz",
-        "calibration_key": "val_traj",
-        "check_dims": (0, 1),
-        "alpha": 0.05,
-        "output": PROJECT_ROOT / "results/pendulum/inflated_tube/dwm_symbolic_inflated.json",
-        "calibration_output": PROJECT_ROOT / "results/pendulum/inflated_tube/dwm_symbolic_calibration.json",
-    },
-    "brake_system": {
-        "tube": PROJECT_ROOT / "safety_results/brake_system/1600cell_dwm_safety_result.json",
-        "calibration": PROJECT_ROOT / "safety_results/brake_system/1600cell_real_trajectories.npz",
-        "calibration_key": "val_traj",
-        "check_dims": (0, 1),
-        "alpha": 0.05,
-        "output": PROJECT_ROOT / "results/brake_system/inflated_tube/dwm_symbolic_inflated.json",
-        "calibration_output": PROJECT_ROOT / "results/brake_system/inflated_tube/dwm_symbolic_calibration.json",
-    },
-}
-
-# Select one default environment. Command-line arguments may override every field.
-ACTIVE_ENV = "cartpole"
-# ACTIVE_ENV = "mountain_car"
-# ACTIVE_ENV = "pendulum"
-# ACTIVE_ENV = "brake_system"
-
-
 def conformal_quantile_with_rank(
     scores: Sequence[float], *, alpha: float
 ) -> tuple[float, int]:
@@ -207,33 +159,15 @@ def run_inflation(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--env", choices=tuple(INFLATION_CONFIGS), default=ACTIVE_ENV)
-    parser.add_argument("--tube", type=Path, default=None)
-    parser.add_argument("--calibration", type=Path, default=None)
-    parser.add_argument("--calibration-key", default=None)
-    parser.add_argument("--check-dims", type=int, nargs=2, default=None)
-    parser.add_argument("--alpha", type=float, default=None)
-    parser.add_argument("--output", type=Path, default=None)
-    parser.add_argument("--calibration-output", type=Path, default=None)
+    parser.add_argument("config", type=Path, help="tube postprocess config JSON")
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
 
-def main() -> None:
-    args = build_parser().parse_args()
-    config = INFLATION_CONFIGS[args.env]
-    calibration = run_inflation(
-        tube_path=args.tube or config["tube"],
-        calibration_path=args.calibration or config["calibration"],
-        calibration_key=args.calibration_key or config["calibration_key"],
-        dims=tuple(args.check_dims or config["check_dims"]),
-        alpha=config["alpha"] if args.alpha is None else args.alpha,
-        output_path=args.output or config["output"],
-        calibration_output_path=(
-            args.calibration_output or config["calibration_output"]
-        ),
-        overwrite=args.overwrite,
-    )
+def main(argv: Sequence[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
+    config = evaluation.load_postprocess_config(args.config, "inflation")
+    calibration = run_inflation(**config, overwrite=args.overwrite)
     print(f"gamma: {calibration['gamma']:.12g}")
     print(f"inflated tube: {calibration['inflated_tube']}")
 
